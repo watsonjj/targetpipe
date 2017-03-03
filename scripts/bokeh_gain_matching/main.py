@@ -10,6 +10,7 @@ from ctapipe.core import Tool, Component
 from ctapipe.io import CameraGeometry
 from targetpipe.visualization.bokeh import CameraDisplay
 from targetpipe.io.pixels import checm_pixel_pos, optical_foclen
+from scipy.optimize import curve_fit
 
 
 class Camera(CameraDisplay):
@@ -39,6 +40,10 @@ class Camera(CameraDisplay):
             self.active_pixels = [val]
 
 
+def gain_func(x, c, alpha):
+    return c * np.power(x, alpha)
+
+
 class Plotter(Component):
     name = 'Plotter'
 
@@ -62,6 +67,7 @@ class Plotter(Component):
 
         self.x = None
         self.y = None
+        self.y_err = None
         self.x_fit = None
         self.y_fit = None
 
@@ -71,15 +77,17 @@ class Plotter(Component):
 
         self.layout = None
 
-    def create(self, x, y, m, c):
+    def create(self, x, y, y_err, m, c):
         self.x = x
         self.y = y
+        self.y_err = y_err
         _, n_pix = self.y.shape
         self.x_fit = np.linspace(self.x[0], self.x[-1], self.x.size*10)
-        self.y_fit = m[None, :] * self.x_fit[:, None] + c[None, :]
+        # self.y_fit = m[None, :] * self.x_fit[:, None] + c[None, :]
+        self.y_fit = gain_func(self.x_fit[:, None], c[None, :], m[None, :])
 
-        self.x = np.exp(self.x)
-        self.x_fit = np.exp(self.x_fit)
+        # self.y = np.log10(self.y)
+        # self.y_fit = np.log10(self.y_fit)
 
         max_ = np.max(self.y_fit, axis=1)
         min_ = np.min(self.y_fit, axis=1)
@@ -87,16 +95,25 @@ class Plotter(Component):
         y_patch = list(max_) + list(min_[::-1])
 
         self.fig = figure(plot_width=800, plot_height=400)
+                          # y_axis_type="log")
         self.fig.patch(x_patch, y_patch, color='red', alpha=0.1, line_alpha=0)
         self.fig.xaxis.axis_label = 'HV'
         self.fig.yaxis.axis_label = 'log(Gain)'
 
-        cdsource_d = dict(x=[], y=[])
+        cdsource_d = dict(x=[], y=[], top=[], bottom=[], left=[], right=[])
         cdsource_d_fit = dict(x=[], y=[])
         self.cdsource = ColumnDataSource(data=cdsource_d)
         self.cdsource_fit = ColumnDataSource(data=cdsource_d_fit)
         self.fig.circle('x', 'y', source=self.cdsource)
         self.fig.line('x', 'y', source=self.cdsource_fit)
+
+        # Errorbars
+        self.fig.segment(x0='x', y0='bottom', x1='x', y1='top',
+                         source=self.cdsource, line_width=1.5, color='black')
+        self.fig.segment(x0='left', y0='top', x1='right', y1='top',
+                         source=self.cdsource, line_width=1.5, color='black')
+        self.fig.segment(x0='left', y0='bottom', x1='right', y1='bottom',
+                         source=self.cdsource, line_width=1.5, color='black')
 
         self.active_pixel = 0
 
@@ -110,7 +127,16 @@ class Plotter(Component):
     def active_pixel(self, val):
         if not self._active_pixel == val:
             self._active_pixel = val
-            cdsource_d = dict(x=self.x, y=self.y[:, val])
+
+            # top = self.y_err[1][:, val]
+            # bottom = self.y_err[0][:, val]
+            top = (self.y + self.y_err)[:, val]
+            bottom = (self.y - self.y_err)[:, val]
+            left = self.x - 0.3
+            right = self.x + 0.3
+
+            cdsource_d = dict(x=self.x, y=self.y[:, val],
+                              top=top, bottom=bottom, left=left, right=right)
             cdsource_d_fit = dict(x=self.x_fit, y=self.y_fit[:, val])
             self.cdsource.data = cdsource_d
             self.cdsource_fit.data = cdsource_d_fit
@@ -136,6 +162,7 @@ class BokehGainMatching(Tool):
         self._active_pixel = None
 
         self.gain = None
+        self.gain_error = None
         self.hv = None
 
         self.n_hv = None
@@ -167,6 +194,7 @@ class BokehGainMatching(Tool):
 
         arrays = np.load(self.input_path)
         self.gain = arrays['gain']
+        self.gain_error = arrays['gain_error']
         self.hv = arrays['hv']
 
         self.n_hv, self.n_pixels = self.gain.shape
@@ -186,40 +214,58 @@ class BokehGainMatching(Tool):
 
     def start(self):
         # Overcomplicated method instead of just reshaping...
-        gain_modules = np.zeros((self.n_hv, self.n_tm, self.n_tmpix))
-        hv_r = np.arange(self.n_hv, dtype=np.int)[:, None]
-        hv_z = np.zeros(self.n_hv, dtype=np.int)[:, None]
-        tm_r = np.arange(self.n_tm, dtype=np.int)[None, :]
-        tm_z = np.zeros(self.n_tm, dtype=np.int)[None, :]
-        tmpix_r = np.arange(self.n_tmpix, dtype=np.int)[None, :]
-        tmpix_z = np.zeros(self.n_tmpix, dtype=np.int)[None, :]
-        hv_i = (hv_r + tm_z)[..., None] + tmpix_z
-        tm_i = (hv_z + tm_r)[..., None] + tmpix_z
-        tmpix_i = (hv_z + tm_z)[..., None] + tmpix_r
-        gain_rs = np.reshape(self.gain, (self.n_hv, self.n_tm, self.n_tmpix))
-        modules_rs = np.reshape(self.modules, (self.n_tm, self.n_tmpix))
-        tmpix_rs = np.reshape(self.tmpix, (self.n_tm, self.n_tmpix))
-        tm_j = hv_z[..., None] + modules_rs[None, ...]
-        tmpix_j = hv_z[..., None] + tmpix_rs[None, ...]
-        gain_modules[hv_i, tm_i, tmpix_i] = gain_rs[hv_i, tm_j, tmpix_j]
-        gain_modules_mean = np.mean(gain_modules, axis=2)
+        # gain_modules = np.zeros((self.n_hv, self.n_tm, self.n_tmpix))
+        # hv_r = np.arange(self.n_hv, dtype=np.int)[:, None]
+        # hv_z = np.zeros(self.n_hv, dtype=np.int)[:, None]
+        # tm_r = np.arange(self.n_tm, dtype=np.int)[None, :]
+        # tm_z = np.zeros(self.n_tm, dtype=np.int)[None, :]
+        # tmpix_r = np.arange(self.n_tmpix, dtype=np.int)[None, :]
+        # tmpix_z = np.zeros(self.n_tmpix, dtype=np.int)[None, :]
+        # hv_i = (hv_r + tm_z)[..., None] + tmpix_z
+        # tm_i = (hv_z + tm_r)[..., None] + tmpix_z
+        # tmpix_i = (hv_z + tm_z)[..., None] + tmpix_r
+        # gain_rs = np.reshape(self.gain, (self.n_hv, self.n_tm, self.n_tmpix))
+        # modules_rs = np.reshape(self.modules, (self.n_tm, self.n_tmpix))
+        # tmpix_rs = np.reshape(self.tmpix, (self.n_tm, self.n_tmpix))
+        # tm_j = hv_z[..., None] + modules_rs[None, ...]
+        # tmpix_j = hv_z[..., None] + tmpix_rs[None, ...]
+        # gain_modules[hv_i, tm_i, tmpix_i] = gain_rs[hv_i, tm_j, tmpix_j]
+        # gain_modules_mean = np.mean(gain_modules, axis=2)
 
-        x = np.ma.log(self.hv)
-        y = np.ma.log(self.gain)
-        y_modules = np.ma.log(gain_modules_mean)
+        shape = (self.n_hv, self.n_tm, self.n_tmpix)
+        gain_tm = np.reshape(self.gain, shape)
+        gain_error_tm = np.reshape(self.gain_error, shape)
+        gain_tm_mean = np.mean(gain_tm, axis=2)
+        gain_error_tm_mean = np.sqrt(np.sum(gain_error_tm**2, axis=2))
+
+        x = self.hv
+        y = self.gain
+        y_err = self.gain_error
+        y_tm = gain_tm_mean
+        y_err_tm = gain_error_tm_mean
 
         self.m_pix = np.zeros(self.n_pixels)
         self.c_pix = np.zeros(self.n_pixels)
         self.m_tm = np.zeros(self.n_tm)
         self.c_tm = np.zeros(self.n_tm)
-        fit = np.ma.polyfit
+        p0 = [0, 5]
+        bounds = (-np.inf, np.inf)  # ([-2000, -10], [2000, 10])
         for pix in range(self.n_pixels):
             try:
-                self.m_pix[pix], self.c_pix[pix] = fit(x, y[:, pix], 1)
-            except TypeError:
-                self.log.warning("No points for pixel: {}".format(pix))
+                coeff, _ = curve_fit(gain_func, x, y[:, pix], p0=p0,
+                                     bounds=bounds, sigma=y_err[:, pix],
+                                     absolute_sigma=True)
+                self.c_pix[pix], self.m_pix[pix] = coeff
+            except RuntimeError:
+                self.log.warning("Unable to fit pixel: {}".format(pix))
         for tm in range(self.n_tm):
-            self.m_tm[tm], self.c_tm[tm] = fit(x, y_modules[:, tm], 1)
+            try:
+                coeff, _ = curve_fit(gain_func, x, y_tm[:, tm], p0=p0,
+                                     bounds=bounds, sigma=y_err_tm[:, tm],
+                                     absolute_sigma=True)
+                self.c_tm[tm], self.m_tm[tm] = coeff
+            except RuntimeError:
+                self.log.warning("Unable to fit tm: {}".format(tm))
 
         self.m_tm2048 = self.m_tm[:, None] * np.ones((self.n_tm, self.n_tmpix))
         self.c_tm2048 = self.c_tm[:, None] * np.ones((self.n_tm, self.n_tmpix))
@@ -229,8 +275,8 @@ class BokehGainMatching(Tool):
         self.p_camera_pix.add_colorbar()
         self.p_camera_tm.enable_pixel_picker()
         self.p_camera_tm.add_colorbar()
-        self.p_plotter_pix.create(x, y, self.m_pix, self.c_pix)
-        self.p_plotter_tm.create(x, y_modules, self.m_tm, self.c_tm)
+        self.p_plotter_pix.create(x, y, y_err, self.m_pix, self.c_pix)
+        self.p_plotter_tm.create(x, y_tm, y_err_tm, self.m_tm, self.c_tm)
 
         # Setup widgets
         self.create_view_radio_widget()
@@ -256,8 +302,11 @@ class BokehGainMatching(Tool):
 
         output_dir = dirname(self.input_path)
         output_path = join(output_dir, 'gain_matching_coeff.npz')
-        np.savez(output_path, alpha_pix=self.m_pix, C_pix=np.exp(self.c_pix),
-                 alpha_tm=self.m_tm, C_tm=np.exp(self.c_tm))
+        np.savez(output_path,
+                 alpha_pix=self.m_pix,
+                 C_pix=np.power(10, self.c_pix),
+                 alpha_tm=self.m_tm,
+                 C_tm=np.power(10, self.c_tm))
         self.log.info("Numpy array saved to: {}".format(output_path))
 
     @property

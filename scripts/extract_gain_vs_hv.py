@@ -59,6 +59,7 @@ class GainVsHVExtractor(Tool):
         self.fitter = None
 
         self.gain = None
+        self.gain_error = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -89,6 +90,7 @@ class GainVsHVExtractor(Tool):
         n_hv = len(self.hv_list)
         # Prepare storage array
         self.gain = np.zeros((n_hv, self.n_pixels))
+        self.gain_error = np.zeros((n_hv, self.n_pixels))
         area_list = []
 
         telid = 0
@@ -119,6 +121,7 @@ class GainVsHVExtractor(Tool):
                     try:
                         self.fitter.apply(area_list[fn][:, pix])
                         self.gain[fn, pix] = self.fitter.gain
+                        self.gain_error[fn, pix] = self.fitter.gain_error
                     except RuntimeError:
                         self.log.warning("FN {} Pixel {} could not be fitted"
                                          .format(fn, pix))
@@ -131,7 +134,8 @@ class GainVsHVExtractor(Tool):
             self.log.info("Creating directory: {}".format(output_dir))
             makedirs(output_dir)
 
-        np.savez(self.output_path, gain=self.gain, hv=self.hv_list)
+        np.savez(self.output_path, gain=self.gain,
+                 gain_error=self.gain_error, hv=self.hv_list)
         self.log.info("Numpy array saved to: {}".format(self.output_path))
 
     def get_next_file(self):

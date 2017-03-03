@@ -49,6 +49,7 @@ class CHECMFitter(Component):
             self.get_histogram = self.get_histogram_spe
             self._fit = self._fit_spe
             self._get_gain = self._get_gain_spe
+            self._get_gain_error = self._get_gain_spe_error
             self._get_subfits = self._get_spe_subfits
             self.subfit_labels = ['pedestal']
             for pe in self.k:
@@ -57,6 +58,7 @@ class CHECMFitter(Component):
             self.get_histogram = self.get_histogram_bright
             self._fit = self._fit_bright
             self._get_gain = self._get_gain_bright
+            self._get_gain_error = self._get_gain_bright_error
             self._get_subfits = self._get_none_subfits
         else:
             self.log.error("Unknown brightness setting: {}"
@@ -69,6 +71,10 @@ class CHECMFitter(Component):
     @property
     def gain(self):
         return self._get_gain()
+
+    @property
+    def gain_error(self):
+        return self._get_gain_error()
 
     @property
     def subfits(self):
@@ -106,8 +112,14 @@ class CHECMFitter(Component):
     def _get_gain_spe(self):
         return self.coeff['spe']
 
+    def _get_gain_spe_error(self):
+        return np.sqrt(self.coeff['spe_sigma'])
+
     def _get_gain_bright(self):
         return self.coeff['mean']
+
+    def _get_gain_bright_error(self):
+        return np.sqrt(self.coeff['stddev'])
 
     @staticmethod
     def _get_gain_none():
