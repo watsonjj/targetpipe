@@ -68,7 +68,9 @@ class TargetioExtractor:
         self.max_events = max_events
 
         self.event_id = 0
-        self.trigger_time = None
+        self.time_tack = None
+        self.time_sec = None
+        self.time_ns = None
 
         self.tio_reader = TIOReader(self.url, N_CELLS,
                                     SKIP_SAMPLE, SKIP_END_SAMPLE,
@@ -114,7 +116,9 @@ class TargetioExtractor:
         self._event_index = val
         self.get_event(self.event_index, self.samples, self.first_cell_ids)
         self.event_id = self.tio_reader.fCurrentEventID
-        self.trigger_time = self.tio_reader.fCurrentTriggerTime
+        self.time_tack = self.tio_reader.fCurrentTimeTack
+        self.time_sec = self.tio_reader.fCurrentTimeSec
+        self.time_ns = self.tio_reader.fCurrentTimeNs
         self.update_container()
 
     def move_to_next_event(self):
@@ -165,9 +169,12 @@ class TargetioExtractor:
         data.dl0.tels_with_data = {chec_tel}
 
         data.trig.tels_with_trigger = [chec_tel]
-        time_ns = self.trigger_time
-        data.trig.gps_time = Time(time_ns * u.ns,
-                                  format='gps', scale='utc')
+
+        data.meta['tack'] = self.time_tack
+        data.meta['sec'] = self.time_sec
+        data.meta['ns'] = self.time_ns
+        data.trig.gps_time = Time(self.time_sec * u.s, self.time_ns * u.ns,
+                                  format='unix', scale='utc', precision=9)
 
         data.count = self.event_index
 
