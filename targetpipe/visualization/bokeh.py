@@ -102,8 +102,9 @@ class CameraDisplay:
         if val is None:
             val = np.zeros(self._n_pixels)
 
-        image_min = val.min()
-        image_max = val.max()
+        nonoutliers = val[abs(val - val.mean()) <= 2 * val.std()]
+        image_min = nonoutliers.min()
+        image_max = nonoutliers.max()
         if image_max == image_min:
             image_min -= 1
             image_max += 1

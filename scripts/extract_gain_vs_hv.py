@@ -22,13 +22,17 @@ class GainVsHVExtractor(Tool):
     output_path = Unicode(None, allow_none=True,
                           help='Path to save the numpy array containing the '
                                'gain').tag(config=True)
+    adc2pe_path = Unicode('', allow_none=True,
+                          help='Path to the numpy adc2pe '
+                               'file').tag(config=True)
 
     aliases = Dict(dict(f='TargetioFileLooper.single_file',
                         N='TargetioFileLooper.max_files',
                         max_events='TargetioFileLooper.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
-                        O='GainVsHVExtractor.output_path'
+                        O='GainVsHVExtractor.output_path',
+                        pe='GainVsHVExtractor.adc2pe_path'
                         ))
 
     classes = List([TargetioFileLooper,
@@ -61,6 +65,8 @@ class GainVsHVExtractor(Tool):
         self.gain = None
         self.gain_error = None
 
+        self.adc2pe = None
+
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
@@ -85,6 +91,9 @@ class GainVsHVExtractor(Tool):
 
         self.hv_list = self.hv_list[:self.file_looper.num_readers]
         assert(len(self.file_looper.file_reader_list) == len(self.hv_list))
+
+        if self.adc2pe_path:
+            self.adc2pe = np.load(self.adc2pe_path)
 
     def start(self):
         n_hv = len(self.hv_list)
@@ -113,19 +122,21 @@ class GainVsHVExtractor(Tool):
                     area[ev], _ = self.extractor.extract(sb_sub_wf, t0)
                 area_list.append(area)
 
+                if self.adc2pe is not None:
+                    area *= self.adc2pe[None, :]
+
         desc = "Extracting gain of pixels"
         with tqdm(total=n_hv * self.n_pixels, desc=desc) as pbar:
             for fn in range(n_hv):
                 for pix in range(self.n_pixels):
                     pbar.update(1)
-                    try:
-                        self.fitter.apply(area_list[fn][:, pix])
-                        self.gain[fn, pix] = self.fitter.gain
-                        self.gain_error[fn, pix] = self.fitter.gain_error
-                    except RuntimeError:
+                    if not self.fitter.apply(area_list[fn][:, pix]):
                         self.log.warning("FN {} Pixel {} could not be fitted"
                                          .format(fn, pix))
                         continue
+                    self.gain[fn, pix] = self.fitter.gain
+                    self.gain_error[fn, pix] = self.fitter.gain_error
+
 
     def finish(self):
         # Save figures
