@@ -1,8 +1,10 @@
+import iminuit
 import numpy as np
-from scipy.optimize import curve_fit
 from scipy.stats import norm as normal
 from ctapipe.core import Component
-from targetpipe.fitting.mapm_spe import mapm_spe_fit, pedestal_signal, pe_signal
+from targetpipe.fitting.mapm_spe import mapm_spe_fit, pedestal_signal, \
+    pe_signal
+from scipy.stats.distributions import poisson
 
 
 class CHECMFitterSPE(Component):
@@ -41,11 +43,21 @@ class CHECMFitterSPE(Component):
         self.coeff_list = ['norm', 'eped', 'eped_sigma',
                            'spe', 'spe_sigma', 'lambda_']
 
-        self.nbins = 40
+        self.nbins = 60
         # self.range = [-5, 15]
-        self.range = [-20, 60]
-        self.initial = [200000, 0, 5, 20, 5, 1]
-        self.bounds = ([0, -np.inf, 0, 0, 0, 0], [np.inf]*6)
+        self.range = [-30, 100]
+        self.initial = dict(norm=20000,
+                            eped=0,
+                            eped_sigma=5,
+                            spe=20,
+                            spe_sigma=20,
+                            lambda_=1)
+        self.limits = dict(limit_norm=(0, 100000),
+                           limit_eped=(-10, 10),
+                           limit_eped_sigma=(0, 100),
+                           limit_spe=(0, 90),
+                           limit_spe_sigma=(0, 100),
+                           limit_lambda_=(0, 10))
 
     @property
     def gain(self):
@@ -70,7 +82,7 @@ class CHECMFitterSPE(Component):
         self.fit_x = fit_x
 
         try:
-            fit, coeff = self._fit(hist, edges, between, fit_x)
+            fit, coeff = self._fit(hist, between, fit_x)
         except RuntimeError:
             self.fit = [0]*len(fit_x)
             self.coeff = {}
@@ -90,31 +102,38 @@ class CHECMFitterSPE(Component):
     def _get_gain_error(self):
         return np.sqrt(self.coeff['spe_sigma'])
 
-    def _fit(self, hist, edges, between, fit_x):
+    def _fit(self, hist, between, fit_x):
         p0 = self.initial
-        bounds = self.bounds
-        fit, coeff = self.scipy_fit(between, hist, p0, fit_x, bounds)
-        coeff_dict = dict()
-        for i, c in enumerate(self.coeff_list):
-            coeff_dict[c] = coeff[i]
-        return fit, coeff_dict
+        limits = self.limits
+        fit, coeff = self.iminuit_fit(between, hist, p0, fit_x, limits)
+        return fit, coeff
 
     @staticmethod
-    def scipy_fit(x, y, p0, fit_x=None, bounds=(-np.inf, np.inf)):
+    def iminuit_fit(x, y, p0, fit_x=None, limits=None):
         if fit_x is None:
             fit_x = x
-        coeff, var_matrix = curve_fit(mapm_spe_fit, x, y, p0=p0, bounds=bounds)
-        result = mapm_spe_fit(fit_x, *coeff)
-        return result, coeff
+        if limits is None:
+            limits = {}
+
+        def minimizehist(norm, eped, eped_sigma, spe, spe_sigma, lambda_):
+            p = mapm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma,
+                             lambda_)
+            like = -2 * poisson.logpmf(y, p)
+            return np.sum(like)
+
+        m0 = iminuit.Minuit(minimizehist, **p0, **limits,
+                            print_level=0, pedantic=False, throw_nan=True)
+        m0.migrad()
+
+        result = mapm_spe_fit(fit_x, **m0.values)
+        return result, m0.values
 
     def _get_subfits(self):
-        subfits = dict()
         if self.coeff:
             def pedestal_kw(x, norm, eped, eped_sigma, lambda_, **kw):
                 return pedestal_signal(x, norm, eped, eped_sigma, lambda_)
 
             def pe_kw(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, **kw):
-                self.k = np.arange(1, 11)
                 return pe_signal(self.k[:, None], x[None, :], norm, eped,
                                  eped_sigma, spe, spe_sigma, lambda_)
 
@@ -123,6 +142,11 @@ class CHECMFitterSPE(Component):
             subfits = dict(pedestal=pedestal)
             for i, pe_i in enumerate(self.k):
                 subfits['{}pe'.format(pe_i)] = pe_fits[i]
+        else:
+            subfits = dict(pedestal=np.zeros(self.fit_x.shape))
+            for i, pe_i in enumerate(self.k):
+                subfits['{}pe'.format(pe_i)] = np.zeros(self.fit_x.shape)
+
         return subfits
 
 
@@ -164,8 +188,12 @@ class CHECMFitterBright(Component):
 
         self.nbins = 40
         self.range = [None, None]
-        self.initial = [None]*3
-        self.bounds = ([-np.inf]*3, [np.inf]*3)
+        self.initial = dict(norm=None,
+                            mean=None,
+                            stddev=None)
+        self.limits = dict(limit_norm=(0, 100000),
+                           limit_mean=(-10000, 10000),
+                           limit_stddev=(0, 10000))
 
     @property
     def gain(self):
@@ -190,7 +218,7 @@ class CHECMFitterBright(Component):
         self.fit_x = fit_x
 
         try:
-            fit, coeff = self._fit(hist, edges, between, fit_x)
+            fit, coeff = self._fit(hist, between, fit_x)
         except RuntimeError:
             self.fit = [0]*len(fit_x)
             self.coeff = {}
@@ -218,28 +246,36 @@ class CHECMFitterBright(Component):
     def _get_gain_error(self):
         return np.sqrt(self.coeff['stddev'])
 
-    def _fit(self, hist, edges, between, fit_x):
+    def _fit(self, hist, between, fit_x):
         p0 = self.initial
-        bounds = self.bounds
-        if not p0[0]:
-            p0[0] = hist.max()
-        if not p0[1]:
-            p0[1] = self._bright_mean
-        if not p0[2]:
-            p0[2] = self._bright_std
-        fit, coeff = self.scipy_fit(between, hist, p0, fit_x, bounds)
-        coeff_dict = dict()
-        for i, c in enumerate(self.coeff_list):
-            coeff_dict[c] = coeff[i]
-        return fit, coeff_dict
+        limits = self.limits
+        if not p0['norm']:
+            p0['norm'] = hist.sum()
+        if not p0['mean']:
+            p0['mean'] = self._bright_mean
+        if not p0['stddev']:
+            p0['stddev'] = self._bright_std
+        fit, coeff = self.iminuit_fit(between, hist, p0, fit_x, limits)
+        return fit, coeff
 
     @staticmethod
-    def scipy_fit(x, y, p0, fit_x=None, bounds=(-np.inf, np.inf)):
+    def iminuit_fit(x, y, p0, fit_x=None, limits=None):
+        if fit_x is None:
+            fit_x = x
+        if limits is None:
+            limits = {}
+
         def gaus(x_, norm, mean, stddev):
             return norm * normal.pdf(x_, mean, stddev)
 
-        if fit_x is None:
-            fit_x = x
-        coeff, var_matrix = curve_fit(gaus, x, y, p0=p0, bounds=bounds)
-        result = gaus(fit_x, *coeff)
-        return result, coeff
+        def minimizehist(norm, mean, stddev):
+            p = gaus(x, norm, mean, stddev)
+            like = -2 * poisson.logpmf(y, p)
+            return np.sum(like)
+
+        m0 = iminuit.Minuit(minimizehist, **p0, **limits,
+                            print_level=0, pedantic=False, throw_nan=True)
+        m0.migrad()
+
+        result = gaus(fit_x, **m0.values)
+        return result, m0.values

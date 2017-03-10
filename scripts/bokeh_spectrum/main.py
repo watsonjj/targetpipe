@@ -1,3 +1,5 @@
+from threading import Thread, Lock
+
 from bokeh.io import curdoc
 from bokeh.layouts import layout
 from bokeh.plotting import figure
@@ -17,8 +19,9 @@ from targetpipe.calib.camera.charge_extractors import CHECMExtractor
 from targetpipe.fitting.checm import CHECMFitterSPE, CHECMFitterBright
 import numpy as np
 from collections import defaultdict
-from tqdm import tqdm
+from tqdm import trange, tqdm
 from time import sleep, time
+from multiprocessing import Pool
 
 
 class Camera(CameraDisplay):
@@ -113,11 +116,13 @@ class FitterWidget(Component):
 
         l = [[self.i_nbins, self.i_min, self.i_max]]
 
-        properties = zip(self.fitter.coeff_list, self.fitter.initial,
-                         self.fitter.bounds[0], self.fitter.bounds[1])
-        for coeff, inital, lower, upper in properties:
+        for coeff in self.fitter.coeff_list:
+            limit_str = "limit_{}".format(coeff)
+            initial = self.fitter.initial[coeff]
+            lower = self.fitter.limits[limit_str][0]
+            upper = self.fitter.limits[limit_str][1]
 
-            i_initial = TextInput(value=str(inital), title="{}".format(coeff))
+            i_initial = TextInput(value=str(initial), title="{}".format(coeff))
             i_lower = TextInput(value=str(lower))
             i_upper = TextInput(value=str(upper))
 
@@ -129,7 +134,25 @@ class FitterWidget(Component):
 
         self.layout = layout(l)
 
-    def _convert_string(self, string):
+    def update(self):
+        self.i_nbins.value = str(self.fitter.nbins)
+        self.i_min.value = str(self.fitter.range[0])
+        self.i_max.value = str(self.fitter.range[1])
+
+        inputs = zip(self.i_initial_l, self.i_lower_l, self.i_upper_l)
+        for i, (i_initial, i_lower, i_upper) in enumerate(inputs):
+            coeff = self.fitter.coeff_list[i]
+            limit_str = "limit_{}".format(coeff)
+            initial = self.fitter.initial[coeff]
+            lower = self.fitter.limits[limit_str][0]
+            upper = self.fitter.limits[limit_str][1]
+
+            i_initial.value = str(initial)
+            i_lower.value = str(lower)
+            i_upper.value = str(upper)
+
+    @staticmethod
+    def _convert_string(string):
         if string == 'None':
             val = None
         else:
@@ -143,9 +166,11 @@ class FitterWidget(Component):
 
         inputs = zip(self.i_initial_l, self.i_lower_l, self.i_upper_l)
         for i, (i_initial, i_lower, i_upper) in enumerate(inputs):
-            self.fitter.initial[i] = self._convert_string(i_initial.value)
-            self.fitter.bounds[0][i] = self._convert_string(i_lower.value)
-            self.fitter.bounds[1][i] = self._convert_string(i_upper.value)
+            coeff = self.fitter.coeff_list[i]
+            l_str = "limit_{}".format(coeff)
+            self.fitter.initial[coeff] = self._convert_string(i_initial.value)
+            self.fitter.limits[l_str] = (self._convert_string(i_lower.value),
+                                         self._convert_string(i_upper.value))
 
     def fit(self, spectrum):
         self._setup_fitter()
@@ -572,26 +597,24 @@ class BokehSPE(Tool):
 
         source = self.reader.read()
         desc = "Looping through file"
-        with tqdm(total=self.n_events, desc=desc) as pbar:
-            for event in source:
-                pbar.update(1)
-                index = event.count
+        for event in tqdm(source, total=self.n_events, desc=desc):
+            index = event.count
 
-                self.r1.calibrate(event)
-                self.dl0.reduce(event)
+            self.r1.calibrate(event)
+            self.dl0.reduce(event)
 
-                telid = list(event.r0.tels_with_data)[0]
-                dl0 = np.copy(event.dl0.tel[telid].pe_samples[0])
+            telid = list(event.r0.tels_with_data)[0]
+            dl0 = np.copy(event.dl0.tel[telid].pe_samples[0])
 
-                # Perform CHECM Waveform Cleaning
-                sb_sub_wf, t0 = self.cleaner.apply(dl0)
+            # Perform CHECM Waveform Cleaning
+            sb_sub_wf, t0 = self.cleaner.apply(dl0)
 
-                # Perform CHECM Charge Extraction
-                peak_area, peak_height = self.extractor.extract(sb_sub_wf, t0)
+            # Perform CHECM Charge Extraction
+            peak_area, peak_height = self.extractor.extract(sb_sub_wf, t0)
 
-                self.area[index] = peak_area
-                self.height[index] = peak_height
-                global_[index] = np.mean(dl0, axis=0)
+            self.area[index] = peak_area
+            self.height[index] = peak_height
+            global_[index] = np.mean(dl0, axis=0)
 
         # Setup Plots
         self.p_camera_area.enable_pixel_picker()
@@ -644,14 +667,15 @@ class BokehSPE(Tool):
         return success
 
     def fit_camera(self):
-        gain = np.zeros(self.n_pixels)
+        gain = np.ma.zeros(self.n_pixels)
+        gain.mask = np.zeros(gain.shape, dtype=np.bool)
 
         desc = "Extracting gain of pixels"
-        with tqdm(total=self.n_pixels, desc=desc) as pbar:
-            for pix in range(self.n_pixels):
-                pbar.update(1)
-                if self.fit_spectrum(pix):
-                    gain[pix] = self.p_fitter.fitter.gain
+        for pix in trange(self.n_pixels, desc=desc):
+            if not self.fit_spectrum(pix):
+                gain.mask[pix] = True
+                continue
+            gain[pix] = self.p_fitter.fitter.gain
 
         gain = np.ma.masked_where(np.isnan(gain), gain)
         gain.mask[1664:1728] = True

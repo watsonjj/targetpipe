@@ -307,12 +307,9 @@ class CHECMWaveformCleaner(Component):
         pulse_window = np.s_[self.pw_l:self.pw_r]
 
         # Get smooth baseline (no pulse)
-        # self.no_pulse = np.ma.array(self.baseline_sub, mask=False, fill_value=0)
-        no_pulse = np.ma.array(baseline_sub, mask=False)
-        # self.no_pulse.mask[:, pulse_window] = True
-        no_pulse.mask[pulse_window] = True
-        # self.smooth_baseline = self.baseline_smoother.apply(np.ma.filled(self.no_pulse))
-        smooth_baseline = self.baseline_smoother.apply(no_pulse)
+        no_pulse = np.ma.array(baseline_sub, mask=False, fill_value=0)
+        no_pulse.mask[:, pulse_window] = True
+        smooth_baseline = self.baseline_smoother.apply(np.ma.filled(no_pulse))
 
         # Get smooth waveform
         smooth_wf = baseline_sub  # self.wf_smoother.apply(baseline_sub)

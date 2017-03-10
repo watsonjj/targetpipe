@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.stats import poisson, norm as gaussian
-from scipy.optimize import curve_fit
 
 
 def pedestal_signal(x, norm, eped, eped_sigma, lambda_):
@@ -27,7 +26,7 @@ def pedestal_signal(x, norm, eped, eped_sigma, lambda_):
 
     """
     p_ped = poisson.pmf(0, lambda_)
-    signal = norm * p_ped * gaussian.pdf(x, eped, eped_sigma) / eped_sigma
+    signal = norm * p_ped * gaussian.pdf(x, eped, eped_sigma)
     return signal
 
 
@@ -73,7 +72,7 @@ def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_):
 
     pe = eped + k * spe
     pe_sigma = np.sqrt(k * spe_sigma ** 2 + eped_sigma ** 2)
-    signal = norm * p[k] * gaussian.pdf(x, pe, pe_sigma) / pe_sigma
+    signal = norm * p[k] * gaussian.pdf(x, pe, pe_sigma)
     return signal
 
 

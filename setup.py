@@ -21,7 +21,7 @@ setup(
     packages=['targetpipe'],
     version=VERSION,
     description=DESCRIPTION,
-    install_requires=['astropy', 'scipy', 'numpy', 'matplotlib',
+    install_requires=['astropy', 'scipy', 'numpy', 'matplotlib', 'iminuit',
                       'scikit-learn', 'traitlets', 'tqdm', 'bokeh', 'pandas'],
     setup_requires=['pytest-runner', ],
     tests_require=['pytest', ],
