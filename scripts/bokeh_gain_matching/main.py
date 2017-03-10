@@ -297,9 +297,9 @@ class BokehGainMatching(Tool):
         output_path = join(output_dir, 'gain_matching_coeff.npz')
         np.savez(output_path,
                  alpha_pix=self.m_pix,
-                 C_pix=np.power(10, self.c_pix),
+                 C_pix=self.c_pix,
                  alpha_tm=self.m_tm,
-                 C_tm=np.power(10, self.c_tm))
+                 C_tm=self.c_tm)
         self.log.info("Numpy array saved to: {}".format(output_path))
 
     @property

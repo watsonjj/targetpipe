@@ -223,8 +223,6 @@ class CHECMFitterBright(Component):
         try:
             fit, coeff = self._fit(hist, between, fit_x)
         except RuntimeError:
-            from IPython import embed
-            embed()
             self.fit = [0]*len(fit_x)
             self.coeff = {}
             return False
