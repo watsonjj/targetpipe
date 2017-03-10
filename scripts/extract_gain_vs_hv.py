@@ -1,15 +1,15 @@
 from traitlets import Dict, List, Int, Unicode
-from ctapipe.core import Tool, Component
+from ctapipe.core import Tool
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from targetpipe.io.file_looper import TargetioFileLooper
 from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.calib.camera.charge_extractors import CHECMExtractor
-from targetpipe.fitting.checm import CHECMFitter
+from targetpipe.fitting.checm import CHECMFitterBright
 import numpy as np
 from tqdm import tqdm
 from os import makedirs
-from os.path import join, exists, dirname
+from os.path import exists, dirname
 
 
 class GainVsHVExtractor(Tool):
@@ -81,7 +81,7 @@ class GainVsHVExtractor(Tool):
 
         self.cleaner = CHECMWaveformCleaner(**kwargs)
         self.extractor = CHECMExtractor(**kwargs)
-        self.fitter = CHECMFitter(**kwargs, brightness='bright')
+        self.fitter = CHECMFitterBright(**kwargs)
 
         self.n_events = self.file_looper.num_events
         first_event = self.file_looper.file_reader_list[0].get_event(0)
@@ -136,7 +136,6 @@ class GainVsHVExtractor(Tool):
                         continue
                     self.gain[fn, pix] = self.fitter.gain
                     self.gain_error[fn, pix] = self.fitter.gain_error
-
 
     def finish(self):
         # Save figures

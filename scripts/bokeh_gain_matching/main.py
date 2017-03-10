@@ -83,11 +83,7 @@ class Plotter(Component):
         self.y_err = y_err
         _, n_pix = self.y.shape
         self.x_fit = np.linspace(self.x[0], self.x[-1], self.x.size*10)
-        # self.y_fit = m[None, :] * self.x_fit[:, None] + c[None, :]
         self.y_fit = gain_func(self.x_fit[:, None], c[None, :], m[None, :])
-
-        # self.y = np.log10(self.y)
-        # self.y_fit = np.log10(self.y_fit)
 
         max_ = np.max(self.y_fit, axis=1)
         min_ = np.min(self.y_fit, axis=1)
@@ -95,10 +91,9 @@ class Plotter(Component):
         y_patch = list(max_) + list(min_[::-1])
 
         self.fig = figure(plot_width=800, plot_height=400)
-                          # y_axis_type="log")
         self.fig.patch(x_patch, y_patch, color='red', alpha=0.1, line_alpha=0)
         self.fig.xaxis.axis_label = 'HV'
-        self.fig.yaxis.axis_label = 'log(Gain)'
+        self.fig.yaxis.axis_label = 'Gain'
 
         cdsource_d = dict(x=[], y=[], top=[], bottom=[], left=[], right=[])
         cdsource_d_fit = dict(x=[], y=[])
@@ -128,8 +123,6 @@ class Plotter(Component):
         if not self._active_pixel == val:
             self._active_pixel = val
 
-            # top = self.y_err[1][:, val]
-            # bottom = self.y_err[0][:, val]
             top = (self.y + self.y_err)[:, val]
             bottom = (self.y - self.y_err)[:, val]
             left = self.x - 0.3

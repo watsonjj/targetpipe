@@ -5,7 +5,7 @@ from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.calib.camera.charge_extractors import CHECMExtractor
-from targetpipe.fitting.checm import CHECMFitter
+from targetpipe.fitting.checm import CHECMFitterSPE
 import numpy as np
 from tqdm import tqdm
 from os.path import join, exists
@@ -25,7 +25,7 @@ class BokehSPE(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitter
+                    CHECMFitterSPE
                     ])
 
     def __init__(self, **kwargs):
@@ -60,7 +60,7 @@ class BokehSPE(Tool):
 
         self.cleaner = CHECMWaveformCleaner(**kwargs)
         self.extractor = CHECMExtractor(**kwargs)
-        self.fitter = CHECMFitter(**kwargs)
+        self.fitter = CHECMFitterSPE(**kwargs)
 
         self.output_dir = join(self.reader.output_directory, "extract_adc2pe")
         if not exists(self.output_dir):
@@ -75,7 +75,9 @@ class BokehSPE(Tool):
 
         # Prepare storage array
         area = np.zeros((n_events, n_pixels))
-        self.adc2pe = np.zeros(n_pixels)
+        ratio = np.ma.zeros(n_pixels)
+        ratio.mask = np.zeros(ratio.shape, dtype=np.bool)
+        ratio.fill_value = 0
 
         source = self.reader.read()
         desc = "Looping through file"
@@ -103,8 +105,11 @@ class BokehSPE(Tool):
                 pbar.update(1)
                 if not self.fitter.apply(area[:, pix]):
                     self.log.warning("Pixel {} couldn't be fit".format(pix))
+                    ratio.mask = True
                     continue
-                self.adc2pe[pix] = 1/self.fitter.gain
+                ratio[pix] = self.fitter.gain
+
+        self.adc2pe = np.ma.filled(1/ratio)
 
     def finish(self):
         output_path = join(self.output_dir, "adc2pe.npy")

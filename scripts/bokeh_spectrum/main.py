@@ -592,7 +592,6 @@ class BokehSPE(Tool):
         # Prepare storage array
         self.area = np.zeros((self.n_events, self.n_pixels))
         self.height = np.zeros((self.n_events, self.n_pixels))
-        global_ = np.zeros((self.n_events, self.n_samples))
         self.gain = np.zeros(self.n_pixels)
 
         source = self.reader.read()
@@ -614,7 +613,6 @@ class BokehSPE(Tool):
 
             self.area[index] = peak_area
             self.height[index] = peak_height
-            global_[index] = np.mean(dl0, axis=0)
 
         # Setup Plots
         self.p_camera_area.enable_pixel_picker()

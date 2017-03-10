@@ -46,7 +46,7 @@ class CHECMFitterSPE(Component):
         self.nbins = 60
         # self.range = [-5, 15]
         self.range = [-30, 100]
-        self.initial = dict(norm=20000,
+        self.initial = dict(norm=None,
                             eped=0,
                             eped_sigma=5,
                             spe=20,
@@ -93,7 +93,8 @@ class CHECMFitterSPE(Component):
         return True
 
     def get_histogram(self, spectrum):
-        hist, edges = np.histogram(spectrum, bins=self.nbins, range=self.range)
+        range_ = self.range[:]
+        hist, edges = np.histogram(spectrum, bins=self.nbins, range=range_)
         return hist, edges
 
     def _get_gain(self):
@@ -103,8 +104,10 @@ class CHECMFitterSPE(Component):
         return np.sqrt(self.coeff['spe_sigma'])
 
     def _fit(self, hist, between, fit_x):
-        p0 = self.initial
-        limits = self.limits
+        p0 = self.initial.copy()
+        limits = self.limits.copy()
+        if p0['norm'] is None:
+            p0['norm'] = hist.sum()
         fit, coeff = self.iminuit_fit(between, hist, p0, fit_x, limits)
         return fit, coeff
 
@@ -220,6 +223,8 @@ class CHECMFitterBright(Component):
         try:
             fit, coeff = self._fit(hist, between, fit_x)
         except RuntimeError:
+            from IPython import embed
+            embed()
             self.fit = [0]*len(fit_x)
             self.coeff = {}
             return False
@@ -233,11 +238,12 @@ class CHECMFitterBright(Component):
                                <= 2 * spectrum.std()]
         self._bright_mean = np.mean(nonoutliers)
         self._bright_std = np.std(nonoutliers)
-        if not self.range[0]:
-            self.range[0] = self._bright_mean - 3 * self._bright_std
-        if not self.range[1]:
-            self.range[1] = self._bright_mean + 3 * self._bright_std
-        hist, edges = np.histogram(spectrum, bins=self.nbins, range=self.range)
+        range_ = self.range[:]
+        if not range_[0]:
+            range_[0] = self._bright_mean - 3 * self._bright_std
+        if not range_[1]:
+            range_[1] = self._bright_mean + 3 * self._bright_std
+        hist, edges = np.histogram(spectrum, bins=self.nbins, range=range_)
         return hist, edges
 
     def _get_gain(self):
@@ -247,8 +253,8 @@ class CHECMFitterBright(Component):
         return np.sqrt(self.coeff['stddev'])
 
     def _fit(self, hist, between, fit_x):
-        p0 = self.initial
-        limits = self.limits
+        p0 = self.initial.copy()
+        limits = self.limits.copy()
         if not p0['norm']:
             p0['norm'] = hist.sum()
         if not p0['mean']:
