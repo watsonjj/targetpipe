@@ -251,8 +251,8 @@ class EventViewerWaveform(WaveformDisplay):
             length = np.sum(windows)
             start = np.argmax(windows)
             end = start + length - 1
-            self.intwin1.set(location=start)
-            self.intwin2.set(location=end)
+            self.intwin1.location = start
+            self.intwin2.location = end
         else:
             self.event_viewer.log.warning("No event has been provided")
 

@@ -321,10 +321,10 @@ class StageViewer(Component):
                     else:
                         self.log.error("Too many dimensions in stage values")
                 cdsource.data = cdsource_d
-            self.pulsewin1[i].set(location=self.w_pulse[0])
-            self.pulsewin2[i].set(location=self.w_pulse[1])
-            self.intwin1[i].set(location=self.w_integration[0])
-            self.intwin2[i].set(location=self.w_integration[1])
+            self.pulsewin1[i].location = self.w_pulse[0]
+            self.pulsewin2[i].location = self.w_pulse[1]
+            self.intwin1[i].location = self.w_integration[0]
+            self.intwin2[i].location = self.w_integration[1]
         sleep(0.1)
         self._update_yrange()
 

@@ -82,8 +82,8 @@ class CameraDisplay:
             self.cdsource.data['height'] = self._pix_sizes
         else:
             image = np.empty(self._pix_x.shape)
-            color = self.cdsource.data['outline_color']
-            alpha = self.cdsource.data['outline_alpha']
+            alpha = [0] * self._n_pixels
+            color = ['black'] * self._n_pixels
             cdsource_d = dict(image=image,
                               x=self._pix_x, y=self._pix_y,
                               width=self._pix_sizes, height=self._pix_sizes,
@@ -295,7 +295,7 @@ class WaveformDisplay:
             val = 0
         if val > max_t:
             val = max_t
-        self.span.set(location=val)
+        self.span.location = val
         self._active_time = val
 
     def _draw_waveform(self):
