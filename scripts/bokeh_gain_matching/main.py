@@ -9,7 +9,7 @@ from bokeh.models import ColumnDataSource, RadioButtonGroup
 from ctapipe.core import Tool, Component
 from ctapipe.io import CameraGeometry
 from targetpipe.visualization.bokeh import CameraDisplay
-from targetpipe.io.pixels import checm_pixel_pos, optical_foclen
+from targetpipe.io.pixels import checm_pixel_pos, optical_foclen, Dead
 from scipy.optimize import curve_fit
 
 
@@ -93,7 +93,7 @@ class Plotter(Component):
         self.fig = figure(plot_width=800, plot_height=400)
         self.fig.patch(x_patch, y_patch, color='red', alpha=0.1, line_alpha=0)
         self.fig.xaxis.axis_label = 'HV'
-        self.fig.yaxis.axis_label = 'Gain'
+        self.fig.yaxis.axis_label = 'Charge'
 
         cdsource_d = dict(x=[], y=[], top=[], bottom=[], left=[], right=[])
         cdsource_d_fit = dict(x=[], y=[])
@@ -154,8 +154,9 @@ class BokehGainMatching(Tool):
 
         self._active_pixel = None
 
-        self.gain = None
-        self.gain_error = None
+        self.dead = Dead()
+        self.charge = None
+        self.charge_error = None
         self.hv = None
 
         self.n_hv = None
@@ -186,11 +187,11 @@ class BokehGainMatching(Tool):
         kwargs = dict(config=self.config, tool=self)
 
         arrays = np.load(self.input_path)
-        self.gain = arrays['gain']
-        self.gain_error = arrays['gain_error']
-        self.hv = arrays['hv']
+        self.charge = self.dead.mask2d(arrays['charge'])
+        self.charge_error = self.dead.mask2d(arrays['charge_error'])
+        self.hv = arrays['rundesc']
 
-        self.n_hv, self.n_pixels = self.gain.shape
+        self.n_hv, self.n_pixels = self.charge.shape
         assert(self.n_hv == self.hv.size)
 
         geom = CameraGeometry.guess(*checm_pixel_pos * u.m,
@@ -217,7 +218,7 @@ class BokehGainMatching(Tool):
         # hv_i = (hv_r + tm_z)[..., None] + tmpix_z
         # tm_i = (hv_z + tm_r)[..., None] + tmpix_z
         # tmpix_i = (hv_z + tm_z)[..., None] + tmpix_r
-        # gain_rs = np.reshape(self.gain, (self.n_hv, self.n_tm, self.n_tmpix))
+        # gain_rs = np.reshape(self.charge, (self.n_hv, self.n_tm, self.n_tmpix))
         # modules_rs = np.reshape(self.modules, (self.n_tm, self.n_tmpix))
         # tmpix_rs = np.reshape(self.tmpix, (self.n_tm, self.n_tmpix))
         # tm_j = hv_z[..., None] + modules_rs[None, ...]
@@ -226,14 +227,14 @@ class BokehGainMatching(Tool):
         # gain_modules_mean = np.mean(gain_modules, axis=2)
 
         shape = (self.n_hv, self.n_tm, self.n_tmpix)
-        gain_tm = np.reshape(self.gain, shape)
-        gain_error_tm = np.reshape(self.gain_error, shape)
+        gain_tm = np.reshape(self.charge, shape)
+        gain_error_tm = np.reshape(self.charge_error, shape)
         gain_tm_mean = np.mean(gain_tm, axis=2)
         gain_error_tm_mean = np.sqrt(np.sum(gain_error_tm**2, axis=2))
 
         x = self.hv
-        y = self.gain
-        y_err = self.gain_error
+        y = self.charge
+        y_err = self.charge_error
         y_tm = gain_tm_mean
         y_err_tm = gain_error_tm_mean
 
@@ -246,16 +247,20 @@ class BokehGainMatching(Tool):
         for pix in range(self.n_pixels):
             try:
                 coeff, _ = curve_fit(gain_func, x, y[:, pix], p0=p0,
-                                     bounds=bounds, sigma=y_err[:, pix],
-                                     absolute_sigma=True)
+                                     bounds=bounds,
+                                     # sigma=y_err[:, pix],
+                                     # absolute_sigma=True
+                                     )
                 self.c_pix[pix], self.m_pix[pix] = coeff
             except RuntimeError:
                 self.log.warning("Unable to fit pixel: {}".format(pix))
         for tm in range(self.n_tm):
             try:
                 coeff, _ = curve_fit(gain_func, x, y_tm[:, tm], p0=p0,
-                                     bounds=bounds, sigma=y_err_tm[:, tm],
-                                     absolute_sigma=True)
+                                     bounds=bounds,
+                                     # sigma=y_err_tm[:, tm],
+                                     # absolute_sigma=True
+                                     )
                 self.c_tm[tm], self.m_tm[tm] = coeff
             except RuntimeError:
                 self.log.warning("Unable to fit tm: {}".format(tm))
@@ -291,7 +296,7 @@ class BokehGainMatching(Tool):
 
     def finish(self):
         curdoc().add_root(self.layout)
-        curdoc().title = "Gain Vs HV"
+        curdoc().title = "Charge Vs HV"
 
         output_dir = dirname(self.input_path)
         output_path = join(output_dir, 'gain_matching_coeff.npz')

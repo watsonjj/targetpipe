@@ -6,6 +6,7 @@ from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.calib.camera.charge_extractors import CHECMExtractor
 from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.io.pixels import Dead
 import numpy as np
 from tqdm import tqdm
 from os.path import join, exists
@@ -38,6 +39,7 @@ class BokehSPE(Tool):
         self.cleaner = None
         self.extractor = None
         self.fitter = None
+        self.dead = None
 
         self.output_dir = None
 
@@ -61,6 +63,7 @@ class BokehSPE(Tool):
         self.cleaner = CHECMWaveformCleaner(**kwargs)
         self.extractor = CHECMExtractor(**kwargs)
         self.fitter = CHECMFitterSPE(**kwargs)
+        self.dead = Dead()
 
         self.output_dir = join(self.reader.output_directory, "extract_adc2pe")
         if not exists(self.output_dir):
@@ -99,7 +102,7 @@ class BokehSPE(Tool):
 
                 area[index] = peak_area
 
-        desc = "Extracting gain of pixels"
+        desc = "Fitting pixels"
         with tqdm(total=n_pixels, desc=desc) as pbar:
             for pix in range(n_pixels):
                 pbar.update(1)
@@ -107,7 +110,9 @@ class BokehSPE(Tool):
                     self.log.warning("Pixel {} couldn't be fit".format(pix))
                     ratio.mask = True
                     continue
-                ratio[pix] = self.fitter.gain
+                ratio[pix] = self.fitter.coeff['spe']
+
+        ratio = self.dead.mask1d(ratio)
 
         self.adc2pe = np.ma.filled(1/ratio)
 

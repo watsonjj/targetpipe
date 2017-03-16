@@ -1,3 +1,4 @@
+from tqdm import trange
 from traitlets import Dict, List, Int, Unicode
 from ctapipe.core import Tool
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
@@ -11,17 +12,19 @@ from tqdm import tqdm
 from os import makedirs
 from os.path import exists, dirname
 
+from targetpipe.io.pixels import Dead
 
-class GainVsHVExtractor(Tool):
-    name = "GainVsHVExtractor"
-    description = "Extract gain vs hv"
 
-    hv_list = List(Int, None, allow_none=True,
-                   help='List of the hv value for each input '
-                        'file').tag(config=True)
+class ChargeVsRunExtractor(Tool):
+    name = "ChargeVsRunExtractor"
+    description = "Extract charge (gaussing fit mean of each pixel) " \
+                  "vs some run descriptor."
+
+    rundesc_list = List(Int, None, allow_none=True,
+                        help='List of the description value for each input '
+                             'file').tag(config=True)
     output_path = Unicode(None, allow_none=True,
-                          help='Path to save the numpy array containing the '
-                               'gain').tag(config=True)
+                          help='Path to save the numpy array').tag(config=True)
     adc2pe_path = Unicode('', allow_none=True,
                           help='Path to the numpy adc2pe '
                                'file').tag(config=True)
@@ -31,8 +34,8 @@ class GainVsHVExtractor(Tool):
                         max_events='TargetioFileLooper.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
-                        O='GainVsHVExtractor.output_path',
-                        pe='GainVsHVExtractor.adc2pe_path'
+                        O='ChargeVsRunExtractor.output_path',
+                        pe='ChargeVsRunExtractor.adc2pe_path'
                         ))
 
     classes = List([TargetioFileLooper,
@@ -61,9 +64,10 @@ class GainVsHVExtractor(Tool):
         self.cleaner = None
         self.extractor = None
         self.fitter = None
+        self.dead = None
 
-        self.gain = None
-        self.gain_error = None
+        self.charge = None
+        self.charge_error = None
 
         self.adc2pe = None
 
@@ -82,60 +86,70 @@ class GainVsHVExtractor(Tool):
         self.cleaner = CHECMWaveformCleaner(**kwargs)
         self.extractor = CHECMExtractor(**kwargs)
         self.fitter = CHECMFitterBright(**kwargs)
+        self.dead = Dead()
 
         self.n_events = self.file_looper.num_events
-        first_event = self.file_looper.file_reader_list[0].get_event(0)
+        file_reader_list = self.file_looper.file_reader_list
+        first_event = file_reader_list[0].get_event(0)
         telid = list(first_event.r0.tels_with_data)[0]
         r0 = first_event.r0.tel[telid].adc_samples[0]
         self.n_pixels, self.n_samples = r0.shape
 
-        self.hv_list = self.hv_list[:self.file_looper.num_readers]
-        assert(len(self.file_looper.file_reader_list) == len(self.hv_list))
+        self.rundesc_list = self.rundesc_list[:self.file_looper.num_readers]
+        assert (len(file_reader_list) == len(self.rundesc_list))
 
         if self.adc2pe_path:
             self.adc2pe = np.load(self.adc2pe_path)
 
     def start(self):
-        n_hv = len(self.hv_list)
+        n_rundesc = len(self.rundesc_list)
         # Prepare storage array
-        self.gain = np.zeros((n_hv, self.n_pixels))
-        self.gain_error = np.zeros((n_hv, self.n_pixels))
+        self.charge = np.ma.zeros((n_rundesc, self.n_pixels))
+        self.charge.mask = np.zeros(self.charge.shape, dtype=np.bool)
+        self.charge.fill_value = 0
+        self.charge_error = np.ma.copy(self.charge)
         area_list = []
 
         telid = 0
-        desc = "Extracting area from events"
-        with tqdm(total=self.n_events, desc=desc) as pbar:
-            for fn, fr in enumerate(self.get_next_file()):
-                source = fr.read()
-                area = np.zeros((fr.num_events, self.n_pixels))
-                for ev, event in enumerate(source):
-                    pbar.update(1)
-                    self.r1.calibrate(event)
-                    self.dl0.reduce(event)
+        desc1 = "Looping over runs"
+        for fr in tqdm(self.get_next_file(), total=n_rundesc, desc=desc1):
+            source = fr.read()
+            n_events = fr.num_events
+            area = np.zeros((n_events, self.n_pixels))
+            desc2 = "Extracting area from events"
+            for event in tqdm(source, total=n_events, desc=desc2):
+                ev = event.count
+                self.r1.calibrate(event)
+                self.dl0.reduce(event)
 
-                    dl0 = event.dl0.tel[telid].pe_samples[0]
+                dl0 = event.dl0.tel[telid].pe_samples[0]
 
-                    # Perform CHECM Waveform Cleaning
-                    sb_sub_wf, t0 = self.cleaner.apply(dl0)
+                # Perform CHECM Waveform Cleaning
+                sb_sub_wf, t0 = self.cleaner.apply(dl0)
 
-                    # Perform CHECM Charge Extraction
-                    area[ev], _ = self.extractor.extract(sb_sub_wf, t0)
-                area_list.append(area)
+                # Perform CHECM Charge Extraction
+                area[ev], _ = self.extractor.extract(sb_sub_wf, t0)
 
-                if self.adc2pe is not None:
-                    area *= self.adc2pe[None, :]
+            if self.adc2pe is not None:
+                area *= self.adc2pe[None, :]
 
-        desc = "Extracting gain of pixels"
-        with tqdm(total=n_hv * self.n_pixels, desc=desc) as pbar:
-            for fn in range(n_hv):
-                for pix in range(self.n_pixels):
-                    pbar.update(1)
-                    if not self.fitter.apply(area_list[fn][:, pix]):
-                        self.log.warning("FN {} Pixel {} could not be fitted"
-                                         .format(fn, pix))
-                        continue
-                    self.gain[fn, pix] = self.fitter.gain
-                    self.gain_error[fn, pix] = self.fitter.gain_error
+            area_list.append(area)
+
+        desc1 = "Looping over runs"
+        for fn in trange(n_rundesc, desc=desc1):
+            desc2 = "Fitting pixels"
+            for pix in trange(self.n_pixels, desc=desc2):
+                if pix in self.dead.dead_pixels:
+                    continue
+                if not self.fitter.apply(area_list[fn][:, pix]):
+                    self.log.warning("FN {} Pixel {} could not be fitted"
+                                     .format(fn, pix))
+                    continue
+                self.charge[fn, pix] = self.fitter.coeff['mean']
+                self.charge_error[fn, pix] = self.fitter.coeff['stddev']
+
+        self.charge = np.ma.filled(self.dead.mask2d(self.charge))
+        self.charge_error = np.ma.filled(self.dead.mask2d(self.charge_error))
 
     def finish(self):
         # Save figures
@@ -144,8 +158,8 @@ class GainVsHVExtractor(Tool):
             self.log.info("Creating directory: {}".format(output_dir))
             makedirs(output_dir)
 
-        np.savez(self.output_path, gain=self.gain,
-                 gain_error=self.gain_error, hv=self.hv_list)
+        np.savez(self.output_path, charge=self.charge,
+                 charge_error=self.charge_error, rundesc=self.rundesc_list)
         self.log.info("Numpy array saved to: {}".format(self.output_path))
 
     def get_next_file(self):
@@ -153,5 +167,5 @@ class GainVsHVExtractor(Tool):
             yield fr
 
 
-exe = GainVsHVExtractor()
+exe = ChargeVsRunExtractor()
 exe.run()

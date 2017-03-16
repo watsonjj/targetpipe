@@ -1,9 +1,7 @@
-from threading import Thread, Lock
-
 from bokeh.io import curdoc
 from bokeh.layouts import layout
 from bokeh.plotting import figure
-from traitlets import Dict, List, CaselessStrEnum as CaStEn
+from traitlets import Dict, List, CaselessStrEnum as CaStEn, Unicode
 from bokeh.models import Select, ColumnDataSource, palettes, \
     RadioGroup, CheckboxGroup, Legend, Div, Span, TableColumn, DataTable, \
     NumberFormatter, TextInput, Button
@@ -13,7 +11,7 @@ from ctapipe.io import CameraGeometry
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from targetpipe.visualization.bokeh import CameraDisplay
-from targetpipe.io.pixels import get_neighbours_2d
+from targetpipe.io.pixels import get_neighbours_2d, Dead
 from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.calib.camera.charge_extractors import CHECMExtractor
 from targetpipe.fitting.checm import CHECMFitterSPE, CHECMFitterBright
@@ -21,7 +19,6 @@ import numpy as np
 from collections import defaultdict
 from tqdm import trange, tqdm
 from time import sleep, time
-from multiprocessing import Pool
 
 
 class Camera(CameraDisplay):
@@ -499,6 +496,10 @@ class BokehSPE(Tool):
     description = "Interactively explore the steps in obtaining and fitting " \
                   "SPE spectrum"
 
+    adc2pe_path = Unicode('', allow_none=True,
+                          help='Path to the numpy adc2pe '
+                               'file').tag(config=True)
+
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
@@ -528,9 +529,10 @@ class BokehSPE(Tool):
         self.reader = None
         self.r1 = None
         self.dl0 = None
-        self.gain = None
         self.area = None
         self.height = None
+
+        self.adc2pe = None
 
         self.n_events = None
         self.n_pixels = None
@@ -538,12 +540,13 @@ class BokehSPE(Tool):
 
         self.cleaner = None
         self.extractor = None
+        self.dead = None
 
         self.neighbours2d = None
         self.stage_names = None
 
         self.p_camera_area = None
-        self.p_camera_gain = None
+        self.p_camera_fit = None
         self.p_fitter = None
         self.p_stage_viewer = None
         self.p_fit_viewer = None
@@ -566,6 +569,7 @@ class BokehSPE(Tool):
 
         self.cleaner = CHECMWaveformCleaner(**kwargs)
         self.extractor = CHECMExtractor(**kwargs)
+        self.dead = Dead()
 
         self.n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
@@ -580,9 +584,12 @@ class BokehSPE(Tool):
         self.cleaner.apply(r0)
         self.stage_names = sorted(list(self.cleaner.stages.keys()))
 
+        if self.adc2pe_path:
+            self.adc2pe = np.load(self.adc2pe_path)
+
         # Init Plots
         self.p_camera_area = Camera(self, self.neighbours2d, "Area", geom)
-        self.p_camera_gain = Camera(self, self.neighbours2d, "Gain", geom)
+        self.p_camera_fit = Camera(self, self.neighbours2d, "Gain", geom)
         self.p_fitter = FitterWidget(**kwargs)
         self.p_stage_viewer = StageViewer(**kwargs)
         self.p_fit_viewer = FitViewer(**kwargs)
@@ -592,7 +599,6 @@ class BokehSPE(Tool):
         # Prepare storage array
         self.area = np.zeros((self.n_events, self.n_pixels))
         self.height = np.zeros((self.n_events, self.n_pixels))
-        self.gain = np.zeros(self.n_pixels)
 
         source = self.reader.read()
         desc = "Looping through file"
@@ -614,11 +620,14 @@ class BokehSPE(Tool):
             self.area[index] = peak_area
             self.height[index] = peak_height
 
+        if self.adc2pe is not None:
+            self.area *= self.adc2pe[None, :]
+
         # Setup Plots
         self.p_camera_area.enable_pixel_picker()
         self.p_camera_area.add_colorbar()
-        self.p_camera_gain.enable_pixel_picker()
-        self.p_camera_gain.add_colorbar()
+        self.p_camera_fit.enable_pixel_picker()
+        self.p_camera_fit.add_colorbar()
         self.p_fitter.create()
         self.p_stage_viewer.create(self.neighbours2d, self.stage_names)
         self.p_fit_viewer.create(self.p_fitter.fitter.subfit_labels)
@@ -633,7 +642,7 @@ class BokehSPE(Tool):
 
         # Get bokeh layouts
         l_camera_area = self.p_camera_area.layout
-        l_camera_gain = self.p_camera_gain.layout
+        l_camera_fit = self.p_camera_fit.layout
         l_fitter = self.p_fitter.layout
         l_stage_viewer = self.p_stage_viewer.layout
         l_fit_viewer = self.p_fit_viewer.layout
@@ -644,7 +653,7 @@ class BokehSPE(Tool):
             [self.w_event_index, self.w_hoa,
              self.w_fitspectrum, self.w_fitcamera],
             [l_camera_area, l_fit_viewer, l_fitter],
-            [l_camera_gain, l_fit_table],
+            [l_camera_fit, l_fit_table],
             [Div(text="Stage Viewer")],
             [l_stage_viewer],
         ])
@@ -665,20 +674,29 @@ class BokehSPE(Tool):
         return success
 
     def fit_camera(self):
-        gain = np.ma.zeros(self.n_pixels)
-        gain.mask = np.zeros(gain.shape, dtype=np.bool)
+        fitcoeff = np.ma.zeros(self.n_pixels)
+        fitcoeff.mask = np.zeros(fitcoeff.shape, dtype=np.bool)
 
-        desc = "Extracting gain of pixels"
+        brightness = self.p_fitter.fitter.brightness
+        if brightness == 'spe':
+            coeff = 'spe'
+        elif brightness == 'bright':
+            coeff = 'mean'
+        else:
+            self.log.error("No case for brightness: {}".format(brightness))
+            raise ValueError
+
+        desc = "Fitting pixels"
         for pix in trange(self.n_pixels, desc=desc):
             if not self.fit_spectrum(pix):
-                gain.mask[pix] = True
+                fitcoeff.mask[pix] = True
                 continue
-            gain[pix] = self.p_fitter.fitter.gain
+            fitcoeff[pix] = self.p_fitter.fitter.coeff[coeff]
 
-        gain = np.ma.masked_where(np.isnan(gain), gain)
-        gain.mask[1664:1728] = True
+        fitcoeff = np.ma.masked_where(np.isnan(fitcoeff), fitcoeff)
+        fitcoeff = self.dead.mask1d(fitcoeff)
 
-        self.p_camera_gain.image = gain
+        self.p_camera_fit.image = fitcoeff
 
     @property
     def event(self):
@@ -695,7 +713,7 @@ class BokehSPE(Tool):
 
         telid = list(val.r0.tels_with_data)[0]
         self.p_camera_area._telid = telid
-        self.p_camera_gain._telid = telid
+        self.p_camera_fit._telid = telid
 
         self._event_index = val.count
         self._event_id = val.r0.event_id
@@ -740,7 +758,7 @@ class BokehSPE(Tool):
             self.fit_spectrum(val)
 
             self.p_camera_area.active_pixel = val
-            self.p_camera_gain.active_pixel = val
+            self.p_camera_fit.active_pixel = val
             self.p_stage_viewer.active_pixel = val
 
             self.p_fit_viewer.update(self.p_fitter.fitter)
