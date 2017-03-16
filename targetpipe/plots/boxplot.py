@@ -1,7 +1,6 @@
 """
 Custom base boxplot module
 """
-from astropy import log
 import numpy as np
 import numpy.ma as ma
 from bokeh.models import HoverTool, ColumnDataSource
@@ -13,161 +12,115 @@ class Boxplot:
 
     The description of a boxplot is taken from:
     http://www.physics.csbsju.edu/stats/box2.html
-
-    Attributes
-    ----------
-    x_val : ndarray
-        1D numpy array containging the x-axis values
-    data2d : ndarray
-        2D reshape of the input data array
-    median : ndarray
-        median for each x value
-    upper_quartile : ndarray
-        upper quartile for each x value
-    lower_quartile : ndarray
-        lower quartile for each x value
-    upper_whisker : ndarray
-        upper whisker for each x value
-    lower_whisker : ndarray
-        lower whisker for each x value
-    suspected_outliers : ndarray
-        masked numpy array containing the suspected outliers for each x value
-    outliers : ndarray
-        masked numpy array containing the outliers for each x value
     """
-    def __init__(self, array, x_axis=None):
-        """
-        Parameters
-        ----------
-        array : ndarray
-            2 dimensional numpy array, the first axis corresponding to the
-            x-axis, and the second axis being the y-values that the boxplot
-            statistics are calculated from.
-        x_axis : ndarray
-            1D axis of same size as the first dimension of array, containing
-            the x axis values.
-        """
 
-        self.outliers_where = None
-        self._calculate_stats(array, x_axis)
+    def __init__(self, fig):
+        cdsource_d = dict(x=[],
+                          median=[],
+                          mean=[],
+                          top=[],
+                          bottom=[],
+                          left=[],
+                          right=[],
+                          emax=[],
+                          emin=[],
+                          el=[],
+                          er=[])
+        self.cdsource = ColumnDataSource(data=cdsource_d)
+        cdsource_outliers_d = dict(x=[],
+                                   y=[],
+                                   i=[],
+                                   color=[])
+        self.cdsource_outliers = ColumnDataSource(data=cdsource_outliers_d)
 
-    def _calculate_stats(self, array, x_axis):
-        s = array.shape
-        ndim = array.ndim
-        if ndim > 2:
-            log.warning("Array dimensions are greater than 2")
 
-        self.x_val = np.arange(s[0]) if x_axis is None else x_axis
-        self.data2d = array
+        fig.quad(source=self.cdsource,
+                 bottom='bottom', left='left', top='top', right='right',
+                 fill_alpha=0.4, color="#000099")
+        fig.segment(source=self.cdsource,
+                    x0='left', y0='median', x1='right', y1='median',
+                    line_width=1.5, color='red')
+        fig.circle(source=self.cdsource, x='x', y='mean', color='purple')
+        fig.segment(source=self.cdsource,
+                    x0='x', y0='top', x1='x', y1='emax',
+                    line_width=1.5, color='black')
+        fig.segment(source=self.cdsource,
+                    x0='el', y0='emax', x1='er', y1='emax',
+                    line_width=1.5, color='black')
+        fig.segment(source=self.cdsource,
+                    x0='x', y0='emin', x1='x', y1='bottom',
+                    line_width=1.5, color='black')
+        fig.segment(source=self.cdsource,
+                    x0='el', y0='emin', x1='er', y1='emin',
+                    line_width=1.5, color='black')
+        c = fig.circle(source=self.cdsource_outliers, x='x', y='y',
+                       fill_alpha=0.6, color='color', radius=7)
 
+        fig.add_tools(HoverTool(tooltips=[("(x,y)", "(@x, @y)"),
+                                          ("i", "@i")],
+                                renderers=[c]))
+
+    def update(self, x, y_data):
         # Statistics
-        self.median = np.median(self.data2d, axis=1)
-        self.upper_quartile = np.percentile(self.data2d, 75, axis=1)
-        self.lower_quartile = np.percentile(self.data2d, 25, axis=1)
-        iqr = self.upper_quartile - self.lower_quartile
-        uif = self.upper_quartile[..., None] + 1.5 * iqr[..., None]
-        lif = self.lower_quartile[..., None] - 1.5 * iqr[..., None]
+        median = np.median(y_data, axis=1)
+        mean = np.mean(y_data, axis=1)
+        upper_quartile = np.percentile(y_data, 75, axis=1)
+        lower_quartile = np.percentile(y_data, 25, axis=1)
+        iqr = upper_quartile - lower_quartile
+        uif = upper_quartile[..., None] + 1.5 * iqr[..., None]
+        lif = lower_quartile[..., None] - 1.5 * iqr[..., None]
         mge = ma.masked_greater_equal
         mle = ma.masked_less_equal
-        self.upper_whisker = mge(self.data2d, uif).max(1).data
-        self.lower_whisker = mle(self.data2d, lif).min(1).data
-        uof = self.upper_quartile[..., None] + 3.0 * iqr[..., None]
-        lof = self.lower_quartile[..., None] - 3.0 * iqr[..., None]
-        self.suspected_outliers = ma.masked_where((self.data2d < uif) &
-                                                  (self.data2d > lif) |
-                                                  (self.data2d >= uof) |
-                                                  (self.data2d <= lof),
-                                                  self.data2d)
-        self.outliers = ma.masked_where((self.data2d < uof) &
-                                        (self.data2d > lof),
-                                        self.data2d)
-        self.suspected_outliers_where = np.where(~self.suspected_outliers.mask)
-        self.outliers_where = np.where(~self.outliers.mask)
-        self.upper_so_whisker = self.suspected_outliers.max(1).data
-        self.lower_so_whisker = self.suspected_outliers.min(1).data
-        self.upper_o_whisker = self.outliers.max(1).data
-        self.lower_o_whisker = self.outliers.min(1).data
+        upper_whisker = mge(y_data, uif).max(1).data
+        lower_whisker = mle(y_data, lif).min(1).data
+        uof = upper_quartile[..., None] + 3.0 * iqr[..., None]
+        lof = lower_quartile[..., None] - 3.0 * iqr[..., None]
+        susp_outliers = ma.masked_where((y_data < uif) & (y_data > lif) |
+                                        (y_data >= uof) | (y_data <= lof),
+                                        y_data)
+        outliers = ma.masked_where((y_data < uof) & (y_data > lof), y_data)
+        susp_outliers_where = np.where(~susp_outliers.mask)
+        outliers_where = np.where(~outliers.mask)
 
-    def plot_bokeh(self, fig):
-        x_diff = self.x_val[1] - self.x_val[0]
+        x_diff = x[1] - x[0]
         widthq = x_diff * 0.4
         widthe = x_diff * 0.1
-        radius = 7
 
-        bottom = self.lower_quartile
-        left = self.x_val - widthq
-        top = self.upper_quartile
-        right = self.x_val + widthq
+        bottom = lower_quartile
+        left = x - widthq
+        top = upper_quartile
+        right = x + widthq
 
-        suspected_outliers_x = self.suspected_outliers_where[0]
-        suspected_outliers_y = self.suspected_outliers[
-            self.suspected_outliers_where].data
-        outliers_x = self.outliers_where[0]
-        outliers_y = self.outliers[self.outliers_where].data
+        el = x - widthe
+        er = x + widthe
 
-        if suspected_outliers_y.size > (10 * self.x_val.size):
-            count = self.suspected_outliers.count(axis=1)
-            w = count > 10
-            x = self.x_val[w]
-            lower = self.lower_so_whisker[w]
-            upper = self.upper_so_whisker[w]
-            source = ColumnDataSource(dict(x=x, lower=lower, upper=upper,
-                                           count=count[w]))
-            fig.segment(x0=x, y0=lower, x1=x, y1=upper,
-                        line_width=1.5, color='green')
-            fig.segment(x0=x - widthe, y0=upper, x1=x + widthe, y1=upper,
-                        line_width=1.5, color='green')
-            fig.segment(x0=x - widthe, y0=lower, x1=x + widthe, y1=lower,
-                        line_width=1.5, color='green')
-            c1 = fig.circle('x', 'upper', size=radius, fill_alpha=0.4,
-                            color='green', source=source)
-            c2 = fig.circle('x', 'lower', size=radius, fill_alpha=0.4,
-                            color='green', source=source)
-            tooltips = [("(x, lower, upper)", "(@x, @lower, @upper)"),
-                        ("count", "@count")]
-            fig.add_tools(HoverTool(tooltips=tooltips, renderers=[c1, c2]))
-        else:
-            c1 = fig.circle(suspected_outliers_x, suspected_outliers_y,
-                            size=radius, fill_alpha=0.4, color='green')
-            fig.add_tools(HoverTool(tooltips=[("(x,y)", "(@x, @y)")],
-                                    renderers=[c1]))
-        if outliers_y.size > (10 * self.x_val.size):
-            count = self.outliers.count(axis=1)
-            w = count > 10
-            x = self.x_val[w]
-            lower = self.lower_o_whisker[w]
-            upper = self.upper_o_whisker[w]
-            source = ColumnDataSource(dict(x=x, lower=lower, upper=upper,
-                                           count=count[w]))
-            fig.segment(x0=x, y0=lower, x1=x, y1=upper,
-                        line_width=1.5, color='red')
-            fig.segment(x0=x - widthe, y0=upper, x1=x + widthe, y1=upper,
-                        line_width=1.5, color='red')
-            fig.segment(x0=x - widthe, y0=lower, x1=x + widthe, y1=lower,
-                        line_width=1.5, color='red')
-            c1 = fig.circle('x', 'upper', size=radius, fill_alpha=0.4,
-                            color='red', source=source)
-            c2 = fig.circle('x', 'lower', size=radius, fill_alpha=0.4,
-                            color='red', source=source)
-            tooltips = [("(x, lower, upper)", "(@x, @lower, @upper)"),
-                        ("count", "@count")]
-            fig.add_tools(HoverTool(tooltips=tooltips, renderers=[c1, c2]))
-        else:
-            c1 = fig.circle(outliers_x, outliers_y,
-                            size=radius, fill_alpha=0.4, color='red')
-            fig.add_tools(HoverTool(tooltips=[("(x,y)", "(@x, @y)")],
-                                    renderers=[c1]))
+        suspected_outliers_x = susp_outliers_where[0]
+        suspected_outliers_i = susp_outliers_where[1]
+        suspected_outliers_y = susp_outliers[susp_outliers_where].data
+        outliers_x = outliers_where[0]
+        outliers_i = outliers_where[1]
+        outliers_y = outliers[outliers_where].data
 
-        fig.quad(bottom=bottom, left=left, top=top, right=right,
-                 fill_alpha=0.7, color="#B3DE69")
-        fig.segment(x0=left, y0=self.median, x1=right, y1=self.median,
-                    line_width=1.5)
-        fig.segment(x0=self.x_val, y0=self.lower_whisker,
-                    x1=self.x_val, y1=self.upper_whisker,
-                    line_width=1.5, color='black')
-        fig.segment(x0=self.x_val - widthe, y0=self.upper_whisker,
-                    x1=self.x_val + widthe, y1=self.upper_whisker,
-                    line_width=1.5, color='black')
-        fig.segment(x0=self.x_val - widthe, y0=self.lower_whisker,
-                    x1=self.x_val + widthe, y1=self.lower_whisker,
-                    line_width=1.5, color='black')
+        all_outliers_x = x[np.append(suspected_outliers_x, outliers_x)]
+        all_outliers_y = np.append(suspected_outliers_y, outliers_y)
+        all_outliers_i = np.append(suspected_outliers_i, outliers_i)
+        color = np.full(all_outliers_x.shape, "red", dtype='<U5')
+        color[:suspected_outliers_x.size] = "green"
+
+        cdsource_d = dict(x=x,
+                          median=median,
+                          mean=mean,
+                          top=top,
+                          bottom=bottom,
+                          left=left,
+                          right=right,
+                          emax=upper_whisker,
+                          emin=lower_whisker,
+                          el=el,
+                          er=er)
+        self.cdsource.data = cdsource_d
+        cdsource_outliers_d = dict(x=all_outliers_x,
+                                   y=all_outliers_y,
+                                   i=all_outliers_i,
+                                   color=color)
+        self.cdsource_outliers.data = cdsource_outliers_d

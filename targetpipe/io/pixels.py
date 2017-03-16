@@ -77,6 +77,42 @@ def get_neighbours_2d(x_pix, y_pix):
     return neighbours
 
 
+class Dead:
+    def __init__(self):
+        self.dead_pixels = [96, 276, 1906, 1910, 1916]
+        self.npix = 2048
+
+    def mask1d(self, array):
+        if not array.shape[0] == self.npix:
+            print("[ERROR] array does not contain {} pixels, "
+                  "cannot mask dead".format(self.npix))
+            return array
+
+        mask = np.zeros(array.shape, dtype=np.bool)
+        mask[self.dead_pixels] = True
+
+        masked = array
+        if not np.ma.isMaskedArray(masked):
+            masked = np.ma.array(masked)
+        masked.mask = np.ma.mask_or(masked.mask, mask)
+        return masked
+
+    def mask2d(self, array):
+        if not array.shape[1] == self.npix:
+            print("[ERROR] array does not contain {} pixels, "
+                  "cannot mask dead".format(self.npix))
+            return array
+
+        mask = np.zeros(array.shape, dtype=np.bool)
+        mask[:, self.dead_pixels] = True
+
+        masked = array
+        if not np.ma.isMaskedArray(masked):
+            masked = np.ma.array(masked)
+        masked.mask = np.ma.mask_or(masked.mask, mask)
+        return masked
+
+
 # def invert_2d_array(array):
 #     y, x = np.indices(array.shape)
 #     positions = np.array(list(zip(y.ravel(), x.ravel())))

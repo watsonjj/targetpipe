@@ -9,6 +9,7 @@ from scipy.stats.distributions import poisson
 
 class CHECMFitterSPE(Component):
     name = 'CHECMFitterSPE'
+    brightness = 'spe'
 
     def __init__(self, config, tool, **kwargs):
         """
@@ -60,14 +61,6 @@ class CHECMFitterSPE(Component):
                            limit_lambda_=(0, 10))
 
     @property
-    def gain(self):
-        return self._get_gain()
-
-    @property
-    def gain_error(self):
-        return self._get_gain_error()
-
-    @property
     def subfits(self):
         return self._get_subfits()
 
@@ -82,7 +75,7 @@ class CHECMFitterSPE(Component):
         self.fit_x = fit_x
 
         try:
-            fit, coeff = self._fit(hist, between, fit_x)
+            fit, coeff = self._fit(hist, edges, between, fit_x)
         except RuntimeError:
             self.fit = [0]*len(fit_x)
             self.coeff = {}
@@ -97,17 +90,11 @@ class CHECMFitterSPE(Component):
         hist, edges = np.histogram(spectrum, bins=self.nbins, range=range_)
         return hist, edges
 
-    def _get_gain(self):
-        return self.coeff['spe']
-
-    def _get_gain_error(self):
-        return np.sqrt(self.coeff['spe_sigma'])
-
-    def _fit(self, hist, between, fit_x):
+    def _fit(self, hist, edges, between, fit_x):
         p0 = self.initial.copy()
         limits = self.limits.copy()
         if p0['norm'] is None:
-            p0['norm'] = hist.sum()
+            p0['norm'] = np.sum(np.diff(edges) * hist)
         fit, coeff = self.iminuit_fit(between, hist, p0, fit_x, limits)
         return fit, coeff
 
@@ -155,6 +142,7 @@ class CHECMFitterSPE(Component):
 
 class CHECMFitterBright(Component):
     name = 'CHECMFitterBright'
+    brightness = 'bright'
 
     def __init__(self, config, tool, **kwargs):
         """
@@ -195,16 +183,8 @@ class CHECMFitterBright(Component):
                             mean=None,
                             stddev=None)
         self.limits = dict(limit_norm=(0, 100000),
-                           limit_mean=(-10000, 10000),
-                           limit_stddev=(0, 10000))
-
-    @property
-    def gain(self):
-        return self._get_gain()
-
-    @property
-    def gain_error(self):
-        return self._get_gain_error()
+                           limit_mean=(None, None),
+                           limit_stddev=(0, None))
 
     @property
     def subfits(self):
@@ -221,7 +201,7 @@ class CHECMFitterBright(Component):
         self.fit_x = fit_x
 
         try:
-            fit, coeff = self._fit(hist, between, fit_x)
+            fit, coeff = self._fit(hist, edges, between, fit_x)
         except RuntimeError:
             self.fit = [0]*len(fit_x)
             self.coeff = {}
@@ -238,27 +218,25 @@ class CHECMFitterBright(Component):
         self._bright_std = np.std(nonoutliers)
         range_ = self.range[:]
         if not range_[0]:
-            range_[0] = self._bright_mean - 3 * self._bright_std
+            range_[0] = self._bright_mean - 2.5 * self._bright_std
         if not range_[1]:
-            range_[1] = self._bright_mean + 3 * self._bright_std
+            range_[1] = self._bright_mean + 2.5 * self._bright_std
         hist, edges = np.histogram(spectrum, bins=self.nbins, range=range_)
         return hist, edges
 
-    def _get_gain(self):
-        return self.coeff['mean']
-
-    def _get_gain_error(self):
-        return np.sqrt(self.coeff['stddev'])
-
-    def _fit(self, hist, between, fit_x):
+    def _fit(self, hist, edges, between, fit_x):
         p0 = self.initial.copy()
         limits = self.limits.copy()
         if not p0['norm']:
-            p0['norm'] = hist.sum()
+            p0['norm'] = np.sum(np.diff(edges) * hist)
         if not p0['mean']:
             p0['mean'] = self._bright_mean
         if not p0['stddev']:
-            p0['stddev'] = self._bright_std
+            p0['stddev'] = self._bright_std/2
+        if None in limits['limit_mean']:
+            limits['limit_mean'] = (edges[0], edges[-1])
+        if None in limits['limit_stddev']:
+            limits['limit_stddev'] = (0, edges.max())
         fit, coeff = self.iminuit_fit(between, hist, p0, fit_x, limits)
         return fit, coeff
 
