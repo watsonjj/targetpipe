@@ -188,7 +188,8 @@ class BokehGainMatching(Tool):
 
         arrays = np.load(self.input_path)
         self.charge = self.dead.mask2d(arrays['charge'])
-        self.charge_error = self.dead.mask2d(arrays['charge_error'])
+        self.charge = np.ma.masked_where(self.charge <= 0, self.charge)
+        self.charge_error = np.ma.array(arrays['charge_error'], mask=self.charge.mask)
         self.hv = arrays['rundesc']
 
         self.n_hv, self.n_pixels = self.charge.shape
@@ -232,21 +233,19 @@ class BokehGainMatching(Tool):
         gain_tm_mean = np.mean(gain_tm, axis=2)
         gain_error_tm_mean = np.sqrt(np.sum(gain_error_tm**2, axis=2))
 
-        x = self.hv
-        y = self.charge
-        y_err = self.charge_error
-        y_tm = gain_tm_mean
-        y_err_tm = gain_error_tm_mean
-
-        self.m_pix = np.zeros(self.n_pixels)
-        self.c_pix = np.zeros(self.n_pixels)
-        self.m_tm = np.zeros(self.n_tm)
-        self.c_tm = np.zeros(self.n_tm)
+        self.m_pix = np.ma.zeros(self.n_pixels, fill_value=0)
+        self.c_pix = np.ma.zeros(self.n_pixels, fill_value=0)
+        self.m_tm = np.ma.zeros(self.n_tm, fill_value=0)
+        self.c_tm = np.ma.zeros(self.n_tm, fill_value=0)
         p0 = [0, 5]
         bounds = (-np.inf, np.inf)  # ([-2000, -10], [2000, 10])
         for pix in range(self.n_pixels):
+            x = self.hv[~self.charge.mask[:, pix]]
+            y = self.charge[:, pix][~self.charge.mask[:, pix]]
+            if x.size == 0:
+                continue
             try:
-                coeff, _ = curve_fit(gain_func, x, y[:, pix], p0=p0,
+                coeff, _ = curve_fit(gain_func, x, y, p0=p0,
                                      bounds=bounds,
                                      # sigma=y_err[:, pix],
                                      # absolute_sigma=True
@@ -255,8 +254,10 @@ class BokehGainMatching(Tool):
             except RuntimeError:
                 self.log.warning("Unable to fit pixel: {}".format(pix))
         for tm in range(self.n_tm):
+            x = self.hv
+            y = gain_tm_mean[:, tm]
             try:
-                coeff, _ = curve_fit(gain_func, x, y_tm[:, tm], p0=p0,
+                coeff, _ = curve_fit(gain_func, x, y, p0=p0,
                                      bounds=bounds,
                                      # sigma=y_err_tm[:, tm],
                                      # absolute_sigma=True
@@ -268,13 +269,20 @@ class BokehGainMatching(Tool):
         self.m_tm2048 = self.m_tm[:, None] * np.ones((self.n_tm, self.n_tmpix))
         self.c_tm2048 = self.c_tm[:, None] * np.ones((self.n_tm, self.n_tmpix))
 
+        self.m_pix = self.dead.mask1d(self.m_pix)
+        self.c_pix = self.dead.mask1d(self.c_pix)
+        self.m_tm2048 = self.dead.mask1d(self.m_tm2048)
+        self.c_tm2048 = self.dead.mask1d(self.c_tm2048)
+
         # Setup Plots
         self.p_camera_pix.enable_pixel_picker()
         self.p_camera_pix.add_colorbar()
         self.p_camera_tm.enable_pixel_picker()
         self.p_camera_tm.add_colorbar()
-        self.p_plotter_pix.create(x, y, y_err, self.m_pix, self.c_pix)
-        self.p_plotter_tm.create(x, y_tm, y_err_tm, self.m_tm, self.c_tm)
+        self.p_plotter_pix.create(self.hv, self.charge, self.charge_error,
+                                  self.m_pix, self.c_pix)
+        self.p_plotter_tm.create(self.hv, gain_tm_mean, gain_error_tm_mean,
+                                 self.m_tm, self.c_tm)
 
         # Setup widgets
         self.create_view_radio_widget()
@@ -301,10 +309,10 @@ class BokehGainMatching(Tool):
         output_dir = dirname(self.input_path)
         output_path = join(output_dir, 'gain_matching_coeff.npz')
         np.savez(output_path,
-                 alpha_pix=self.m_pix,
-                 C_pix=self.c_pix,
-                 alpha_tm=self.m_tm,
-                 C_tm=self.c_tm)
+                 alpha_pix=np.ma.filled(self.m_pix),
+                 C_pix=np.ma.filled(self.c_pix),
+                 alpha_tm=np.ma.filled(self.m_tm),
+                 C_tm=np.ma.filled(self.c_tm))
         self.log.info("Numpy array saved to: {}".format(output_path))
 
     @property

@@ -40,7 +40,8 @@ class Boxplot:
         fig.segment(source=self.cdsource,
                     x0='left', y0='median', x1='right', y1='median',
                     line_width=1.5, color='red')
-        fig.circle(source=self.cdsource, x='x', y='mean', color='purple')
+        fig.circle(source=self.cdsource, x='x', y='mean',
+                   color='purple', size=7)
         fig.segment(source=self.cdsource,
                     x0='x', y0='top', x1='x', y1='emax',
                     line_width=1.5, color='black')
@@ -54,7 +55,7 @@ class Boxplot:
                     x0='el', y0='emin', x1='er', y1='emin',
                     line_width=1.5, color='black')
         c = fig.circle(source=self.cdsource_outliers, x='x', y='y',
-                       fill_alpha=0.6, color='color', radius=7)
+                       fill_alpha=0.6, color='color', size=7)
 
         fig.add_tools(HoverTool(tooltips=[("(x,y)", "(@x, @y)"),
                                           ("i", "@i")],
