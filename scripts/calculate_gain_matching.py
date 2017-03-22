@@ -43,6 +43,7 @@ class ADC2PEvsHVPlotter(Tool):
         self.alpha = gain_matching['alpha_tm']
 
     def start(self):
+        print("JASON METHOD")
         hv = 800
         gm_800 = self.gain_match(self.c, self.alpha, hv).astype(np.int)
         print('[', ', '.join(map(str, gm_800)), ']')
@@ -54,6 +55,29 @@ class ADC2PEvsHVPlotter(Tool):
         hv = 1000
         gm_1000 = self.gain_match(self.c, self.alpha, hv).astype(np.int)
         print('[', ', '.join(map(str, gm_1000)), ']')
+
+        hv = 1100
+        gm_1100 = self.gain_match(self.c, self.alpha, hv).astype(np.int)
+        print('[', ', '.join(map(str, gm_1100)), ']')
+
+        print("JUSTUS METHOD")
+        hv = 800
+        gm_800 = self.gain_match_justus(self.c, self.alpha, hv).astype(np.int)
+        print('[', ', '.join(map(str, gm_800)), ']')
+
+        hv = 900
+        gm_900 = self.gain_match_justus(self.c, self.alpha, hv).astype(np.int)
+        print('[', ', '.join(map(str, gm_900)), ']')
+
+        hv = 1000
+        gm_1000 = self.gain_match_justus(self.c, self.alpha, hv).astype(np.int)
+        print('[', ', '.join(map(str, gm_1000)), ']')
+
+        # filename = "Measurement_2/hvSetting_%i.cfg" % st
+        # f = open(filename, 'w')
+        # for s in slots:
+        #     f.write("M:%i/F|HV=%i\n" % (s, hv_setting[st][s]))
+        # f.close()
 
     def finish(self):
         pass
@@ -82,12 +106,19 @@ class ADC2PEvsHVPlotter(Tool):
         p0 = dict(try_y=f_x(x=goal_x))
         limits = dict(limit_try_y=(f_x(x=0), f_x(x=1500)))
         m0 = iminuit.Minuit(m, **p0, **limits,
-                            print_level=0, pedantic=False, throw_nan=True)
+                            print_level=-1, pedantic=False, throw_nan=True)
         m0.migrad()
         y = m0.args[0]
         best_x = self.y_function(c, alpha, y)
         print("Goal: {}, Best: {}".format(goal_x, best_x))
         return self.y_function_arr(c, alpha, y)
+
+    def gain_match_justus(self, c, alpha, goal_x):
+        mean_G = np.mean(self.x_function(c, alpha, goal_x))
+        mean_hv = self.y_function(c, alpha, mean_G)
+
+        print("Goal: {}, Best: {}".format(goal_x, mean_hv))
+        return self.y_function_arr(c, alpha, mean_G)
 
 if __name__ == '__main__':
     exe = ADC2PEvsHVPlotter()
