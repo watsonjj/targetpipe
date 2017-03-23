@@ -130,7 +130,7 @@ class EventFileLooper(Tool):
 
                 # r1[4] = 0
                 # r1[16:] = 0
-                r1 = np.ma.masked_where(r1 == 0, r1)
+                # r1 = np.ma.masked_where(r1 == 0, r1)
 
 
                 event_mean[index] = np.mean(r1)
