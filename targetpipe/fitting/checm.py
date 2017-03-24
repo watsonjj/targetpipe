@@ -236,7 +236,7 @@ class CHECMFitterBright(Component):
         if None in limits['limit_mean']:
             limits['limit_mean'] = (edges[0], edges[-1])
         if None in limits['limit_stddev']:
-            limits['limit_stddev'] = (0, edges.max())
+            limits['limit_stddev'] = (0, np.abs(edges[-1]))
         fit, coeff = self.iminuit_fit(between, hist, p0, fit_x, limits)
         return fit, coeff
 

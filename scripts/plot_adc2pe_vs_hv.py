@@ -38,6 +38,8 @@ class ADC2PEvsHVPlotter(Tool):
 
         sns.set_style("whitegrid")
 
+        self.adc2pe = None
+
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
@@ -62,8 +64,8 @@ class ADC2PEvsHVPlotter(Tool):
         self.hv = np.vstack((hv_ngm, hv_gm))
 
     def start(self):
-        adc2pe = self.a2p.get_adc2pe_at_hv(self.hv, np.arange(2048)[None, :])
-        self.spe = self.dead.mask2d(1/adc2pe)
+        self.adc2pe = self.a2p.get_adc2pe_at_hv(self.hv, np.arange(2048)[None, :])
+        self.spe = self.dead.mask2d(1/self.adc2pe)
 
         # Build Dataframe
         hv_df = np.array([[800]*2048,
@@ -108,6 +110,29 @@ class ADC2PEvsHVPlotter(Tool):
         self.log.info("Numpy array saved to: {}".format(numpy_path))
         self.fig.savefig(fig_path)
         self.log.info("Figure saved to: {}".format(fig_path))
+
+        adc2pe_800_path = join(output_dir, "adc2pe_800.npy")
+        adc2pe_900_path = join(output_dir, "adc2pe_900.npy")
+        adc2pe_1000_path = join(output_dir, "adc2pe_1000.npy")
+        adc2pe_1100_path = join(output_dir, "adc2pe_1100.npy")
+        adc2pe_800gm_path = join(output_dir, "adc2pe_800gm.npy")
+        adc2pe_900gm_path = join(output_dir, "adc2pe_900gm.npy")
+        adc2pe_1000gm_path = join(output_dir, "adc2pe_1000gm.npy")
+
+        np.save(adc2pe_800_path, np.ma.filled(self.adc2pe[0], 0))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_800_path))
+        np.save(adc2pe_900_path, np.ma.filled(self.adc2pe[1], 0))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_900_path))
+        np.save(adc2pe_1000_path, np.ma.filled(self.adc2pe[2]))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_1000_path))
+        np.save(adc2pe_1100_path, np.ma.filled(self.adc2pe[3]))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_1100_path))
+        np.save(adc2pe_800gm_path, np.ma.filled(self.adc2pe[4]))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_800gm_path))
+        np.save(adc2pe_900gm_path, np.ma.filled(self.adc2pe[5]))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_900gm_path))
+        np.save(adc2pe_1000gm_path, np.ma.filled(self.adc2pe[6]))
+        self.log.info("ADC2PE array saved to: {}".format(adc2pe_1000gm_path))
 
 
 if __name__ == '__main__':
