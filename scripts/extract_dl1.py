@@ -30,7 +30,8 @@ class DL1Extractor(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitterSPE
+                    CHECMFitterSPE,
+                    CHECMExtractor
                     ])
 
     def __init__(self, **kwargs):
