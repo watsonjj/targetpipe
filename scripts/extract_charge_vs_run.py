@@ -1,5 +1,5 @@
 from tqdm import trange
-from traitlets import Dict, List, Int, Unicode
+from traitlets import Dict, List, Int, Unicode, Bool
 from ctapipe.core import Tool
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
@@ -28,6 +28,8 @@ class ChargeVsRunExtractor(Tool):
     adc2pe_path = Unicode('', allow_none=True,
                           help='Path to the numpy adc2pe '
                                'file').tag(config=True)
+    calc_mean = Bool(False, help='Extract the mean and stdev directly insted '
+                                 'of fitting the file.').tag(config=True)
 
     aliases = Dict(dict(f='TargetioFileLooper.single_file',
                         N='TargetioFileLooper.max_files',
@@ -37,6 +39,10 @@ class ChargeVsRunExtractor(Tool):
                         O='ChargeVsRunExtractor.output_path',
                         pe='ChargeVsRunExtractor.adc2pe_path'
                         ))
+    flags = Dict(dict(mean=({'ChargeVsRunExtractor': {'calc_mean': True}},
+                            'Extract the mean and stdev directly insted '
+                            'of fitting the file.')
+                      ))
 
     classes = List([TargetioFileLooper,
                     CameraR1CalibratorFactory,
@@ -107,7 +113,9 @@ class ChargeVsRunExtractor(Tool):
         self.charge = np.ma.zeros((n_rundesc, self.n_pixels))
         self.charge.mask = np.zeros(self.charge.shape, dtype=np.bool)
         self.charge.fill_value = 0
-        self.charge_error = np.ma.copy(self.charge)
+        self.charge_error = np.ma.zeros((n_rundesc, self.n_pixels))
+        self.charge_error.mask = np.zeros(self.charge_error.shape, dtype=np.bool)
+        self.charge_error.fill_value = 0
         area_list = []
 
         telid = 0
@@ -139,14 +147,21 @@ class ChargeVsRunExtractor(Tool):
         for fn in trange(n_rundesc, desc=desc1):
             desc2 = "Fitting pixels"
             for pix in trange(self.n_pixels, desc=desc2):
+                pixel_area = area_list[fn][:, pix]
                 if pix in self.dead.dead_pixels:
                     continue
-                if not self.fitter.apply(area_list[fn][:, pix]):
-                    self.log.warning("FN {} Pixel {} could not be fitted"
-                                     .format(fn, pix))
-                    continue
-                self.charge[fn, pix] = self.fitter.coeff['mean']
-                self.charge_error[fn, pix] = self.fitter.coeff['stddev']
+                if self.calc_mean:
+                    self.charge[fn, pix] = np.mean(pixel_area)
+                    self.charge_error[fn, pix] = np.std(pixel_area)
+                else:
+                    if not self.fitter.apply(pixel_area.compressed):
+                        self.log.warning("FN {} Pixel {} could not be fitted"
+                                         .format(fn, pix))
+                        self.charge.mask[fn, pix] = True
+                        self.charge_error.mask[fn, pix] = True
+                        continue
+                    self.charge[fn, pix] = self.fitter.coeff['mean']
+                    self.charge_error[fn, pix] = self.fitter.coeff['stddev']
 
         self.charge = np.ma.filled(self.dead.mask2d(self.charge))
         self.charge_error = np.ma.filled(self.dead.mask2d(self.charge_error))
