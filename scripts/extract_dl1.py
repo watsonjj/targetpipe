@@ -25,7 +25,8 @@ class DL1Extractor(Tool):
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
-                        pe='DL1Extractor.adc2pe_path'
+                        pe='DL1Extractor.adc2pe_path',
+                        t0='CHECMExtractor.t0'
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
