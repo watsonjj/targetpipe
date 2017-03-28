@@ -506,11 +506,13 @@ class BokehSPE(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         brightness='FitterWidget.brightness',
-                        pe='BokehSPE.adc2pe_path'
+                        pe='BokehSPE.adc2pe_path',
+                        t0='CHECMWaveformCleaner.t0'
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    FitterWidget
+                    FitterWidget,
+                    CHECMWaveformCleaner
                     ])
 
     def __init__(self, **kwargs):

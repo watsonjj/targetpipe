@@ -26,12 +26,12 @@ class DL1Extractor(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='DL1Extractor.adc2pe_path',
-                        t0='CHECMExtractor.t0'
+                        t0='CHECMWaveformCleaner.t0'
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
                     CHECMFitterSPE,
-                    CHECMExtractor
+                    CHECMWaveformCleaner
                     ])
 
     def __init__(self, **kwargs):

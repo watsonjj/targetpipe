@@ -140,8 +140,8 @@ class Convolver(Component):
     def apply(self, samples):
         smooth0 = np.convolve(samples.ravel(), self.kernel, "same")
         smooth = np.reshape(smooth0, samples.shape)
-
         smooth *= (np.mean(samples, axis=1)/np.mean(smooth, axis=1))[:, None]
+        smooth[np.std(smooth, axis=1) > 15] = 0
         return smooth
 
 
@@ -255,10 +255,12 @@ class Filter(Component):
 class CHECMWaveformCleaner(Component):
     name = 'CHECMWaveformCleaner'
 
-    width = Int(12, help='Define the width of the peak '
+    width = Int(15, help='Define the width of the peak '
                          'window').tag(config=True)
     shift = Int(6, help='Define the shift of the peak window from the peakpos '
                         '(peakpos - shift).').tag(config=True)
+    t0 = Int(None, allow_none=True,
+             help='Override the value of t0').tag(config=True)
 
     def __init__(self, config, tool, **kwargs):
         """
@@ -291,6 +293,9 @@ class CHECMWaveformCleaner(Component):
         self.pw_l = None
         self.pw_r = None
 
+        if self.t0:
+            self.log.info("User has set t0, extracted t0 will be overridden")
+
     def apply(self, samples):
         # Subtract initial baseline
         baseline_sub = self.init_baseline.apply(samples)
@@ -298,6 +303,8 @@ class CHECMWaveformCleaner(Component):
         # Fit average waveform
         self.fitter.fit_average_wf(baseline_sub)
         t0 = self.fitter.t0
+        if self.t0:
+            t0 = self.t0
         avg_wf = self.fitter.avg
         fit_wf = self.fitter.fit
 

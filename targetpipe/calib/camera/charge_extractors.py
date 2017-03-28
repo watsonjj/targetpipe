@@ -10,8 +10,6 @@ class CHECMExtractor(Component):
                          'window').tag(config=True)
     shift = Int(3, help='Define the shift of the integration window from the '
                         'peakpos (peakpos - shift).').tag(config=True)
-    t0 = Int(None, allow_none=True,
-             help='Override the value of t0').tag(config=True)
 
     def __init__(self, config, tool, **kwargs):
         """
@@ -34,14 +32,8 @@ class CHECMExtractor(Component):
         self.iw_l = None
         self.iw_r = None
 
-        if self.t0:
-            self.log.info("User has set t0, extracted t0 will be overridden")
-
     def extract(self, samples, t0):
         n_pixels, n_samples = samples.shape
-
-        if self.t0:
-            t0 = self.t0
 
         self.iw_l = t0 - self.shift
         self.iw_r = self.iw_l + self.width

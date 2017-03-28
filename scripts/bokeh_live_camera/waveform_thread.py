@@ -62,11 +62,11 @@ class WaveformThread(Tool):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.origin = 'hessio'
-        self.input_path = '/Users/Jason/Software/outputs/sim_telarray/meudon_gamma/simtel_runmeudon_gamma_30tel_30deg_19.gz'
+        # self.origin = 'hessio'
+        # self.input_path = '/Users/Jason/Software/outputs/sim_telarray/meudon_gamma/simtel_runmeudon_gamma_30tel_30deg_19.gz'
 
-        # self.origin = 'targetio'
-        # self.input_path = '/Users/Jason/Software/outputs/lab/2016-11-23/run0.fits'
+        self.origin = 'targetio'
+        self.input_path = '/Volumes/gct-jason/data/170328/Run04990_r0.tio'
 
         self.extractor = None
         self.r1 = None
@@ -82,7 +82,10 @@ class WaveformThread(Tool):
         kwargs = dict(config=None, tool=None)
 
         ext = 'LocalPeakIntegrator'
-        extractor_factory = ChargeExtractorFactory(**kwargs, extractor=ext)
+        ext = 'SimpleIntegrator'
+        start = '41'
+        width = '4'
+        extractor_factory = ChargeExtractorFactory(**kwargs, extractor=ext, start=start, width=width)
         extractor_class = extractor_factory.get_class()
         self.extractor = extractor_class(**kwargs)
 
@@ -172,6 +175,7 @@ class WaveformThread(Tool):
                     # print(hillas[0].length)
 
                     live_d = dict(index=index, image=intensity_to_hex(cleaned))
+                    live_d = dict(index=index, image=intensity_to_hex(image))
                     LIVE_DATA = live_d
 
                     freeze_d = dict(index=index, event=copy.deepcopy(event))

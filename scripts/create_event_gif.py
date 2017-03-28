@@ -4,182 +4,191 @@ Create a animated gif of an waveforms, similar to those produced in libCHEC for
 the inauguration press release.
 """
 
-import argparse
-from astropy import log
-
-from targetpipe.io.eventfilereader import TargetioFileReader
-from ctapipe.plotting.camera import CameraPlotter
-
+from traitlets import Dict, List, Unicode, Int
+from ctapipe.core import Tool, Component
+from ctapipe.io.eventfilereader import EventFileReaderFactory
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.calib.camera.dl0 import CameraDL0Reducer
+from ctapipe.io import CameraGeometry
+from ctapipe.visualization import CameraDisplay
+from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
+from targetpipe.calib.camera.charge_extractors import CHECMExtractor
+from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.io.pixels import Dead
+import numpy as np
+from tqdm import tqdm
+from os.path import join, exists
+from os import makedirs
 from matplotlib import pyplot as plt
 from matplotlib import animation
 
-import numpy as np
-from tqdm import tqdm
-import os
 
+class Animator(Component):
+    name = 'Animator'
 
-def main():
-    parser = argparse.ArgumentParser(description='Create a gif of an waveforms')
-    parser.add_argument('-f', '--file', dest='input_path', action='store',
-                        required=True, help='path to the input file')
-    parser.add_argument('-e', '--event', dest='event_req', action='store',
-                        required=True, type=int,
-                        help='event index to plot (not id!)')
-    parser.add_argument('--id', dest='event_id_f', action='store_true',
-                        default=False, help='-e will specify event_id instead '
-                                            'of index')
-    parser.add_argument('-T', '--time', dest='time', action='store',
-                                required=True, nargs=2, type=int,
-                                help='time window to generate gif between e.g.'
-                                     ' "-T 20 21"')
-    parser.add_argument('-P', '--pixels', dest='pixels', action='store',
-                        required=True, nargs=2, type=int,
-                        help='two pixels to draw the waveform of e.g. '
-                             '"-P 10 221"')
-    parser.add_argument('--maxpix', dest='maxpix_f',
-                                action='store_true', default=False,
-                                help='output a png of the timeslice at max '
-                                     'amplitude value, with annotated '
-                                     'pixel_ids. Useful for identifying where '
-                                     'to create gif. -P and -T are overwritten'
-                                     'in this mode.')
-    parser.add_argument('-t', '--telescope', dest='tel', action='store',
-                        default=-1, help='telecope to view (default = first)')
-    parser.add_argument('-c', '--channel', dest='channel', action='store',
-                        default=0, help='channel to view (default = first)')
+    start = Int(40, help='Time to start gif').tag(config=True)
+    end = Int(8, help='Time to end gif').tag(config=True)
+    p1 = Int(0, help='Pixel 1').tag(config=True)
+    p2 = Int(0, help='Pixel 2').tag(config=True)
 
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, parent=tool, **kwargs)
 
+        self.fig = plt.figure(figsize=(24, 10))
+        self.ax1 = self.fig.add_subplot(2, 2, 1)
+        self.ax2 = self.fig.add_subplot(2, 2, 3)
+        self.camera = self.fig.add_subplot(1, 2, 2)
 
-    logger_detail = parser.add_mutually_exclusive_group()
-    logger_detail.add_argument('-q', '--quiet', dest='quiet',
-                               action='store_true', default=False,
-                               help='Quiet mode')
-    logger_detail.add_argument('-v', '--verbose', dest='verbose',
-                               action='store_true', default=False,
-                               help='Verbose mode')
-    logger_detail.add_argument('-d', '--debug', dest='debug',
-                               action='store_true', default=False,
-                               help='Debug mode')
+    def plot(self, waveforms, geom, event_id, output_dir):
+        camera = CameraDisplay(geom, ax=self.camera, image=np.zeros(2048),
+                               cmap='viridis')
+        camera.add_colorbar()
+        max_ = np.percentile(waveforms[:, self.start:self.end].max()*0.5, 60)
+        camera.set_limits_minmax(0, max_)
 
-    args = parser.parse_args()
+        self.ax1.plot(waveforms[self.p1, :])
+        self.ax2.plot(waveforms[self.p2, :])
 
-    if args.quiet:
-        log.setLevel(40)
-    if args.verbose:
-        log.setLevel(20)
-    if args.debug:
-        log.setLevel(10)
+        self.fig.suptitle("Event {}".format(event_id))
+        self.ax1.set_title("Pixel: {}".format(self.p1))
+        self.ax1.set_xlabel("Time (ns)")
+        self.ax1.set_ylabel("Amplitude (Calibrated ADC)")
+        self.ax2.set_title("Pixel: {}".format(self.p2))
+        self.ax2.set_xlabel("Time (ns)")
+        self.ax2.set_ylabel("Amplitude (Calibrated ADC)")
 
-    log.info("[SCRIPT] create_event_gif")
+        line1, = self.ax1.plot([0, 0], self.ax1.get_ylim(), color='r', alpha=1)
+        line2, = self.ax2.plot([0, 0], self.ax2.get_ylim(), color='r', alpha=1)
 
-    log.debug("[file] Reading file")
-    file_reader = TargetioFileReader(None, None, input_path = args.input_path)
-    event = file_reader.get_event(args.event_req, args.event_id_f)
+        self.camera.annotate("Pixel: {}".format(self.p1),
+                          xy=(geom.pix_x.value[self.p1],
+                          geom.pix_y.value[self.p1]),
+                          xycoords='data', xytext=(0.05, 0.98),
+                          textcoords='axes fraction',
+                          arrowprops=dict(facecolor='red', width=2, alpha=0.4),
+                          horizontalalignment='left', verticalalignment='top')
+        self.camera.annotate("Pixel: {}".format(self.p2),
+                          xy=(geom.pix_x.value[self.p2],
+                          geom.pix_y.value[self.p2]),
+                          xycoords='data', xytext=(0.05, 0.94),
+                          textcoords='axes fraction',
+                          arrowprops=dict(facecolor='orange', width=2, alpha=0.4),
+                          horizontalalignment='left', verticalalignment='top')
 
-    # Calibrate event
-
-    # Gather waveforms/args values
-    event_id = event.dl0.event_id
-    tel_list = list(event.dl0.tels_with_data)
-    tel = tel_list[0] if args.tel == -1 else args.tel
-    channel = args.channel
-    data = event.r0.tel[tel].adc_samples[channel]
-    n_pixels = event.inst.num_pixels[tel]
-    t0 = args.time[0] if args.time[0] > 0 else 0
-    t1 = args.time[1] if args.time[1] < np.size(data[0, :]) \
-        else np.size(data[0, :])
-
-    # Print waveforms/args values
-    log.info("[event_id] {}".format(event_id))
-    log.info("[event_index] {}".format(event.count))
-    log.info("[telescope] {}".format(tel))
-    log.info("[channel] {}".format(channel))
-
-    # Draw figures
-    fig = plt.figure(figsize=(24, 10))
-    ax0 = fig.add_subplot(2, 2, 1)
-    ax1 = fig.add_subplot(2, 2, 3)
-    ax2 = fig.add_subplot(1, 2, 2)
-
-    plotter = CameraPlotter(event)
-    waveform0 = plotter.draw_waveform(data[args.pixels[0], :], ax0)
-    ax0.set_title("Pixel: {}".format(args.pixels[0]))
-    line0 = plotter.draw_waveform_positionline(0, ax0)
-    waveform1 = plotter.draw_waveform(data[args.pixels[1], :], ax1)
-    ax1.set_title("Pixel: {}".format(args.pixels[1]))
-    line1 = plotter.draw_waveform_positionline(0, ax1)
-
-    camera = plotter.draw_camera(tel, data[:, 0], ax2)
-    ax2.set_title("[Input] {} [Event] {} [Telescope] {} [Channel] {} "
-                  "[Time] {}-{} UNCALIBRATED".format(file_reader.filename,
-                                                     event_id, tel,
-                                                     channel, t0, t1))
-
-    if args.maxpix_f:
-        # Create image of maxpix
-        flatten_sorted = data.flatten().argsort()[:][::-1]
-        pixels_max = np.unravel_index(flatten_sorted, data.shape)[0]
-        pixels_max_sortedunique, ind = np.unique(pixels_max, return_index=True)
-        pixels_max_unique = pixels_max[ind[np.argsort(ind)]]
-        p0 = pixels_max_unique[0]
-        p1 = pixels_max_unique[8]
-        t0 = np.unravel_index(np.argmax(data), data.shape)[1]
-
-        ax0.cla()
-        plotter.draw_waveform(data[p0, :], ax0)
-        ax0.set_title("Pixel: {}".format(p0))
-        ax1.cla()
-        plotter.draw_waveform(data[p1, :], ax1)
-        ax1.set_title("Pixel: {}".format(p1))
-        camera.image = data[:, t0]
-        ax2.set_title("[Input] {} [Event] {} [Telescope] {} [Channel] {} "
-                      "[Time] {} UNCALIBRATED".format(file_reader.filename, event_id, tel,
-                                            channel, t0, t1))
-        plotter.draw_camera_pixel_annotation(tel, p0, p1, ax2)
-        plotter.draw_camera_pixel_ids(tel, np.arange(n_pixels), ax2)
-
-        output_name = "{}_e{}_t{}_c{}_maxpix.pdf".format(file_reader.filename,
-                                                         event_id, tel,
-                                                         channel)
-        output_path = os.path.join(file_reader.output_directory, output_name)
-        if not os.path.exists(os.path.dirname(output_path)):
-            log.info("[output] Creating directory: {}".format(
-                os.path.dirname(output_path)))
-            os.makedirs(os.path.dirname(output_path))
-        log.info("[output] {}".format(output_path))
-        plt.savefig(output_path, format='pdf')
-
-    else:
-        plotter.draw_camera_pixel_annotation(tel, args.pixels[0],
-                                             args.pixels[1], ax2)
         # Create animation
-        div = 3
+        div = 5
         increment = 1/div
-        n_frames = int((t1 - t0)/increment)
+        n_frames = int((self.end - self.start)/increment)
         interval = int(500*increment)
 
-        output_name = "{}_e{}_t{}_c{}_camera.gif".format(file_reader.filename,
-                                                         event_id, tel, channel)
-        output_path = os.path.join(file_reader.output_directory, output_name)
-        if not os.path.exists(os.path.dirname(output_path)):
-            log.info("[output] Creating directory: {}".format(
-                os.path.dirname(output_path)))
-            os.makedirs(os.path.dirname(output_path))
-        log.info("[output][in_progress] {}".format(output_path))
+        # Prepare Output
+        output_path = join(output_dir, "animation_e{}.gif".format(event_id))
+        if not exists(output_dir):
+            self.log.info("Creating directory: {}".format(output_dir))
+            makedirs(output_dir)
+        self.log.info("Output: {}".format(output_path))
 
-        with tqdm(total=n_frames, desc="Creating animation", smoothing=0) \
-                as pbar:
+        with tqdm(total=n_frames, desc="Creating animation") as pbar:
             def animate(i):
                 pbar.update(1)
-                camera.image = data[:, int(t0+(i//div))]
-                line0.set_xdata(t0+(i/div))
-                line1.set_xdata(t0+(i/div))
-                return line1, line0
+                t = self.start + (i / div)
+                camera.image = waveforms[:, int(t)]
+                line1.set_xdata(t)
+                line2.set_xdata(t)
 
-            anim = animation.FuncAnimation(fig, animate, frames=n_frames,
-                                           interval=interval, blit=True)
+            anim = animation.FuncAnimation(self.fig, animate, frames=n_frames,
+                                           interval=interval)
             anim.save(output_path, writer='imagemagick')
-    log.info("[COMPLETE]")
 
-if __name__ == '__main__':
-    main()
+
+class EventAnimationCreator(Tool):
+    name = "EventAnimationCreator"
+    description = "Create an animation of the camera image through timeslices"
+
+    adc2pe_path = Unicode('', help='Path to the numpy adc2pe '
+                                   'file').tag(config=True)
+    req_event = Int(0, help='Event to plot').tag(config=True)
+
+    aliases = Dict(dict(r='EventFileReaderFactory.reader',
+                        f='EventFileReaderFactory.input_path',
+                        max_events='EventFileReaderFactory.max_events',
+                        ped='CameraR1CalibratorFactory.pedestal_path',
+                        tf='CameraR1CalibratorFactory.tf_path',
+                        # pe='DL1Extractor.adc2pe_path',
+                        t0='CHECMWaveformCleaner.t0',
+                        e='EventAnimationCreator.req_event',
+                        start='Animator.start',
+                        end='Animator.end',
+                        p1='Animator.p1',
+                        p2='Animator.p2'
+                        ))
+    classes = List([EventFileReaderFactory,
+                    CameraR1CalibratorFactory,
+                    CHECMWaveformCleaner,
+                    CHECMFitterSPE,
+                    Animator
+                    ])
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.reader = None
+        self.r1 = None
+        self.dl0 = None
+
+        self.cleaner = None
+        self.extractor = None
+        self.fitter = None
+        self.dead = None
+
+        self.adc2pe = None
+
+        self.animator = None
+
+    def setup(self):
+        self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
+        kwargs = dict(config=self.config, tool=self)
+
+        reader_factory = EventFileReaderFactory(**kwargs)
+        reader_class = reader_factory.get_class()
+        self.reader = reader_class(**kwargs)
+
+        r1_factory = CameraR1CalibratorFactory(origin=self.reader.origin,
+                                               **kwargs)
+        r1_class = r1_factory.get_class()
+        self.r1 = r1_class(**kwargs)
+
+        self.dl0 = CameraDL0Reducer(**kwargs)
+
+        self.cleaner = CHECMWaveformCleaner(**kwargs)
+        self.extractor = CHECMExtractor(**kwargs)
+        self.fitter = CHECMFitterSPE(**kwargs)
+        self.dead = Dead()
+
+        if self.adc2pe_path:
+            self.adc2pe = np.load(self.adc2pe_path)
+
+        self.animator = Animator(**kwargs)
+
+    def start(self):
+        event = self.reader.get_event(self.req_event)
+        telid = list(event.r0.tels_with_data)[0]
+        geom = CameraGeometry.guess(*event.inst.pixel_pos[0],
+                                    event.inst.optical_foclen[0])
+
+        self.r1.calibrate(event)
+        self.dl0.reduce(event)
+
+        dl0 = np.copy(event.dl0.tel[telid].pe_samples[0])
+
+        # Perform CHECM Waveform Cleaning
+        sb_sub_wf, t0 = self.cleaner.apply(dl0)
+
+        output_dir = self.reader.output_directory
+        self.animator.plot(sb_sub_wf, geom, self.req_event, output_dir)
+
+    def finish(self):
+        pass
+
+exe = EventAnimationCreator()
+exe.run()
