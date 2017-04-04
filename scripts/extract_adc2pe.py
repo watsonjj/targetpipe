@@ -3,8 +3,9 @@ from ctapipe.core import Tool
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
-from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from targetpipe.calib.camera.charge_extractors import CHECMExtractor
+from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
+from ctapipe.calib.camera.charge_extractors import AverageWfPeakIntegrator
+from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.fitting.checm import CHECMFitterSPE
 from targetpipe.io.pixels import Dead
 import numpy as np
@@ -26,7 +27,7 @@ class BokehSPE(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitterSPE
+                    CHECMFitterSPE,
                     ])
 
     def __init__(self, **kwargs):
@@ -35,9 +36,10 @@ class BokehSPE(Tool):
         self.reader = None
         self.r1 = None
         self.dl0 = None
-
         self.cleaner = None
         self.extractor = None
+        self.dl1 = None
+
         self.fitter = None
         self.dead = None
 
@@ -57,11 +59,15 @@ class BokehSPE(Tool):
                                                **kwargs)
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
-
-        self.dl0 = CameraDL0Reducer(**kwargs)
-
         self.cleaner = CHECMWaveformCleaner(**kwargs)
-        self.extractor = CHECMExtractor(**kwargs)
+        self.extractor = AverageWfPeakIntegrator(**kwargs,
+                                                 window_shift=3,
+                                                 window_width=8)
+        self.dl0 = CameraDL0Reducer(**kwargs)
+        self.dl1 = CameraDL1Calibrator(extractor=self.extractor,
+                                       cleaner=self.cleaner,
+                                       **kwargs)
+
         self.fitter = CHECMFitterSPE(**kwargs)
         self.dead = Dead()
 
@@ -91,14 +97,10 @@ class BokehSPE(Tool):
 
                 self.r1.calibrate(event)
                 self.dl0.reduce(event)
-
-                dl0 = np.copy(event.dl0.tel[telid].pe_samples[0])
-
-                # Perform CHECM Waveform Cleaning
-                sb_sub_wf, t0 = self.cleaner.apply(dl0)
+                self.dl1.calibrate(event)
 
                 # Perform CHECM Charge Extraction
-                peak_area, peak_height = self.extractor.extract(sb_sub_wf, t0)
+                peak_area = event.dl1.tel[telid].image
 
                 area[index] = peak_area
 

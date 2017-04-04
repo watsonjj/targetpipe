@@ -5,14 +5,16 @@ the inauguration press release.
 """
 
 from traitlets import Dict, List, Unicode, Int
+
 from ctapipe.core import Tool, Component
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
+from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
+from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
+from ctapipe.calib.camera.waveform_cleaning import WaveformCleanerFactory
 from ctapipe.io import CameraGeometry
 from ctapipe.visualization import CameraDisplay
-from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from targetpipe.calib.camera.charge_extractors import CHECMExtractor
 from targetpipe.fitting.checm import CHECMFitterSPE
 from targetpipe.io.pixels import Dead
 import numpy as np
@@ -60,20 +62,20 @@ class Animator(Component):
         line1, = self.ax1.plot([0, 0], self.ax1.get_ylim(), color='r', alpha=1)
         line2, = self.ax2.plot([0, 0], self.ax2.get_ylim(), color='r', alpha=1)
 
-        self.camera.annotate("Pixel: {}".format(self.p1),
-                          xy=(geom.pix_x.value[self.p1],
-                          geom.pix_y.value[self.p1]),
-                          xycoords='data', xytext=(0.05, 0.98),
-                          textcoords='axes fraction',
-                          arrowprops=dict(facecolor='red', width=2, alpha=0.4),
-                          horizontalalignment='left', verticalalignment='top')
-        self.camera.annotate("Pixel: {}".format(self.p2),
-                          xy=(geom.pix_x.value[self.p2],
-                          geom.pix_y.value[self.p2]),
-                          xycoords='data', xytext=(0.05, 0.94),
-                          textcoords='axes fraction',
-                          arrowprops=dict(facecolor='orange', width=2, alpha=0.4),
-                          horizontalalignment='left', verticalalignment='top')
+        self.camera.annotate(
+            "Pixel: {}".format(self.p1),
+            xy=(geom.pix_x.value[self.p1], geom.pix_y.value[self.p1]),
+            xycoords='data', xytext=(0.05, 0.98),
+            textcoords='axes fraction',
+            arrowprops=dict(facecolor='red', width=2, alpha=0.4),
+            horizontalalignment='left', verticalalignment='top')
+        self.camera.annotate(
+            "Pixel: {}".format(self.p2),
+            xy=(geom.pix_x.value[self.p2], geom.pix_y.value[self.p2]),
+            xycoords='data', xytext=(0.05, 0.94),
+            textcoords='axes fraction',
+            arrowprops=dict(facecolor='orange', width=2, alpha=0.4),
+            horizontalalignment='left', verticalalignment='top')
 
         # Create animation
         div = 5
@@ -114,8 +116,9 @@ class EventAnimationCreator(Tool):
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
+                        cleaner='WaveformCleanerFactory.cleaner',
+                        cleaner_t0='WaveformCleanerFactory.t0',
                         # pe='DL1Extractor.adc2pe_path',
-                        t0='CHECMWaveformCleaner.t0',
                         e='EventAnimationCreator.req_event',
                         start='Animator.start',
                         end='Animator.end',
@@ -124,7 +127,7 @@ class EventAnimationCreator(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMWaveformCleaner,
+                    WaveformCleanerFactory,
                     CHECMFitterSPE,
                     Animator
                     ])
@@ -135,9 +138,10 @@ class EventAnimationCreator(Tool):
         self.reader = None
         self.r1 = None
         self.dl0 = None
-
         self.cleaner = None
         self.extractor = None
+        self.dl1 = None
+
         self.fitter = None
         self.dead = None
 
@@ -158,10 +162,20 @@ class EventAnimationCreator(Tool):
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
 
+        cleaner_factory = WaveformCleanerFactory(**kwargs)
+        cleaner_class = cleaner_factory.get_class()
+        self.cleaner = cleaner_class(**kwargs)
+
+        extractor_factory = ChargeExtractorFactory(**kwargs)
+        extractor_class = extractor_factory.get_class()
+        self.extractor = extractor_class(**kwargs)
+
         self.dl0 = CameraDL0Reducer(**kwargs)
 
-        self.cleaner = CHECMWaveformCleaner(**kwargs)
-        self.extractor = CHECMExtractor(**kwargs)
+        self.dl1 = CameraDL1Calibrator(extractor=self.extractor,
+                                       cleaner=self.cleaner,
+                                       **kwargs)
+
         self.fitter = CHECMFitterSPE(**kwargs)
         self.dead = Dead()
 
@@ -178,14 +192,12 @@ class EventAnimationCreator(Tool):
 
         self.r1.calibrate(event)
         self.dl0.reduce(event)
+        self.dl1.calibrate(event)
 
-        dl0 = np.copy(event.dl0.tel[telid].pe_samples[0])
-
-        # Perform CHECM Waveform Cleaning
-        sb_sub_wf, t0 = self.cleaner.apply(dl0)
+        cleaned = event.dl1.tel[telid].cleaned[0]
 
         output_dir = self.reader.output_directory
-        self.animator.plot(sb_sub_wf, geom, self.req_event, output_dir)
+        self.animator.plot(cleaned, geom, self.req_event, output_dir)
 
     def finish(self):
         pass

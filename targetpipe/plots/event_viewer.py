@@ -16,7 +16,7 @@ class EventViewerCamera(CameraDisplay):
         self._time = 0
         super().__init__(fig=fig)
 
-        self._view_options = ['r0', 'r1', 'dl0', 'dl1', 'peakpos']
+        self._view_options = ['r0', 'r1', 'dl0', 'dl1', 'peakpos', 'cleaned']
         self.w_view = None
         self._geom_tel = None
         self._geom_url = None
@@ -77,6 +77,16 @@ class EventViewerCamera(CameraDisplay):
                 self.fig.title.text = 'DL1 Peakpos Image'
                 if self.cb:
                     self.cb.title = "ns"
+            elif v == 'cleaned':
+                samples = e.dl1.tel[t].cleaned
+                if samples is None:
+                    self.image = None
+                else:
+                    self.image = samples[c, :, time]
+                self.fig.title.text = 'Cleaned p.e. Samples (T = {})'\
+                    .format(time)
+                if self.cb:
+                    self.cb.title = "p.e."
             else:
                 raise ValueError("No view configuration set up "
                                  "for: {}".format(v))
@@ -186,7 +196,7 @@ class EventViewerWaveform(WaveformDisplay):
         super().__init__(fig=fig)
         self._draw_integration_window()
 
-        self._view_options = ['r0', 'r1', 'dl0']
+        self._view_options = ['r0', 'r1', 'dl0', 'cleaned']
         self.w_view = None
 
         self.event_viewer = event_viewer
@@ -225,6 +235,15 @@ class EventViewerWaveform(WaveformDisplay):
                 else:
                     self.waveform = samples[c, p]
                 self.fig.title.text = 'DL0 p.e. Samples (Pixel = {})'.format(p)
+                self.fig.yaxis.axis_label = 'p.e.'
+            elif v == 'cleaned':
+                samples = e.dl1.tel[t].cleaned
+                if samples is None:
+                    self.waveform = None
+                else:
+                    self.waveform = samples[c, p]
+                self.fig.title.text = 'Cleaned p.e. Samples (Pixel = {})'\
+                    .format(p)
                 self.fig.yaxis.axis_label = 'p.e.'
             else:
                 raise ValueError("No view configuration set up "

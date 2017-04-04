@@ -79,8 +79,8 @@ def show_absent_pedestal_entries(input_path, pedestal_path):
     tm = 0
     tmpix = 0
 
-    # p = ped_adrian[tm, tmpix]
-    p = ped_blocks4[tm, tmpix]
+    p = ped_adrian[tm, tmpix]
+    # p = ped_blocks4[tm, tmpix]
 
     empty_x, empty_y = np.where(p == 0)
 
@@ -94,20 +94,20 @@ def show_absent_pedestal_entries(input_path, pedestal_path):
     with tqdm(total=reader.n_events) as pbar:
         for _ in source:
             pbar.update(1)
-            # fci = reader.first_cell_ids[0]
-            # bp, r, c = get_bp_r_c(fci)
-            # block = r + c * N_ROWS
-            # hits[block, bp:bp+n_samples] += 1
-
             fci = reader.first_cell_ids[0]
-            uncorrected_cells = sample_range + fci
-            cells = uncorrected_cells % N_CELLS
-            uncor_x = uncorrected_cells[:, None]
-            cells_x = cells[:, None]
-            i_block4 = uncor_x // N_BLOCKSAMPLES - \
-                (uncor_x[0, :] // N_BLOCKSAMPLES)[:, None]
-            h = hits[cells_x, i_block4]
-            hits[cells_x, i_block4] = h + 1
+            bp, r, c = get_bp_r_c(fci)
+            block = r + c * N_ROWS
+            hits[block, bp:bp+n_samples] += 1
+
+            # fci = reader.first_cell_ids[0]
+            # uncorrected_cells = sample_range + fci
+            # cells = uncorrected_cells % N_CELLS
+            # uncor_x = uncorrected_cells[:, None]
+            # cells_x = cells[:, None]
+            # i_block4 = uncor_x // N_BLOCKSAMPLES - \
+            #     (uncor_x[0, :] // N_BLOCKSAMPLES)[:, None]
+            # h = hits[cells_x, i_block4]
+            # hits[cells_x, i_block4] = h + 1
 
     hit_x, hit_y = np.where((p == 0) & (hits > 0))
 
@@ -119,10 +119,10 @@ def show_absent_pedestal_entries(input_path, pedestal_path):
     output_file(join(fig_dir, 'absent.html'))
     fig = figure(plot_width=700, plot_height=700,
                  active_scroll='wheel_zoom')
-    # fig.xaxis.axis_label="Block"
-    # fig.yaxis.axis_label="BlockPhase+Sample"
-    fig.xaxis.axis_label = "Cell"
-    fig.yaxis.axis_label = "DBlock"
+    fig.xaxis.axis_label="Block"
+    fig.yaxis.axis_label="BlockPhase+Sample"
+    # fig.xaxis.axis_label = "Cell"
+    # fig.yaxis.axis_label = "DBlock"
     c1 = fig.circle(empty_x, empty_y, legend="Pedestal_Hits=0")
     c2 = fig.cross(hit_x, hit_y, size=10, color='orange',
                    legend="Pedestal_Hits=0, Run_Hits>0")

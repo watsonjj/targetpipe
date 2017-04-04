@@ -128,11 +128,6 @@ class EventFileLooper(Tool):
                 telid = list(event.r0.tels_with_data)[0]
                 r1 = event.r1.tel[telid].pe_samples[0]
 
-                # r1[4] = 0
-                # r1[16:] = 0
-                # r1 = np.ma.masked_where(r1 == 0, r1)
-
-
                 event_mean[index] = np.mean(r1)
                 event_stddev[index] = np.std(r1)
 

@@ -8,6 +8,7 @@ from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
 from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
+from ctapipe.calib.camera.waveform_cleaning import WaveformCleanerFactory
 from targetpipe.plots.event_viewer import EventViewer
 
 
@@ -21,14 +22,20 @@ class BokehFileViewer(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         extractor='ChargeExtractorFactory.extractor',
-                        window_width='ChargeExtractorFactory.window_width',
-                        window_start='ChargeExtractorFactory.window_start',
-                        window_shift='ChargeExtractorFactory.window_shift',
-                        sig_amp_cut_HG='ChargeExtractorFactory.sig_amp_cut_HG',
-                        sig_amp_cut_LG='ChargeExtractorFactory.sig_amp_cut_LG',
-                        lwt='ChargeExtractorFactory.lwt',
+                        extractor_t0='ChargeExtractorFactory.t0',
+                        extractor_window_width='ChargeExtractorFactory.'
+                                               'window_width',
+                        extractor_window_shift='ChargeExtractorFactory.'
+                                               'window_shift',
+                        extractor_sig_amp_cut_HG='ChargeExtractorFactory.'
+                                                 'sig_amp_cut_HG',
+                        extractor_sig_amp_cut_LG='ChargeExtractorFactory.'
+                                                 'sig_amp_cut_LG',
+                        extractor_lwt='ChargeExtractorFactory.lwt',
                         clip_amplitude='CameraDL1Calibrator.clip_amplitude',
                         radius='CameraDL1Calibrator.radius',
+                        cleaner='WaveformCleanerFactory.cleaner',
+                        cleaner_t0='WaveformCleanerFactory.t0',
                         ))
     flags = Dict(dict(id=({'DisplayDL1Calib': {'use_event_index': True}},
                           'event_index will obtain an event using '
@@ -37,7 +44,8 @@ class BokehFileViewer(Tool):
     classes = List([EventFileReaderFactory,
                     ChargeExtractorFactory,
                     CameraR1CalibratorFactory,
-                    CameraDL1Calibrator
+                    CameraDL1Calibrator,
+                    WaveformCleanerFactory
                     ])
 
     def __init__(self, **kwargs):
@@ -48,6 +56,7 @@ class BokehFileViewer(Tool):
         self._telid = None
         self._channel = None
         self._extractor = None
+        self._cleaner = None
 
         self.w_event_index = None
         self.w_event_id = None
@@ -63,7 +72,7 @@ class BokehFileViewer(Tool):
         self.dl1 = None
         self.viewer = None
 
-        self._updating_extractor = False
+        self._updating_dl1 = False
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -77,6 +86,10 @@ class BokehFileViewer(Tool):
         extractor_class = extractor_factory.get_class()
         self._extractor = extractor_class(**kwargs)
 
+        cleaner_factory = WaveformCleanerFactory(**kwargs)
+        cleaner_class = cleaner_factory.get_class()
+        self._cleaner = cleaner_class(**kwargs)
+
         r1_factory = CameraR1CalibratorFactory(origin=self.file_reader.origin,
                                                **kwargs)
         r1_class = r1_factory.get_class()
@@ -84,7 +97,9 @@ class BokehFileViewer(Tool):
 
         self.dl0 = CameraDL0Reducer(**kwargs)
 
-        self.dl1 = CameraDL1Calibrator(extractor=self.extractor, **kwargs)
+        self.dl1 = CameraDL1Calibrator(extractor=self.extractor,
+                                       cleaner=self.cleaner,
+                                       **kwargs)
 
         self.viewer = EventViewer(**kwargs)
 
@@ -95,8 +110,8 @@ class BokehFileViewer(Tool):
         self.create_event_id_widget()
         self.create_telid_widget()
         self.create_channel_widget()
-        self.create_extractor_widgets()
-        self.update_extractor_widget_values()
+        self.create_dl1_widgets()
+        self.update_dl1_widget_values()
 
         # Setup layout
         self.layout = layout([
@@ -193,7 +208,23 @@ class BokehFileViewer(Tool):
     def extractor(self, val):
         self._extractor = val
         kwargs = dict(config=self.config, tool=self)
-        self.dl1 = CameraDL1Calibrator(extractor=val, **kwargs)
+        self.dl1 = CameraDL1Calibrator(extractor=val,
+                                       cleaner=self.cleaner,
+                                       **kwargs)
+        self.dl1.calibrate(self.event)
+        self.viewer.refresh()
+
+    @property
+    def cleaner(self):
+        return self._cleaner
+
+    @cleaner.setter
+    def cleaner(self, val):
+        self._cleaner = val
+        kwargs = dict(config=self.config, tool=self)
+        self.dl1 = CameraDL1Calibrator(extractor=self.extractor,
+                                       cleaner=val,
+                                       **kwargs)
         self.dl1.calibrate(self.event)
         self.viewer.refresh()
 
@@ -251,45 +282,62 @@ class BokehFileViewer(Tool):
         if self.channel != int(self.w_channel.value):
             self.channel = int(self.w_channel.value)
 
-    def create_extractor_widgets(self):
+    def create_dl1_widgets(self):
         self.w_dl1_dict = dict(
+            cleaner=Select(title="Cleaner:", value='', width=5,
+                           options=WaveformCleanerFactory.subclass_names),
+            cleaner_t0=TextInput(title="T0:", value=''),
             extractor=Select(title="Extractor:", value='', width=5,
                              options=ChargeExtractorFactory.subclass_names),
-            window_width=TextInput(title="Window Width:", value=''),
-            window_start=TextInput(title="Window Start:", value=''),
-            window_shift=TextInput(title="Window Shift:", value=''),
-            sig_amp_cut_HG=TextInput(title="Significant Amplitude Cut (HG):",
-                                     value=''),
-            sig_amp_cut_LG=TextInput(title="Significant Amplitude Cut (LG):",
-                                     value=''),
-            lwt=TextInput(title="Local Pixel Weight:", value=''))
+            extractor_t0=TextInput(title="T0:", value=''),
+            extractor_window_width=TextInput(title="Window Width:", value=''),
+            extractor_window_shift=TextInput(title="Window Shift:", value=''),
+            extractor_sig_amp_cut_HG=TextInput(title="Significant Amplitude "
+                                                     "Cut (HG):", value=''),
+            extractor_sig_amp_cut_LG=TextInput(title="Significant Amplitude "
+                                                     "Cut (LG):", value=''),
+            extractor_lwt=TextInput(title="Local Pixel Weight:", value=''))
 
         for key, val in self.w_dl1_dict.items():
-            val.on_change('value', self.on_extractor_widget_change)
+            val.on_change('value', self.on_dl1_widget_change)
 
-        self.wb_extractor = widgetbox(PreText(text="Charge Extractor "
-                                                   "Configuration"),
-                                      self.w_dl1_dict['extractor'],
-                                      self.w_dl1_dict['window_width'],
-                                      self.w_dl1_dict['window_start'],
-                                      self.w_dl1_dict['window_shift'],
-                                      self.w_dl1_dict['sig_amp_cut_HG'],
-                                      self.w_dl1_dict['sig_amp_cut_LG'],
-                                      self.w_dl1_dict['lwt'])
+        self.wb_extractor = widgetbox(
+            PreText(text="Charge Extractor Configuration"),
+            self.w_dl1_dict['cleaner'],
+            self.w_dl1_dict['cleaner_t0'],
+            self.w_dl1_dict['extractor'],
+            self.w_dl1_dict['extractor_t0'],
+            self.w_dl1_dict['extractor_window_width'],
+            self.w_dl1_dict['extractor_window_shift'],
+            self.w_dl1_dict['extractor_sig_amp_cut_HG'],
+            self.w_dl1_dict['extractor_sig_amp_cut_LG'],
+            self.w_dl1_dict['extractor_lwt'])
 
-    def update_extractor_widget_values(self):
+    def update_dl1_widget_values(self):
         for key, val in self.w_dl1_dict.items():
-            if key == 'extractor':
-                key = 'name'
-            try:
-                val.value = str(getattr(self.extractor, key))
-            except AttributeError:
-                val.value = ''
+            if 'extractor' in key:
+                if key == 'extractor':
+                    key = 'name'
+                else:
+                    key = key.replace("extractor_", "")
+                try:
+                    val.value = str(getattr(self.extractor, key))
+                except AttributeError:
+                    val.value = ''
+            elif 'cleaner' in key:
+                if key == 'cleaner':
+                    key = 'name'
+                else:
+                    key = key.replace("cleaner_", "")
+                try:
+                    val.value = str(getattr(self.cleaner, key))
+                except AttributeError:
+                    val.value = ''
 
-    def on_extractor_widget_change(self, attr, old, new):
+    def on_dl1_widget_change(self, attr, old, new):
         if self.event:
-            if not self._updating_extractor:
-                self._updating_extractor = True
+            if not self._updating_dl1:
+                self._updating_dl1 = True
                 cmdline = []
                 for key, val in self.w_dl1_dict.items():
                     if val.value:
@@ -300,8 +348,11 @@ class BokehFileViewer(Tool):
                 extractor_factory = ChargeExtractorFactory(**kwargs)
                 extractor_class = extractor_factory.get_class()
                 self.extractor = extractor_class(**kwargs)
-                self.update_extractor_widget_values()
-                self._updating_extractor = False
+                cleaner_factory = WaveformCleanerFactory(**kwargs)
+                cleaner_class = cleaner_factory.get_class()
+                self.cleaner = cleaner_class(**kwargs)
+                self.update_dl1_widget_values()
+                self._updating_dl1 = False
 
 
 exe = BokehFileViewer()

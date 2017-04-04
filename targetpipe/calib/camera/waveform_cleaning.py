@@ -4,6 +4,7 @@ from ctapipe.core import Component
 import numpy as np
 from scipy import signal
 from scipy.signal import general_gaussian
+from scipy.ndimage.filters import convolve1d
 
 
 class BaselineSubtractor(Component):
@@ -140,8 +141,7 @@ class Convolver(Component):
     def apply(self, samples):
         smooth0 = np.convolve(samples.ravel(), self.kernel, "same")
         smooth = np.reshape(smooth0, samples.shape)
-        smooth *= (np.mean(samples, axis=1)/np.mean(smooth, axis=1))[:, None]
-        smooth[np.std(smooth, axis=1) > 15] = 0
+        smooth *= (np.std(samples, axis=1)/np.std(smooth, axis=1))[:, None]
         return smooth
 
 

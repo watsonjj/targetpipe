@@ -1,7 +1,7 @@
 from bokeh.io import curdoc
 from bokeh.layouts import layout
 from bokeh.plotting import figure
-from traitlets import Dict, List, CaselessStrEnum as CaStEn, Unicode
+from traitlets import Dict, List, CaselessStrEnum as CaStEn, Unicode, Int
 from bokeh.models import Select, ColumnDataSource, palettes, \
     RadioGroup, CheckboxGroup, Legend, Div, Span, TableColumn, DataTable, \
     NumberFormatter, TextInput, Button
@@ -10,10 +10,12 @@ from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.io import CameraGeometry
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
+from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
+from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.calib.camera.charge_extractors import SimpleIntegrator, \
+    AverageWfPeakIntegrator
 from targetpipe.visualization.bokeh import CameraDisplay
 from targetpipe.io.pixels import get_neighbours_2d, Dead
-from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from targetpipe.calib.camera.charge_extractors import CHECMExtractor
 from targetpipe.fitting.checm import CHECMFitterSPE, CHECMFitterBright
 import numpy as np
 from collections import defaultdict
@@ -266,7 +268,7 @@ class StageViewer(Component):
                                 label_text_color='green')
                 fig.add_layout(legend, 'right')
 
-        self.cb = CheckboxGroup(labels=self.stage_list, active=[0, 7])
+        self.cb = CheckboxGroup(labels=self.stage_list, active=[0, 6])
         self.cb.on_click(self._on_checkbox_select)
         self.active_stages = [self.stage_list[i] for i in self.cb.active]
 
@@ -305,12 +307,13 @@ class StageViewer(Component):
             pixel = self._get_neighbour_pixel(i)
             if pixel is None:
                 cdsource_d = dict(x=[])
-                for stage, values in self.stages.items():
+                for stage in self.stage_list:
                     cdsource_d[stage] = []
                 cdsource.data = cdsource_d
             else:
                 cdsource_d = dict(x=x)
-                for stage, values in self.stages.items():
+                for stage in self.stage_list:
+                    values = self.stages[stage]
                     if values.ndim == 2:
                         cdsource_d[stage] = values[pixel]
                     elif values.ndim == 1:
@@ -499,6 +502,8 @@ class BokehSPE(Tool):
     adc2pe_path = Unicode('', allow_none=True,
                           help='Path to the numpy adc2pe '
                                'file').tag(config=True)
+    t0 = Int(None, allow_none=True,
+             help='Override the value of t0').tag(config=True)
 
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
@@ -507,7 +512,7 @@ class BokehSPE(Tool):
                         tf='CameraR1CalibratorFactory.tf_path',
                         brightness='FitterWidget.brightness',
                         pe='BokehSPE.adc2pe_path',
-                        t0='CHECMWaveformCleaner.t0'
+                        t0='BokehSPE.t0'
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
@@ -531,6 +536,7 @@ class BokehSPE(Tool):
         self.reader = None
         self.r1 = None
         self.dl0 = None
+        self.dl1 = None
         self.area = None
         self.height = None
 
@@ -542,6 +548,7 @@ class BokehSPE(Tool):
 
         self.cleaner = None
         self.extractor = None
+        self.extractor_height = None
         self.dead = None
 
         self.neighbours2d = None
@@ -569,22 +576,45 @@ class BokehSPE(Tool):
 
         self.dl0 = CameraDL0Reducer(**kwargs)
 
-        self.cleaner = CHECMWaveformCleaner(**kwargs)
-        self.extractor = CHECMExtractor(**kwargs)
+        self.cleaner = CHECMWaveformCleaner(t0=self.t0, **kwargs)
+        if self.t0:
+            self.extractor = SimpleIntegrator(t0=self.t0,
+                                              window_shift=3,
+                                              window_width=8,
+                                              **kwargs)
+        else:
+            self.extractor = AverageWfPeakIntegrator(window_shift=3,
+                                                     window_width=8,
+                                                     **kwargs)
+        self.extractor_height = SimpleIntegrator(window_shift=0,
+                                                 window_width=1,
+                                                 **kwargs)
+
+        self.dl1 = CameraDL1Calibrator(extractor=self.extractor,
+                                       cleaner=self.cleaner,
+                                       **kwargs)
+        self.dl1_height = CameraDL1Calibrator(extractor=self.extractor_height,
+                                              cleaner=self.cleaner,
+                                              **kwargs)
+
         self.dead = Dead()
 
         self.n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
-        telid = list(first_event.r0.tels_with_data)[0]
-        geom = CameraGeometry.guess(*first_event.inst.pixel_pos[telid],
-                                    first_event.inst.optical_foclen[telid])
+        r0 = first_event.r0.tel[0].adc_samples[0]
+        self.n_pixels, self.n_samples = r0.shape
+        geom = CameraGeometry.guess(*first_event.inst.pixel_pos[0],
+                                    first_event.inst.optical_foclen[0])
         self.neighbours2d = get_neighbours_2d(geom.pix_x, geom.pix_y)
 
         # Get stage names
-        r0 = first_event.r0.tel[telid].adc_samples[0]
-        self.n_pixels, self.n_samples = r0.shape
-        self.cleaner.apply(r0)
-        self.stage_names = sorted(list(self.cleaner.stages.keys()))
+        self.stage_names = ['0: raw',
+                            '1: baseline_sub',
+                            '2: avg_wf',
+                            '3: no_pulse',
+                            '4: smooth_baseline',
+                            '5: smooth_wf',
+                            '6: cleaned']
 
         if self.adc2pe_path:
             self.adc2pe = np.load(self.adc2pe_path)
@@ -609,15 +639,10 @@ class BokehSPE(Tool):
 
             self.r1.calibrate(event)
             self.dl0.reduce(event)
-
-            telid = list(event.r0.tels_with_data)[0]
-            dl0 = np.copy(event.dl0.tel[telid].pe_samples[0])
-
-            # Perform CHECM Waveform Cleaning
-            sb_sub_wf, t0 = self.cleaner.apply(dl0)
-
-            # Perform CHECM Charge Extraction
-            peak_area, peak_height = self.extractor.extract(sb_sub_wf, t0)
+            self.dl1.calibrate(event)
+            peak_area = np.copy(event.dl1.tel[0].image)
+            self.dl1_height.calibrate(event)
+            peak_height = np.copy(event.dl1.tel[0].image)
 
             self.area[index] = peak_area
             self.height[index] = peak_height
@@ -706,37 +731,27 @@ class BokehSPE(Tool):
 
     @event.setter
     def event(self, val):
-
-        # Calibrate
-        self.r1.calibrate(val)
-        self.dl0.reduce(val)
-
         self._event = val
 
-        telid = list(val.r0.tels_with_data)[0]
-        self.p_camera_area._telid = telid
-        self.p_camera_fit._telid = telid
+        self.r1.calibrate(val)
+        self.dl0.reduce(val)
+        self.dl1.calibrate(val)
+        peak_area = val.dl1.tel[0].image
 
         self._event_index = val.count
         self._event_id = val.r0.event_id
         self.update_event_index_widget()
 
-        dl0 = np.copy(val.dl0.tel[telid].pe_samples[0])
-        n_pixels, n_samples = dl0.shape
-
-        # Perform CHECM Waveform Cleaning
-        sb_sub_wf, t0 = self.cleaner.apply(dl0)
-        stages = self.cleaner.stages
-        pw_l = self.cleaner.pw_l
-        pw_r = self.cleaner.pw_r
-
-        # Perform CHECM Charge Extraction
-        peak_area, peak_height = self.extractor.extract(sb_sub_wf, t0)
-        iw_l = self.extractor.iw_l
-        iw_r = self.extractor.iw_r
+        stages = self.dl1.cleaner.stages
+        pw_l = self.dl1.cleaner.stages['window_start']
+        pw_r = self.dl1.cleaner.stages['window_end']
+        windows = val.dl1.tel[0].extracted_samples[0, 0]
+        length = np.sum(windows)
+        iw_l = np.argmax(windows)
+        iw_r = iw_l + length - 1
 
         self.p_camera_area.image = peak_area
-        self.p_stage_viewer.update_stages(np.arange(n_samples), stages,
+        self.p_stage_viewer.update_stages(np.arange(self.n_samples), stages,
                                           [pw_l, pw_r], [iw_l, iw_r])
 
     @property

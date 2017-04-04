@@ -121,8 +121,8 @@ def generate_pedestal(input_path, output_path):
 
             i_block4 = uncor_x // N_BLOCKSAMPLES - \
                 (uncor_x[:, 0, :] // N_BLOCKSAMPLES)[:, None]
-            i_block8 = uncor_x // (N_BLOCKSAMPLES // 2) - \
-                (uncor_x[:, 0, :] // (N_BLOCKSAMPLES // 2))[:, None]
+            # i_block8 = uncor_x // (N_BLOCKSAMPLES // 2) - \
+            #     (uncor_x[:, 0, :] // (N_BLOCKSAMPLES // 2))[:, None]
             bp_fci, r_fci, c_fci = get_bp_r_c(fci_cell_x)
             block_fci = r_fci + c_fci * N_ROWS
             block_pos = sample_range[:, :, None] + bp_fci
@@ -130,31 +130,31 @@ def generate_pedestal(input_path, output_path):
             s = samples[pix_i]
             s_x = s[..., None]
 
-            p = ped_basic[tm_i, tmpix_i, cells]
-            h = hits_basic[tm_i, tmpix_i, cells]
-            ped_basic[tm_i, tmpix_i, cells] = mean(p, h, s)
-            hits_basic[tm_i, tmpix_i, cells] += 1
+            # p = ped_basic[tm_i, tmpix_i, cells]
+            # h = hits_basic[tm_i, tmpix_i, cells]
+            # ped_basic[tm_i, tmpix_i, cells] = mean(p, h, s)
+            # hits_basic[tm_i, tmpix_i, cells] += 1
 
             p = ped_blocks4[tm_ix, tmpix_ix, cells_x, i_block4]
             h = hits_blocks4[tm_ix, tmpix_ix, cells_x, i_block4]
             ped_blocks4[tm_ix, tmpix_ix, cells_x, i_block4] = mean(p, h, s_x)
             hits_blocks4[tm_ix, tmpix_ix, cells_x, i_block4] += 1
 
-            p = ped_blocks8[tm_ix, tmpix_ix, cells_x, i_block8]
-            h = hits_blocks8[tm_ix, tmpix_ix, cells_x, i_block8]
-            ped_blocks8[tm_ix, tmpix_ix, cells_x, i_block8] = mean(p, h, s_x)
-            hits_blocks8[tm_ix, tmpix_ix, cells_x, i_block8] += 1
-
+            # p = ped_blocks8[tm_ix, tmpix_ix, cells_x, i_block8]
+            # h = hits_blocks8[tm_ix, tmpix_ix, cells_x, i_block8]
+            # ped_blocks8[tm_ix, tmpix_ix, cells_x, i_block8] = mean(p, h, s_x)
+            # hits_blocks8[tm_ix, tmpix_ix, cells_x, i_block8] += 1
+            #
             p = ped_adrian[tm_ix, tmpix_ix, block_fci, block_pos]
             h = hits_adrian[tm_ix, tmpix_ix, block_fci, block_pos]
             ped_adrian[tm_ix, tmpix_ix, block_fci, block_pos] = mean(p, h, s_x)
             hits_adrian[tm_ix, tmpix_ix, block_fci, block_pos] += 1
-
-            residual = s - ped_basic[tm_i, tmpix_i, cells]
-            p = ped_correction[tm_i, tmpix_i, sample_index]
-            h = hits_correction[tm_i, tmpix_i, sample_index]
-            ped_correction[tm_i, tmpix_i, sample_index] = mean(p, h, residual)
-            hits_correction[tm_i, tmpix_i, sample_index] += 1
+            #
+            # residual = s - ped_basic[tm_i, tmpix_i, cells]
+            # p = ped_correction[tm_i, tmpix_i, sample_index]
+            # h = hits_correction[tm_i, tmpix_i, sample_index]
+            # ped_correction[tm_i, tmpix_i, sample_index] = mean(p, h, residual)
+            # hits_correction[tm_i, tmpix_i, sample_index] += 1
 
     if not exists(dirname(output_path)):
         print("Creating directory: {}".format(dirname(output_path)))
