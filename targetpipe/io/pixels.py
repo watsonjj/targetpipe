@@ -7,12 +7,17 @@ from astropy import log
 from os.path import dirname, realpath, join
 from ctapipe.io.camera import get_min_pixel_seperation
 
-log.info("Initialising pixel geometry and ids")
+log.info("Initialising pixel geometry and ids and reference pulse shapes")
 
 path = join(dirname(realpath(__file__)), 'checm_pixel_id.npy')
 checm_pixel_id = np.load(path)
 path = join(dirname(realpath(__file__)), 'checm_pixel_pos.npy')
 checm_pixel_pos = np.load(path)
+path = join(dirname(realpath(__file__)), 'checm_reference_pulse.npz')
+file = np.load(path)
+checm_refshape = file['refshape']
+checm_refstep = file['refstep']
+checm_time_slice = file['time_slice']
 
 optical_foclen = 2.283
 

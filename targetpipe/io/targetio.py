@@ -10,7 +10,8 @@ from astropy import units as u
 from astropy.time import Time
 
 from targetpipe.io.containers import CHECDataContainer as DataContainer
-from targetpipe.io.pixels import checm_pixel_pos, optical_foclen
+from targetpipe.io.pixels import checm_pixel_pos, optical_foclen, \
+    checm_refshape, checm_refstep, checm_time_slice
 
 # CHEC-M
 N_ROWS = 8
@@ -186,11 +187,16 @@ class TargetioExtractor:
         data.r1.tel.clear()
         data.dl0.tel.clear()
         data.dl1.tel.clear()
+        data.mc.tel.clear()
 
         # load the data per telescope/chan
         data.r0.tel[chec_tel].adc_samples = self.r0_samples
         data.r1.tel[chec_tel].pe_samples = self.r1_samples
         data.r0.tel[chec_tel].first_cell_ids = self.first_cell_ids
+
+        data.mc.tel[chec_tel].reference_pulse_shape = checm_refshape
+        data.mc.tel[chec_tel].meta['refstep'] = checm_refstep
+        data.mc.tel[chec_tel].time_slice = checm_time_slice
 
     def read_generator(self):
         data = self.data

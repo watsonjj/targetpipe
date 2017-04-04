@@ -4,7 +4,7 @@ Create a animated gif of an waveforms, similar to those produced in libCHEC for
 the inauguration press release.
 """
 
-from traitlets import Dict, List, Unicode, Int
+from traitlets import Dict, List, Int
 
 from ctapipe.core import Tool, Component
 from ctapipe.io.eventfilereader import EventFileReaderFactory
@@ -45,7 +45,7 @@ class Animator(Component):
         camera = CameraDisplay(geom, ax=self.camera, image=np.zeros(2048),
                                cmap='viridis')
         camera.add_colorbar()
-        max_ = np.percentile(waveforms[:, self.start:self.end].max()*0.5, 60)
+        max_ = np.percentile(waveforms[:, self.start:self.end].max(), 60)
         camera.set_limits_minmax(0, max_)
 
         self.ax1.plot(waveforms[self.p1, :])
@@ -54,10 +54,11 @@ class Animator(Component):
         self.fig.suptitle("Event {}".format(event_id))
         self.ax1.set_title("Pixel: {}".format(self.p1))
         self.ax1.set_xlabel("Time (ns)")
-        self.ax1.set_ylabel("Amplitude (Calibrated ADC)")
+        self.ax1.set_ylabel("Amplitude (p.e.)")
         self.ax2.set_title("Pixel: {}".format(self.p2))
         self.ax2.set_xlabel("Time (ns)")
-        self.ax2.set_ylabel("Amplitude (Calibrated ADC)")
+        self.ax2.set_ylabel("Amplitude (p.e.)")
+        camera.colorbar.set_label("Amplitude (p.e.)")
 
         line1, = self.ax1.plot([0, 0], self.ax1.get_ylim(), color='r', alpha=1)
         line2, = self.ax2.plot([0, 0], self.ax2.get_ylim(), color='r', alpha=1)
@@ -107,8 +108,6 @@ class EventAnimationCreator(Tool):
     name = "EventAnimationCreator"
     description = "Create an animation of the camera image through timeslices"
 
-    adc2pe_path = Unicode('', help='Path to the numpy adc2pe '
-                                   'file').tag(config=True)
     req_event = Int(0, help='Event to plot').tag(config=True)
 
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
@@ -116,9 +115,9 @@ class EventAnimationCreator(Tool):
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
+                        pe='CameraR1CalibratorFactory.adc2pe_path',
                         cleaner='WaveformCleanerFactory.cleaner',
                         cleaner_t0='WaveformCleanerFactory.t0',
-                        # pe='DL1Extractor.adc2pe_path',
                         e='EventAnimationCreator.req_event',
                         start='Animator.start',
                         end='Animator.end',
@@ -178,9 +177,6 @@ class EventAnimationCreator(Tool):
 
         self.fitter = CHECMFitterSPE(**kwargs)
         self.dead = Dead()
-
-        if self.adc2pe_path:
-            self.adc2pe = np.load(self.adc2pe_path)
 
         self.animator = Animator(**kwargs)
 

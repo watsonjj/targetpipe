@@ -3,6 +3,7 @@ from ctapipe.io.containers import ReconstructedContainer, \
     CentralTriggerContainer, InstrumentContainer, \
     R0Container, R1Container, DL0Container, DL1Container
 from numpy import ndarray
+from astropy import units as u
 
 
 class CHECR0CameraContainer(Container):
@@ -29,6 +30,23 @@ class CHECR0Container(Container):
                                            "CHECR0CameraContainer")
 
 
+class CHECMCCameraEventContainer(Container):
+    """
+    Storage of mc data for a single telescope that change per event
+    """
+    reference_pulse_shape = Item(None, ("reference pulse shape for each "
+                                        "channel"))
+    time_slice = Item(0, "width of time slice", unit=u.ns)
+
+
+class CHECMCEventContainer(Container):
+    """
+    Monte-Carlo
+    """
+    tel = Item(Map(CHECMCCameraEventContainer),
+               "map of tel_id to MCCameraEventContainer")
+
+
 class CHECDataContainer(Container):
     """ Top-level container for all waveforms information """
 
@@ -40,3 +58,4 @@ class CHECDataContainer(Container):
     trig = Item(CentralTriggerContainer(), "central trigger information")
     count = Item(0, "number of events processed")
     inst = Item(InstrumentContainer(), "instrumental information (deprecated")
+    mc = Item(CHECMCEventContainer(), "Monte-Carlo data")

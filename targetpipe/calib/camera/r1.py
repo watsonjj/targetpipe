@@ -1,6 +1,7 @@
 from traitlets import Unicode, observe
 import target_calib
 from ctapipe.calib.camera.r1 import CameraR1Calibrator
+import numpy as np
 
 
 class TargetioR1Calibrator(CameraR1Calibrator):
@@ -13,6 +14,9 @@ class TargetioR1Calibrator(CameraR1Calibrator):
     tf_path = Unicode('', allow_none=True,
                       help='Path to the TargetCalib Transfer Function '
                            'file').tag(config=True)
+    adc2pe_path = Unicode('', allow_none=True,
+                          help='Path to the numpy adc2pe '
+                               'file').tag(config=True)
 
     def __init__(self, config, tool, **kwargs):
         """
@@ -33,6 +37,7 @@ class TargetioR1Calibrator(CameraR1Calibrator):
         super().__init__(config=config, tool=tool, **kwargs)
 
         self.calibrator = None
+        self.adc2pe = None
         self.telid = 0
 
         self._load_calib()
@@ -49,6 +54,8 @@ class TargetioR1Calibrator(CameraR1Calibrator):
             self.calibrator = target_calib.Calibrator(self.pedestal_path,
                                                       self.tf_path)
             self.calibrate = self.real_calibrate
+            if self.adc2pe_path:
+                self.adc2pe = np.load(self.adc2pe_path)
         else:
             self.log.warning("No pedestal path supplied, "
                              "r1 samples will equal r0 samples.")
@@ -93,3 +100,8 @@ class TargetioR1Calibrator(CameraR1Calibrator):
             fci = event.r0.tel[self.telid].first_cell_ids
             r1 = event.r1.tel[self.telid].pe_samples[0]
             self.calibrator.ApplyEvent(tm, tmpix, samples, fci, r1)
+            # TODO: handle vped subtraction in generation of tf
+            if self.tf_path:
+                event.r1.tel[self.telid].pe_samples[0] -= 1050
+            if self.adc2pe is not None:
+                event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]

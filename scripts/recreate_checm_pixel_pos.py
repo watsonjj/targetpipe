@@ -34,6 +34,7 @@ for pix in range(n_pix):
     ax.text(pos_x, pos_y, pix, fontsize=3, color='w', ha='center')
     # print("[{0:.5g}, {1:.5g}],  # {2}".format(pos_x, pos_y, pix))
 
-path = join(realpath(dirname(__file__)), "../targetpipe/io/checm_pixel_pos.npy")
+name = "checm_pixel_pos.npy"
+path = join(realpath(dirname(__file__)), "../targetpipe/io", name)
 np.save(path, pos_arr)
 plt.show()

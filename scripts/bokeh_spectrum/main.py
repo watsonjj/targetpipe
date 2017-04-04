@@ -1,7 +1,7 @@
 from bokeh.io import curdoc
 from bokeh.layouts import layout
 from bokeh.plotting import figure
-from traitlets import Dict, List, CaselessStrEnum as CaStEn, Unicode, Int
+from traitlets import Dict, List, CaselessStrEnum as CaStEn, Int
 from bokeh.models import Select, ColumnDataSource, palettes, \
     RadioGroup, CheckboxGroup, Legend, Div, Span, TableColumn, DataTable, \
     NumberFormatter, TextInput, Button
@@ -499,9 +499,6 @@ class BokehSPE(Tool):
     description = "Interactively explore the steps in obtaining and fitting " \
                   "SPE spectrum"
 
-    adc2pe_path = Unicode('', allow_none=True,
-                          help='Path to the numpy adc2pe '
-                               'file').tag(config=True)
     t0 = Int(None, allow_none=True,
              help='Override the value of t0').tag(config=True)
 
@@ -510,8 +507,8 @@ class BokehSPE(Tool):
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
+                        pe='CameraR1CalibratorFactory.adc2pe_path',
                         brightness='FitterWidget.brightness',
-                        pe='BokehSPE.adc2pe_path',
                         t0='BokehSPE.t0'
                         ))
     classes = List([EventFileReaderFactory,
@@ -537,10 +534,9 @@ class BokehSPE(Tool):
         self.r1 = None
         self.dl0 = None
         self.dl1 = None
+        self.dl1_height = None
         self.area = None
         self.height = None
-
-        self.adc2pe = None
 
         self.n_events = None
         self.n_pixels = None
@@ -579,13 +575,9 @@ class BokehSPE(Tool):
         self.cleaner = CHECMWaveformCleaner(t0=self.t0, **kwargs)
         if self.t0:
             self.extractor = SimpleIntegrator(t0=self.t0,
-                                              window_shift=3,
-                                              window_width=8,
                                               **kwargs)
         else:
-            self.extractor = AverageWfPeakIntegrator(window_shift=3,
-                                                     window_width=8,
-                                                     **kwargs)
+            self.extractor = AverageWfPeakIntegrator(**kwargs)
         self.extractor_height = SimpleIntegrator(window_shift=0,
                                                  window_width=1,
                                                  **kwargs)
@@ -616,9 +608,6 @@ class BokehSPE(Tool):
                             '5: smooth_wf',
                             '6: cleaned']
 
-        if self.adc2pe_path:
-            self.adc2pe = np.load(self.adc2pe_path)
-
         # Init Plots
         self.p_camera_area = Camera(self, self.neighbours2d, "Area", geom)
         self.p_camera_fit = Camera(self, self.neighbours2d, "Gain", geom)
@@ -646,9 +635,6 @@ class BokehSPE(Tool):
 
             self.area[index] = peak_area
             self.height[index] = peak_height
-
-        if self.adc2pe is not None:
-            self.area *= self.adc2pe[None, :]
 
         # Setup Plots
         self.p_camera_area.enable_pixel_picker()

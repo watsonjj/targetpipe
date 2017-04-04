@@ -12,12 +12,12 @@ from pandas import DataFrame
 
 class ADC2PEvsHVPlotter(Tool):
     name = "ADC2PEvsHVPlotter"
-    description = "For a given hv values, see the conversion from adc " \
+    description = "For a given hv values, get the conversion from adc " \
                   "to pe for each pixel."
 
     output_dir = Unicode('', help='Directory to store output').tag(config=True)
 
-    aliases = Dict(dict(adc2pe='TargetioADC2PECalibrator.adc2pe_path',
+    aliases = Dict(dict(spe='TargetioADC2PECalibrator.spe_path',
                         gm='TargetioADC2PECalibrator.gain_matching_path',
                         o='ADC2PEvsHVPlotter.output_dir'
                         ))

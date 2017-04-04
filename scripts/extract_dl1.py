@@ -1,4 +1,4 @@
-from traitlets import Dict, List, Unicode
+from traitlets import Dict, List
 from ctapipe.core import Tool
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
@@ -17,15 +17,12 @@ class DL1Extractor(Tool):
     name = "DL1Extractor"
     description = "Extract the dl1 information and store into a numpy file"
 
-    adc2pe_path = Unicode('', help='Path to the numpy adc2pe '
-                                   'file').tag(config=True)
-
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
-                        pe='DL1Extractor.adc2pe_path',
+                        pe='CameraR1CalibratorFactory.adc2pe_path',
                         extractor='ChargeExtractorFactory.extractor',
                         extractor_t0='ChargeExtractorFactory.t0',
                         window_width='ChargeExtractorFactory.window_width',
@@ -52,8 +49,6 @@ class DL1Extractor(Tool):
         self.dead = None
 
         self.output_dir = None
-
-        self.adc2pe = None
 
         self.tack = None
         self.sec = None
@@ -125,9 +120,6 @@ class DL1Extractor(Tool):
         self.rise_time = np.zeros((n_events, n_pixels))
         self.n_saturated = np.zeros((n_events, n_pixels))
 
-        if self.adc2pe_path:
-            self.adc2pe = np.load(self.adc2pe_path)
-
     def start(self):
         n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
@@ -180,15 +172,11 @@ class DL1Extractor(Tool):
                 # d90 = np.diff(np.sign(_90percent[:, None] - masked_aft))
                 # rise_time = np.argmax(d10, axis=1) - np.argmax(d90, axis=1)
 
-                charge = peak_area
-                if self.adc2pe is not None:
-                    charge = peak_area * self.adc2pe
-
                 self.tack[ev] = event.meta['tack']
                 self.sec[ev] = event.meta['sec']
                 self.ns[ev] = event.meta['ns']
                 self.fci[ev] = event.r0.tel[0].first_cell_ids
-                self.charge[ev] = charge
+                self.charge[ev] = peak_area
                 self.t0[ev] = t0
                 self.baseline_mean_start[ev] = baseline_mean_start
                 self.baseline_mean_end[ev] = baseline_mean_end

@@ -2052,5 +2052,6 @@ pixel_id = [   # [module][asic][channel]
     2047,  # 31 3 15
 ]
 
-path = join(realpath(dirname(__file__)), "../targetpipe/io/checm_pixel_id.npy")
+name = "checm_pixel_id.npy"
+path = join(realpath(dirname(__file__)), "../targetpipe/io", name)
 np.save(path, pixel_id)

@@ -271,8 +271,8 @@ class BokehGainMatching(Tool):
 
         self.m_pix = self.dead.mask1d(self.m_pix)
         self.c_pix = self.dead.mask1d(self.c_pix)
-        self.m_tm2048 = self.dead.mask1d(self.m_tm2048)
-        self.c_tm2048 = self.dead.mask1d(self.c_tm2048)
+        self.m_tm2048 = self.dead.mask1d(self.m_tm2048.ravel())
+        self.c_tm2048 = self.dead.mask1d(self.c_tm2048.ravel())
 
         # Setup Plots
         self.p_camera_pix.enable_pixel_picker()

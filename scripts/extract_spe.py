@@ -45,7 +45,7 @@ class BokehSPE(Tool):
 
         self.output_dir = None
 
-        self.adc2pe = None
+        self.spe = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -60,9 +60,7 @@ class BokehSPE(Tool):
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
         self.cleaner = CHECMWaveformCleaner(**kwargs)
-        self.extractor = AverageWfPeakIntegrator(**kwargs,
-                                                 window_shift=3,
-                                                 window_width=8)
+        self.extractor = AverageWfPeakIntegrator(**kwargs)
         self.dl0 = CameraDL0Reducer(**kwargs)
         self.dl1 = CameraDL1Calibrator(extractor=self.extractor,
                                        cleaner=self.cleaner,
@@ -71,7 +69,7 @@ class BokehSPE(Tool):
         self.fitter = CHECMFitterSPE(**kwargs)
         self.dead = Dead()
 
-        self.output_dir = join(self.reader.output_directory, "extract_adc2pe")
+        self.output_dir = join(self.reader.output_directory, "extract_spe")
         if not exists(self.output_dir):
             self.log.info("Creating directory: {}".format(self.output_dir))
             makedirs(self.output_dir)
@@ -84,9 +82,9 @@ class BokehSPE(Tool):
 
         # Prepare storage array
         area = np.zeros((n_events, n_pixels))
-        ratio = np.ma.zeros(n_pixels)
-        ratio.mask = np.zeros(ratio.shape, dtype=np.bool)
-        ratio.fill_value = 0
+        spe = np.ma.zeros(n_pixels)
+        spe.mask = np.zeros(spe.shape, dtype=np.bool)
+        spe.fill_value = 0
 
         source = self.reader.read()
         desc = "Looping through file"
@@ -110,17 +108,15 @@ class BokehSPE(Tool):
                 pbar.update(1)
                 if not self.fitter.apply(area[:, pix]):
                     self.log.warning("Pixel {} couldn't be fit".format(pix))
-                    ratio.mask = True
+                    spe.mask = True
                     continue
-                ratio[pix] = self.fitter.coeff['spe']
+                spe[pix] = self.fitter.coeff['spe']
 
-        ratio = self.dead.mask1d(ratio)
-
-        self.adc2pe = np.ma.filled(1/ratio)
+        self.spe = np.ma.filled(self.dead.mask1d(spe))
 
     def finish(self):
-        output_path = join(self.output_dir, "adc2pe.npy")
-        np.save(output_path, self.adc2pe)
+        output_path = join(self.output_dir, "spe.npy")
+        np.save(output_path, self.spe)
         self.log.info("adc2pe array saved: {}".format(output_path))
 
 

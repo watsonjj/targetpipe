@@ -13,14 +13,12 @@ class DL1Extractor(Tool):
     name = "DL1Extractor"
     description = "Extract the dl1 information and store into a numpy file"
 
-    adc2pe_path = Unicode('', help='Path to the numpy adc2pe '
-                                   'file').tag(config=True)
-
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
+                        pe='CameraR1CalibratorFactory.adc2pe_path',
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
