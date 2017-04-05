@@ -121,7 +121,7 @@ class ADC2PEResidualsPlotter(Tool):
         density = np.sum(kernels, axis=0)
         density /= integrate.trapz(density, x)
         ax_comgaus.plot(x, density)
-        ax_comgaus.set_xlabel("Amplitude (p.e.)")
+        ax_comgaus.set_xlabel("SPE Fit Value (p.e.)")
         ax_comgaus.set_ylabel("Sum")
 
         # Kernel density estimate
@@ -129,15 +129,15 @@ class ADC2PEResidualsPlotter(Tool):
         ax_kde = self.fig_kde.add_subplot(1, 1, 1)
         sns.rugplot(spe.compressed(), color=".2", linewidth=1, ax=ax_kde)
         sns.kdeplot(spe.compressed(), shade=True, ax=ax_kde)
-        ax_kde.set_xlabel("Amplitude (p.e.)")
+        ax_kde.set_xlabel("SPE Fit Value (p.e.)")
         ax_kde.set_ylabel("KDE")
 
         # Histogram
         self.log.info("Plotting: histogram")
         ax_hist = self.fig_hist.add_subplot(1, 1, 1)
         sns.distplot(spe.compressed(), kde=False, rug=True, ax=ax_hist)
-        ax_kde.set_xlabel("Amplitude (p.e.)")
-        ax_kde.set_ylabel("N")
+        ax_hist.set_xlabel("SPE Fit Value (p.e.)")
+        ax_hist.set_ylabel("N")
 
     def finish(self):
         output_path = join(self.output_dir, "spectrum_all.png")
