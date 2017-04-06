@@ -4,8 +4,7 @@ Create a animated gif of an waveforms, similar to those produced in libCHEC for
 the inauguration press release.
 """
 
-from traitlets import Dict, List, Int
-
+from traitlets import Dict, List, Unicode
 from ctapipe.core import Tool, Component
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
@@ -15,6 +14,7 @@ from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
 from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from ctapipe.io import CameraGeometry
 from ctapipe.visualization import CameraDisplay
+from ctapipe.image import tailcuts_clean
 from targetpipe.fitting.checm import CHECMFitterSPE
 from targetpipe.io.pixels import Dead
 import numpy as np
@@ -28,80 +28,48 @@ from matplotlib import animation
 class Animator(Component):
     name = 'Animator'
 
-    start = Int(40, help='Time to start gif').tag(config=True)
-    end = Int(8, help='Time to end gif').tag(config=True)
-    p1 = Int(0, help='Pixel 1').tag(config=True)
-    p2 = Int(0, help='Pixel 2').tag(config=True)
+    description = Unicode("", help="Description for the run "
+                                   "file").tag(config=True)
 
     def __init__(self, config, tool, **kwargs):
         super().__init__(config=config, parent=tool, **kwargs)
 
-        self.fig = plt.figure(figsize=(24, 10))
-        self.ax1 = self.fig.add_subplot(2, 2, 1)
-        self.ax2 = self.fig.add_subplot(2, 2, 3)
-        self.camera = self.fig.add_subplot(1, 2, 2)
+        self.fig = plt.figure(figsize=(10, 10))
+        self.ax_camera = self.fig.add_subplot(1, 1, 1)
+        self.fig.patch.set_visible(False)
+        self.ax_camera.axis('off')
 
-    def plot(self, waveforms, geom, event_id, output_dir):
-        camera = CameraDisplay(geom, ax=self.camera, image=np.zeros(2048),
+    def plot(self, images, event_list, geom, output_path, title):
+        camera = CameraDisplay(geom, ax=self.ax_camera, image=np.zeros(2048),
                                cmap='viridis')
         camera.add_colorbar()
-        max_ = np.percentile(waveforms[:, self.start:self.end].max(), 60)
-        camera.set_limits_minmax(0, max_)
-
-        self.ax1.plot(waveforms[self.p1, :])
-        self.ax2.plot(waveforms[self.p2, :])
-
-        self.fig.suptitle("Event {}".format(event_id))
-        self.ax1.set_title("Pixel: {}".format(self.p1))
-        self.ax1.set_xlabel("Time (ns)")
-        self.ax1.set_ylabel("Amplitude (p.e.)")
-        self.ax2.set_title("Pixel: {}".format(self.p2))
-        self.ax2.set_xlabel("Time (ns)")
-        self.ax2.set_ylabel("Amplitude (p.e.)")
         camera.colorbar.set_label("Amplitude (p.e.)")
-
-        line1, = self.ax1.plot([0, 0], self.ax1.get_ylim(), color='r', alpha=1)
-        line2, = self.ax2.plot([0, 0], self.ax2.get_ylim(), color='r', alpha=1)
-
-        self.camera.annotate(
-            "Pixel: {}".format(self.p1),
-            xy=(geom.pix_x.value[self.p1], geom.pix_y.value[self.p1]),
-            xycoords='data', xytext=(0.05, 0.98),
-            textcoords='axes fraction',
-            arrowprops=dict(facecolor='red', width=2, alpha=0.4),
-            horizontalalignment='left', verticalalignment='top')
-        self.camera.annotate(
-            "Pixel: {}".format(self.p2),
-            xy=(geom.pix_x.value[self.p2], geom.pix_y.value[self.p2]),
-            xycoords='data', xytext=(0.05, 0.94),
-            textcoords='axes fraction',
-            arrowprops=dict(facecolor='orange', width=2, alpha=0.4),
-            horizontalalignment='left', verticalalignment='top')
+        self.fig.suptitle(title + " - " + self.description)
 
         # Create animation
-        div = 5
-        increment = 1/div
-        n_frames = int((self.end - self.start)/increment)
-        interval = int(500*increment)
+        n_frames = np.vstack(images).shape[0]-1
+        interval = 100
 
-        # Prepare Output
-        output_path = join(output_dir, "animation_e{}.gif".format(event_id))
-        if not exists(output_dir):
-            self.log.info("Creating directory: {}".format(output_dir))
-            makedirs(output_dir)
+        def animation_generator():
+            for ev, event in enumerate(images):
+                max_ = np.percentile(event.max(), 60)
+                camera.set_limits_minmax(0, max_)
+                self.ax_camera.set_title("Event: {}".format(event_list[ev]))
+                for s in event:
+                    camera.image = s
+                    yield
+        source = animation_generator()
+
         self.log.info("Output: {}".format(output_path))
-
         with tqdm(total=n_frames, desc="Creating animation") as pbar:
             def animate(i):
                 pbar.update(1)
-                t = self.start + (i / div)
-                camera.image = waveforms[:, int(t)]
-                line1.set_xdata(t)
-                line2.set_xdata(t)
+                next(source)
 
-            anim = animation.FuncAnimation(self.fig, animate, frames=n_frames,
+            anim = animation.FuncAnimation(self.fig, animate,
+                                           frames=n_frames,
                                            interval=interval)
-            anim.save(output_path, writer='imagemagick')
+            anim.save(output_path)
 
         self.log.info("Created animation: {}".format(output_path))
 
@@ -110,8 +78,6 @@ class EventAnimationCreator(Tool):
     name = "EventAnimationCreator"
     description = "Create an animation of the camera image through timeslices"
 
-    req_event = Int(0, help='Event to plot').tag(config=True)
-
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
@@ -119,11 +85,7 @@ class EventAnimationCreator(Tool):
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
                         cleaner_t0='CHECMWaveformCleaner.t0',
-                        e='EventAnimationCreator.req_event',
-                        start='Animator.start',
-                        end='Animator.end',
-                        p1='Animator.p1',
-                        p2='Animator.p2'
+                        desc='Animator.description',
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
@@ -180,19 +142,74 @@ class EventAnimationCreator(Tool):
         self.animator = Animator(**kwargs)
 
     def start(self):
-        event = self.reader.get_event(self.req_event)
-        telid = list(event.r0.tels_with_data)[0]
-        geom = CameraGeometry.guess(*event.inst.pixel_pos[0],
-                                    event.inst.optical_foclen[0])
+        images = []
+        event_list = []
 
-        self.r1.calibrate(event)
-        self.dl0.reduce(event)
-        self.dl1.calibrate(event)
+        first_event = self.reader.get_event(0)
+        r0 = first_event.r0.tel[0].adc_samples[0]
+        n_pixels, n_samples = r0.shape
+        pos = first_event.inst.pixel_pos[0]
+        foclen = first_event.inst.optical_foclen[0]
+        geom = CameraGeometry.guess(*pos, foclen)
 
-        cleaned = event.dl1.tel[telid].cleaned[0]
+        desc = "Extracting image slices from file"
+        n_events = self.reader.num_events
+        source = self.reader.read()
+        for event in tqdm(source, total=n_events, desc=desc):
+            ev = event.count
+
+            self.r1.calibrate(event)
+            self.dl0.reduce(event)
+            self.dl1.calibrate(event)
+
+            image = event.dl1.tel[0].image[0]
+            cleaned = event.dl1.tel[0].cleaned[0]
+
+            # Cleaning
+            tc = tailcuts_clean(geom, image, 1, 7, 3)
+            empty = np.zeros(cleaned.shape, dtype=bool)
+            cleaned_tc_mask = np.ma.mask_or(empty, ~tc[:, None])
+            cleaned_tc = np.ma.masked_array(cleaned, mask=cleaned_tc_mask)
+
+            # Find start and end of movie for event
+            sum_wf = np.sum(cleaned_tc, axis=0)
+            sum_wf_t = np.arange(sum_wf.size)
+            max_ = np.max(sum_wf)
+            tmax = np.argmax(sum_wf)
+            before = sum_wf[:tmax+1][::-1]
+            before_t = sum_wf_t[:tmax+1][::-1]
+            after = sum_wf[tmax:]
+            after_t = sum_wf_t[tmax:]
+            limit = 0.1 * max_
+            # if limit < 2:
+            #     limit = 2
+            try:
+                start = before_t[before <= limit][0] - 2
+                end = after_t[after <= limit][0] + 5
+            except IndexError:
+                self.log.warning("No image for event {}".format(ev))
+                continue
+            if start < 0:
+                start = 0
+            if end >= n_samples:
+                end = n_samples-1
+
+            s = []
+            for t in range(start, end):
+                s.append(cleaned[:, t])
+            images.append(np.array(s))
+            event_list.append(ev)
 
         output_dir = self.reader.output_directory
-        self.animator.plot(cleaned, geom, self.req_event, output_dir)
+        title = self.reader.filename
+        title = title[:title.find("_")]
+        # Prepare Output
+        if not exists(output_dir):
+            self.log.info("Creating directory: {}".format(output_dir))
+            makedirs(output_dir)
+        output_path = join(output_dir, title+"_animation.mp4")
+
+        self.animator.plot(images, event_list, geom, output_path, title)
 
     def finish(self):
         pass

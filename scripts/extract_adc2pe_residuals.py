@@ -14,10 +14,10 @@ from os.path import join, exists
 from os import makedirs
 
 
-class BokehSPE(Tool):
-    name = "BokehSPE"
-    description = "Extract the conversion from adc to pe and save as a " \
-                  "numpy array"
+class ADC2PEResidualsExtractor(Tool):
+    name = "ADC2PEResidualsExtractor"
+    description = "Extract values used to show the residuals of the adc2pe " \
+                  "calibration into a numpy array"
 
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
@@ -144,5 +144,5 @@ class BokehSPE(Tool):
                  between=self.between)
         self.log.info("Created numpy array: {}".format(output_path))
 
-exe = BokehSPE()
+exe = ADC2PEResidualsExtractor()
 exe.run()
