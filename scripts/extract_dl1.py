@@ -33,7 +33,9 @@ class DL1Extractor(Tool):
 
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMWaveformCleaner
+                    CHECMWaveformCleaner,
+                    ChargeExtractorFactory,
+                    CameraDL1Calibrator
                     ])
 
     def __init__(self, **kwargs):
