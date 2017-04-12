@@ -105,3 +105,8 @@ class TargetioR1Calibrator(CameraR1Calibrator):
                 event.r1.tel[self.telid].pe_samples[0] -= 1050
             if self.adc2pe is not None:
                 event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]
+        else:
+            # TODO: remove this, as they will be applied in r1 calibration
+            event.r1.tel[self.telid].pe_samples[0] -= 1050
+            if self.adc2pe is not None:
+                event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]

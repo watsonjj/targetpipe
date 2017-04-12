@@ -1,4 +1,4 @@
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from ctapipe.visualization import CameraDisplay
 from targetpipe.io.pixels import checm_pixel_pos, optical_foclen
 from astropy import units as u

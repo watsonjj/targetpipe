@@ -3,7 +3,7 @@ from bokeh.layouts import layout, column
 from bokeh.models import Select, Span
 from traitlets import Int
 from ctapipe.core import Component
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from targetpipe.visualization.bokeh import CameraDisplay, WaveformDisplay
 
 

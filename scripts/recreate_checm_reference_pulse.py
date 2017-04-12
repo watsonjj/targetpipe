@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from os.path import realpath, join, dirname
 from ctapipe.utils.datasets import get_path
 from ctapipe.io.hessio import hessio_event_source
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from ctapipe.visualization import CameraDisplay
 from targetpipe.io.pixels import checm_pixel_id
 

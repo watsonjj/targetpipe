@@ -5,7 +5,7 @@ handles the hard coding of pixel positions for the GCT camera.
 import numpy as np
 from astropy import log
 from os.path import dirname, realpath, join
-from ctapipe.io.camera import get_min_pixel_seperation
+from ctapipe.instrument.camera import _get_min_pixel_seperation
 
 log.info("Initialising pixel geometry and ids and reference pulse shapes")
 
@@ -53,7 +53,7 @@ def get_pixel_2d(x_pix, y_pix, values=None):
     xc = gx[:, 10][gx[:, 10].nonzero()]
     yc = gy[10, :][gy[10, :].nonzero()]
 
-    dist = get_min_pixel_seperation(xc, yc)
+    dist = _get_min_pixel_seperation(xc, yc)
     edges_x = np.zeros(xc.size + 1)
     edges_x[0:xc.size] = xc - dist / 2
     edges_x[-1] = xc[-1] + dist / 2

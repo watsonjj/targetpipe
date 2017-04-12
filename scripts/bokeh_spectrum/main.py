@@ -7,7 +7,7 @@ from bokeh.models import Select, ColumnDataSource, palettes, \
     NumberFormatter, TextInput, Button
 from ctapipe.core import Tool, Component
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator

@@ -12,7 +12,7 @@ from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
 from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
 from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from ctapipe.visualization import CameraDisplay
 from ctapipe.image import tailcuts_clean
 from targetpipe.fitting.checm import CHECMFitterSPE
@@ -43,8 +43,8 @@ class Animator(Component):
         camera = CameraDisplay(geom, ax=self.ax_camera, image=np.zeros(2048),
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label("Amplitude (p.e.)")
-        self.fig.suptitle(title + " - " + self.description)
+        camera.colorbar.set_label("Amplitude")# (p.e.)")
+        #self.fig.suptitle(title + " - " + self.description)
 
         # Create animation
         n_frames = np.vstack(images).shape[0]-1
@@ -166,7 +166,7 @@ class EventAnimationCreator(Tool):
             cleaned = event.dl1.tel[0].cleaned[0]
 
             # Cleaning
-            tc = tailcuts_clean(geom, image, 1, 7, 3)
+            tc = tailcuts_clean(geom, image, 7, 3)
             empty = np.zeros(cleaned.shape, dtype=bool)
             cleaned_tc_mask = np.ma.mask_or(empty, ~tc[:, None])
             cleaned_tc = np.ma.masked_array(cleaned, mask=cleaned_tc_mask)

@@ -7,7 +7,7 @@ from bokeh.layouts import layout
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, RadioButtonGroup
 from ctapipe.core import Tool, Component
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from targetpipe.visualization.bokeh import CameraDisplay
 from targetpipe.io.pixels import checm_pixel_pos, optical_foclen, Dead
 from scipy.optimize import curve_fit

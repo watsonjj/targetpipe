@@ -6,7 +6,7 @@ from bokeh.models.widgets import Select, PreText
 from bokeh.models import HoverTool, Range1d, ColumnDataSource
 from traitlets import Dict, List, Unicode
 from ctapipe.core import Tool, Component
-from ctapipe.io import CameraGeometry
+from ctapipe.instrument import CameraGeometry
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.pedestal import PedestalSubtractor
 from targetpipe.visualization.bokeh import CameraDisplay
