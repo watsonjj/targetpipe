@@ -14,9 +14,9 @@ class PedestalMaker(Component):
     output_path = Unicode(None, allow_none=True,
                           help='Path to save the TargetCalib pedestal '
                                'file').tag(config=True)
-    number_tms = Int(32, help='Number of TARGET modules '
-                              'connected').tag(config=True)
-    n_cells = Int(2**14, help='Number of cells').tag(config=True)
+    n_tms = Int(32, help='Number of TARGET modules connected').tag(config=True)
+    n_blocks = Int(512, help='Number of blocks').tag(config=True)
+    n_samples = Int(96, help='Number of samples').tag(config=True)
     diagnosis = Bool(False, help='Run diagnosis while creating '
                                  'file?').tag(config=True)
     compress = Bool(False, help='Compress the pedestal file? (store in uint16 '
@@ -45,11 +45,12 @@ class PedestalMaker(Component):
             raise ValueError("Please specify an output path to save "
                              "pedestal file")
 
-        self.ped_obj = TCPedestalMaker(self.diagnosis, 4, self.number_tms)
+        self.ped_obj = TCPedestalMaker(self.n_tms, self.n_blocks,
+                                       self.n_samples, self.diagnosis)
         self.ped_stats = None
-        if self.stddev:
-            self.ped_stats = PedestalMeanStdDev(self.number_tms * 64,
-                                                self.n_cells)
+        # if self.stddev:
+        #     self.ped_stats = PedestalMeanStdDev(self.n_tms * 64,
+        #                                         self.n_cells)
 
     def add_event(self, event):
         """
@@ -61,11 +62,9 @@ class PedestalMaker(Component):
             A `ctapipe` event container
         """
         telid = 0
-        tm = event.meta['tm']
-        tmpix = event.meta['tmpix']
         waveforms = event.r0.tel[telid].adc_samples[0]
         first_cell_ids = event.r0.tel[telid].first_cell_ids
-        self.ped_obj.AddEvent(tm, tmpix, waveforms, first_cell_ids)
+        self.ped_obj.AddEvent(waveforms, first_cell_ids)
         if self.ped_stats:
             self.ped_stats.send_waveform(waveforms, first_cell_ids)
 
@@ -99,6 +98,7 @@ class TFMaker(Component):
                                'file').tag(config=True)
     number_tms = Int(32, help='Number of TARGET modules '
                               'connected').tag(config=True)
+    vped_zero = Int(1050, help='VPed value for the pedestal').tag(config=True)
     compress = Bool(False, help='Compress the TF file?').tag(config=True)
     tf_input = Bool(False, help='Create a numpy file containing the input TF '
                                 'array before the switch of '
@@ -133,7 +133,7 @@ class TFMaker(Component):
                                       pedestal_path=self.pedestal_path)
 
         vpeds = np.array(self.vped_list, dtype=np.uint16)
-        self.tf_obj = TCTfMaker(vpeds, self.number_tms)
+        self.tf_obj = TCTfMaker(vpeds, self.number_tms, self.vped_zero)
         self.current_vped = None
 
     def add_event(self, event, vped):
@@ -162,7 +162,7 @@ class TFMaker(Component):
         if vped > 2000:
             pedsub[waveforms < 1000] = -10000
 
-        self.tf_obj.AddEvent(tm, tmpix, pedsub, first_cell_ids % 64)
+        self.tf_obj.AddEvent(pedsub, first_cell_ids)
 
     def save(self):
         """

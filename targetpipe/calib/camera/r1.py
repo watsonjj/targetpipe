@@ -53,6 +53,7 @@ class TargetioR1Calibrator(CameraR1Calibrator):
         if self.pedestal_path:
             self.calibrator = target_calib.Calibrator(self.pedestal_path,
                                                       self.tf_path)
+            print("created")
             self.calibrate = self.real_calibrate
             if self.adc2pe_path:
                 self.adc2pe = np.load(self.adc2pe_path)
@@ -94,19 +95,14 @@ class TargetioR1Calibrator(CameraR1Calibrator):
                              'non-targetio event.')
 
         if self.check_r0_exists(event, self.telid):
-            tm = event.meta['tm']
-            tmpix = event.meta['tmpix']
             samples = event.r0.tel[self.telid].adc_samples[0]
             fci = event.r0.tel[self.telid].first_cell_ids
             r1 = event.r1.tel[self.telid].pe_samples[0]
-            self.calibrator.ApplyEvent(tm, tmpix, samples, fci, r1)
-            # TODO: handle vped subtraction in generation of tf
-            if self.tf_path:
-                event.r1.tel[self.telid].pe_samples[0] -= 1050
+            self.calibrator.ApplyEvent(samples, fci, r1)
             if self.adc2pe is not None:
                 event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]
         else:
             # TODO: remove this, as they will be applied in r1 calibration
-            event.r1.tel[self.telid].pe_samples[0] -= 1050
+            # event.r1.tel[self.telid].pe_samples[0] -= 1050
             if self.adc2pe is not None:
                 event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]

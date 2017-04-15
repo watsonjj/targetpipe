@@ -44,10 +44,13 @@ class PedestalBuilder(Tool):
 
         first_event = self.file_reader.get_event(0)
         n_modules = first_event.meta['n_modules']
-        n_cells = first_event.meta['n_cells']
+        n_blocks = first_event.meta['n_blocks']
+        n_samples = first_event.r0.tel[0].adc_samples.shape[2]
 
-        self.pedmaker = PedestalMaker(**kwargs, number_tms=n_modules,
-                                      n_cells=n_cells)
+        self.pedmaker = PedestalMaker(**kwargs,
+                                      n_tms=n_modules,
+                                      n_blocks=n_blocks,
+                                      n_samples=n_samples)
 
     def start(self):
         n_events = self.file_reader.num_events

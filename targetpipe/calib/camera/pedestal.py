@@ -62,11 +62,9 @@ class PedestalSubtractor(Component):
 
         """
         telid = 0
-        tm = event.meta['tm']
-        tmpix = event.meta['tmpix']
         waveforms = event.r0.tel[telid].adc_samples[0]
         fci = event.r0.tel[telid].first_cell_ids
-        self.calibrator.ApplyEvent(tm, tmpix, waveforms, fci, pedsub)
+        self.calibrator.ApplyEvent(waveforms, fci, pedsub)
 
     def get_ped(self):
         """

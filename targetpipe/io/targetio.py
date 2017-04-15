@@ -137,6 +137,9 @@ class TargetioExtractor:
         # some targetio_event_source specific parameters
         data.meta['input'] = url
         data.meta['max_events'] = max_events
+        data.meta['n_rows'] = N_ROWS
+        data.meta['n_columns'] = N_COLUMNS
+        data.meta['n_blocks'] = N_BLOCKS
         data.meta['n_cells'] = self.n_cells
         data.meta['n_modules'] = self.n_modules
         data.meta['tm'] = np.arange(self.n_pix,

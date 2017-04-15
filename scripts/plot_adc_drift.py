@@ -35,11 +35,11 @@ class AdcSpread(Component):
 
         self.layout = None
 
-    def create(self, mean, stddev):
+    def create(self, mean, stddev, min_, max_):
         self.log.info("Creating {}".format(self.name))
         x = np.arange(mean.size)
 
-        cdsource_d = dict(x=x, mean=mean, stddev=stddev)
+        cdsource_d = dict(x=x, mean=mean, stddev=stddev, min=min_, max=max_)
         cdsource = ColumnDataSource(data=cdsource_d)
 
         title = "ADC Spread Vs Event"
@@ -49,11 +49,24 @@ class AdcSpread(Component):
                      active_scroll='xwheel_zoom', webgl=True)
         c = fig.circle(source=cdsource, x='x', y='mean', hover_color="red")
         fig.add_tools(HoverTool(tooltips=[("(x,y)", "(@x, @mean)"),
-                                          ("stddev", "@stddev")
+                                          ("stddev", "@stddev"),
+                                          ("(min, max)", "@min, @max")
                                           ], renderers=[c]))
 
         fig.xaxis.axis_label = 'Event'
         fig.yaxis.axis_label = 'ADC'
+
+        # Rangebars
+        top = max_
+        bottom = min_
+        left = x - 0.3
+        right = x + 0.3
+        # fig.segment(x0=x, y0=bottom, x1=x, y1=top,
+        #             line_width=1.5, color='red')
+        # fig.segment(x0=left, y0=top, x1=right, y1=top,
+        #             line_width=1.5, color='red')
+        # fig.segment(x0=left, y0=bottom, x1=right, y1=bottom,
+        #             line_width=1.5, color='red')
 
         # Errorbars
         top = mean + stddev
@@ -115,6 +128,8 @@ class EventFileLooper(Tool):
 
         event_mean = np.zeros(n_events)
         event_stddev = np.zeros(n_events)
+        event_min = np.zeros(n_events)
+        event_max = np.zeros(n_events)
 
         source = self.file_reader.read()
         desc = "Looping through file"
@@ -130,9 +145,11 @@ class EventFileLooper(Tool):
 
                 event_mean[index] = np.mean(r1)
                 event_stddev[index] = np.std(r1)
+                event_min[index] = np.min(r1)
+                event_max[index] = np.max(r1)
 
         # Create bokeh figures
-        self.p_adcspread.create(event_mean, event_stddev)
+        self.p_adcspread.create(event_mean, event_stddev, event_min, event_max)
 
         # Get bokeh layouts
         l_adcspread = self.p_adcspread.layout
@@ -149,8 +166,10 @@ class EventFileLooper(Tool):
             self.log.info("Creating directory: {}".format(fig_dir))
             makedirs(fig_dir)
 
-        output_file(join(fig_dir, 'adc_drift.html'))
+        path = join(fig_dir, 'adc_drift.html')
+        output_file(path)
         show(self.layout)
+        self.log.info("Created bokeh figure: {}".format(path))
 
         curdoc().add_root(self.layout)
         curdoc().title = "ADC Drift"

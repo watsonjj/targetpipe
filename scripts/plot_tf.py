@@ -11,7 +11,7 @@ from bokeh.models import HoverTool, ColumnDataSource
 from traitlets import Dict, List, Unicode
 from ctapipe.core import Tool, Component
 from targetpipe.calib.camera.tf import TFApplier
-from os.path import join, exists
+from os.path import join, exists, dirname
 from os import makedirs
 
 
@@ -430,7 +430,6 @@ class TargetCalibTFExplorer(Tool):
     vped_path = Unicode(None, allow_none=True,
                         help='Path to a numpy file containing the vped '
                              'vector').tag(config=True)
-    output_dir = Unicode('', help='Directory to store output').tag(config=True)
 
     aliases = Dict(dict(tf='TFApplier.tf_path',
                         tf_input='TargetCalibTFExplorer.tfinput_path',
@@ -512,7 +511,6 @@ class TargetCalibTFExplorer(Tool):
             l_tfinputspread = self.p_tfinputspread.layout
             l_tfinputselect = self.p_tfinputselect.layout
 
-
         # Get widgets
 
         # Layout
@@ -527,13 +525,15 @@ class TargetCalibTFExplorer(Tool):
         self.layout = layout(layout_list, sizing_mode="scale_width")
 
     def finish(self):
-        fig_dir = join(self.output_dir, "plot_tf")
+        fig_dir = join(dirname(self.tf.tf_path), "plot_tf")
         if not exists(fig_dir):
             self.log.info("Creating directory: {}".format(fig_dir))
             makedirs(fig_dir)
 
-        output_file(join(fig_dir, 'adc_drift.html'))
+        path = join(fig_dir, 'tf.html')
+        output_file(path)
         show(self.layout)
+        self.log.info("Created bokeh figure: {}".format(path))
 
         curdoc().add_root(self.layout)
         curdoc().title = "Transfer Function"
