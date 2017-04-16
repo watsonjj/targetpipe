@@ -37,7 +37,6 @@ class TargetioR1Calibrator(CameraR1Calibrator):
         super().__init__(config=config, tool=tool, **kwargs)
 
         self.calibrator = None
-        self.adc2pe = None
         self.telid = 0
 
         self._load_calib()
@@ -52,11 +51,9 @@ class TargetioR1Calibrator(CameraR1Calibrator):
     def _load_calib(self):
         if self.pedestal_path:
             self.calibrator = target_calib.Calibrator(self.pedestal_path,
-                                                      self.tf_path)
-            print("created")
+                                                      self.tf_path,
+                                                      [self.adc2pe_path])
             self.calibrate = self.real_calibrate
-            if self.adc2pe_path:
-                self.adc2pe = np.load(self.adc2pe_path)
         else:
             self.log.warning("No pedestal path supplied, "
                              "r1 samples will equal r0 samples.")
@@ -99,10 +96,3 @@ class TargetioR1Calibrator(CameraR1Calibrator):
             fci = event.r0.tel[self.telid].first_cell_ids
             r1 = event.r1.tel[self.telid].pe_samples[0]
             self.calibrator.ApplyEvent(samples, fci, r1)
-            if self.adc2pe is not None:
-                event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]
-        else:
-            # TODO: remove this, as they will be applied in r1 calibration
-            # event.r1.tel[self.telid].pe_samples[0] -= 1050
-            if self.adc2pe is not None:
-                event.r1.tel[self.telid].pe_samples[0] *= self.adc2pe[:, None]

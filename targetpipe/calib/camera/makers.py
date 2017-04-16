@@ -157,11 +157,6 @@ class TFMaker(Component):
         first_cell_ids = event.r0.tel[telid].first_cell_ids
         pedsub = np.zeros(waveforms.shape, dtype=np.float32)
         self.ped.apply(event, pedsub)
-
-        # Mask saturated samples
-        if vped > 2000:
-            pedsub[waveforms < 1000] = -10000
-
         self.tf_obj.AddEvent(pedsub, first_cell_ids)
 
     def save(self):

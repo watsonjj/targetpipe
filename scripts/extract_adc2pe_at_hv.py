@@ -8,6 +8,7 @@ from os.path import exists, join
 from os import makedirs
 import seaborn as sns
 from pandas import DataFrame
+from target_calib import CfMaker
 
 
 class ADC2PEvsHVPlotter(Tool):
@@ -40,6 +41,8 @@ class ADC2PEvsHVPlotter(Tool):
 
         self.adc2pe = None
 
+        self.cfmaker = None
+
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
@@ -62,6 +65,8 @@ class ADC2PEvsHVPlotter(Tool):
                       [1100]*2048]
         hv_ngm = np.array(hv_modules)
         self.hv = np.vstack((hv_ngm, hv_gm))
+
+        self.cfmaker = CfMaker(32)
 
     def start(self):
         self.adc2pe = self.a2p.get_adc2pe_at_hv(self.hv, np.arange(2048)[None, :])
@@ -104,36 +109,45 @@ class ADC2PEvsHVPlotter(Tool):
         x = x[sort]
         spe = self.spe[sort]
 
-        np.savez(numpy_path,
-                 charge=np.ma.filled(spe, 0),
-                 charge_error=np.zeros(spe.shape),
-                 rundesc=x)
-        self.log.info("Numpy array saved to: {}".format(numpy_path))
         self.fig.savefig(fig_path)
         self.log.info("Figure saved to: {}".format(fig_path))
 
-        adc2pe_800_path = join(output_dir, "adc2pe_800.npy")
-        adc2pe_900_path = join(output_dir, "adc2pe_900.npy")
-        adc2pe_1000_path = join(output_dir, "adc2pe_1000.npy")
-        adc2pe_1100_path = join(output_dir, "adc2pe_1100.npy")
-        adc2pe_800gm_path = join(output_dir, "adc2pe_800gm.npy")
-        adc2pe_900gm_path = join(output_dir, "adc2pe_900gm.npy")
-        adc2pe_1000gm_path = join(output_dir, "adc2pe_1000gm.npy")
+        hv_txt_list = ['800', '900', '1000', '1100', '800gm', '900gm', '1000gm']
+        for i, hv_txt in enumerate(hv_txt_list):
+            self.cfmaker.SetAll(self.adc2pe[i].astype(np.float32))
+            path = join(output_dir, "adc2pe_{}.tcal".format(hv_txt))
+            self.cfmaker.Save(path, False)
+            self.log.info("ADC2PE tcal created: {}".format(path))
+            self.cfmaker.Clear()
 
-        np.save(adc2pe_800_path, np.ma.filled(self.adc2pe[0], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_800_path))
-        np.save(adc2pe_900_path, np.ma.filled(self.adc2pe[1], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_900_path))
-        np.save(adc2pe_1000_path, np.ma.filled(self.adc2pe[2], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_1000_path))
-        np.save(adc2pe_1100_path, np.ma.filled(self.adc2pe[3], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_1100_path))
-        np.save(adc2pe_800gm_path, np.ma.filled(self.adc2pe[4], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_800gm_path))
-        np.save(adc2pe_900gm_path, np.ma.filled(self.adc2pe[5], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_900gm_path))
-        np.save(adc2pe_1000gm_path, np.ma.filled(self.adc2pe[6], 0))
-        self.log.info("ADC2PE array saved to: {}".format(adc2pe_1000gm_path))
+        # np.savez(numpy_path,
+        #          charge=np.ma.filled(spe, 0),
+        #          charge_error=np.zeros(spe.shape),
+        #          rundesc=x)
+        # self.log.info("Numpy array saved to: {}".format(numpy_path))
+        #
+        # np_adc2pe_800_path = join(output_dir, "adc2pe_800.npy")
+        # np_adc2pe_900_path = join(output_dir, "adc2pe_900.npy")
+        # np_adc2pe_1000_path = join(output_dir, "adc2pe_1000.npy")
+        # np_adc2pe_1100_path = join(output_dir, "adc2pe_1100.npy")
+        # np_adc2pe_800gm_path = join(output_dir, "adc2pe_800gm.npy")
+        # np_adc2pe_900gm_path = join(output_dir, "adc2pe_900gm.npy")
+        # np_adc2pe_1000gm_path = join(output_dir, "adc2pe_1000gm.npy")
+        #
+        # np.save(np_adc2pe_800_path, np.ma.filled(self.adc2pe[0], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_800_path))
+        # np.save(np_adc2pe_900_path, np.ma.filled(self.adc2pe[1], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_900_path))
+        # np.save(np_adc2pe_1000_path, np.ma.filled(self.adc2pe[2], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_1000_path))
+        # np.save(np_adc2pe_1100_path, np.ma.filled(self.adc2pe[3], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_1100_path))
+        # np.save(np_adc2pe_800gm_path, np.ma.filled(self.adc2pe[4], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_800gm_path))
+        # np.save(np_adc2pe_900gm_path, np.ma.filled(self.adc2pe[5], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_900gm_path))
+        # np.save(np_adc2pe_1000gm_path, np.ma.filled(self.adc2pe[6], 0))
+        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_1000gm_path))
 
 
 if __name__ == '__main__':
