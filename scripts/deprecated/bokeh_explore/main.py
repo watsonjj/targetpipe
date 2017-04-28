@@ -1,16 +1,16 @@
 import numpy as np
 import pandas as pd
+from bokeh.plotting import curdoc
 from tqdm import tqdm
-from traitlets import Dict, List, Unicode, Int
-from ctapipe.core import Tool, Component
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from traitlets import Dict, List, Unicode
+
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
-from targetpipe.io.eventfilereader import TargetioFileReader
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
 from targetpipe.io.file_looper import TargetioFileLooper as FileLooper
 from targetpipe.plots.explore import ExploreDataApp
-from bokeh.plotting import curdoc
 
 TELID = 0
 ORIGIN = 'targetio'

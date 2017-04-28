@@ -1,26 +1,28 @@
+from collections import defaultdict
+from time import sleep, time
+
+import numpy as np
 from bokeh.io import curdoc
 from bokeh.layouts import layout
-from bokeh.plotting import figure
-from traitlets import Dict, List, CaselessStrEnum as CaStEn, Int
 from bokeh.models import Select, ColumnDataSource, palettes, \
     RadioGroup, CheckboxGroup, Legend, Div, Span, TableColumn, DataTable, \
     NumberFormatter, TextInput, Button
-from ctapipe.core import Tool, Component
-from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.instrument import CameraGeometry
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from bokeh.plotting import figure
+from tqdm import trange, tqdm
+from traitlets import Dict, List, CaselessStrEnum as CaStEn, Int
+
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from ctapipe.calib.camera.charge_extractors import SimpleIntegrator, \
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool, Component
+from ctapipe.image.charge_extractors import SimpleIntegrator, \
     AverageWfPeakIntegrator
-from targetpipe.visualization.bokeh import CameraDisplay
-from targetpipe.io.pixels import get_neighbours_2d, Dead
+from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.instrument import CameraGeometry
+from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.fitting.checm import CHECMFitterSPE, CHECMFitterBright
-import numpy as np
-from collections import defaultdict
-from tqdm import trange, tqdm
-from time import sleep, time
+from targetpipe.io.pixels import get_neighbours_2d, Dead
+from targetpipe.visualization.bokeh import CameraDisplay
 
 
 class Camera(CameraDisplay):

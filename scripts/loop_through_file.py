@@ -1,12 +1,13 @@
+from tqdm import tqdm
 from traitlets import Dict, List
-from ctapipe.core import Tool
-from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
-from ctapipe.calib.camera.waveform_cleaning import WaveformCleanerFactory
-from tqdm import tqdm
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
+from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
+from ctapipe.io.eventfilereader import EventFileReaderFactory
 
 
 class EventFileLooper(Tool):

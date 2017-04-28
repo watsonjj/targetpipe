@@ -1,4 +1,3 @@
-import time
 import copy
 from tqdm import tqdm
 import numpy as np
@@ -8,11 +7,25 @@ from ctapipe.instrument import CameraGeometry
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
 from ctapipe.image import tailcuts_clean, hillas_parameters
-from ctapipe.image.hillas import HillasParameterizationError, hillas_parameters_2
+from ctapipe.image.hillas import HillasParameterizationError
 from targetpipe.utils.plotting import intensity_to_hex
+import copy
 
+import numpy as np
+from tqdm import tqdm
+
+from ctapipe.calib.camera.dl0 import CameraDL0Reducer
+from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool
+from ctapipe.image import tailcuts_clean, hillas_parameters
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
+from ctapipe.image.hillas import HillasParameterizationError
+from ctapipe.instrument import CameraGeometry
+from ctapipe.io.eventfilereader import EventFileReaderFactory
+from targetpipe.utils.plotting import intensity_to_hex
 
 # GLOBALS
 

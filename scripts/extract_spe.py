@@ -1,17 +1,19 @@
-from traitlets import Dict, List
-from ctapipe.core import Tool
-from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
-from ctapipe.calib.camera.dl0 import CameraDL0Reducer
-from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import AverageWfPeakIntegrator
-from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from targetpipe.fitting.checm import CHECMFitterSPE
-from targetpipe.io.pixels import Dead
+from os import makedirs
+from os.path import join, exists
+
 import numpy as np
 from tqdm import tqdm
-from os.path import join, exists
-from os import makedirs
+from traitlets import Dict, List
+
+from ctapipe.calib.camera.dl0 import CameraDL0Reducer
+from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool
+from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
+from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.io.eventfilereader import EventFileReaderFactory
+from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.io.pixels import Dead
 
 
 class BokehSPE(Tool):

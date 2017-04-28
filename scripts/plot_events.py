@@ -1,21 +1,24 @@
-from traitlets import Dict, List
-from ctapipe.core import Tool
-from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
-from ctapipe.calib.camera.dl0 import CameraDL0Reducer
-from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
-from ctapipe.calib.camera.waveform_cleaning import WaveformCleanerFactory
-from tqdm import tqdm
+from os import makedirs
+from os.path import join, exists
+
+import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from os.path import join, exists
-from os import makedirs
-from ctapipe.instrument import CameraGeometry
-from ctapipe.visualization import CameraDisplay
-import numpy as np
+from tqdm import tqdm
+from traitlets import Dict, List
+
+from ctapipe.calib.camera.dl0 import CameraDL0Reducer
+from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool
 from ctapipe.image import tailcuts_clean
-from ctapipe.image.hillas import HillasParameterizationError, hillas_parameters_4
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
+from ctapipe.image.hillas import HillasParameterizationError, \
+    hillas_parameters_4
+from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
+from ctapipe.instrument import CameraGeometry
+from ctapipe.io.eventfilereader import EventFileReaderFactory
+from ctapipe.visualization import CameraDisplay
 
 
 class EventFileLooper(Tool):

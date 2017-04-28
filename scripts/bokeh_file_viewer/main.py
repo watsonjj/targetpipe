@@ -1,14 +1,15 @@
 from bokeh.io import curdoc
 from bokeh.layouts import widgetbox, layout
-from traitlets import Dict, List
 from bokeh.models import Select, TextInput, PreText
-from ctapipe.core import Tool
-from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from traitlets import Dict, List
+
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
-from ctapipe.calib.camera.waveform_cleaning import WaveformCleanerFactory
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
+from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
+from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.plots.event_viewer import EventViewer
 
 

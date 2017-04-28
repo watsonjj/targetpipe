@@ -4,25 +4,27 @@ Create a animated gif of an waveforms, similar to those produced in libCHEC for
 the inauguration press release.
 """
 
+from os import makedirs
+from os.path import join, exists
+
+import numpy as np
+from matplotlib import animation
+from matplotlib import pyplot as plt
+from tqdm import tqdm
 from traitlets import Dict, List, Unicode
-from ctapipe.core import Tool, Component
-from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
-from ctapipe.calib.camera.charge_extractors import ChargeExtractorFactory
-from ctapipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
-from ctapipe.instrument import CameraGeometry
-from ctapipe.visualization import CameraDisplay
+from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
+from ctapipe.core import Tool, Component
 from ctapipe.image import tailcuts_clean
+from ctapipe.image.charge_extractors import ChargeExtractorFactory
+from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.instrument import CameraGeometry
+from ctapipe.io.eventfilereader import EventFileReaderFactory
+from ctapipe.visualization import CameraDisplay
 from targetpipe.fitting.checm import CHECMFitterSPE
 from targetpipe.io.pixels import Dead
-import numpy as np
-from tqdm import tqdm
-from os.path import join, exists
-from os import makedirs
-from matplotlib import pyplot as plt
-from matplotlib import animation
 
 
 class Animator(Component):
