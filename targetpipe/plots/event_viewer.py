@@ -265,13 +265,14 @@ class EventViewerWaveform(WaveformDisplay):
         c = self.channel
         p = self.pixel
         if e:
-            # Get Windows
-            windows = e.dl1.tel[t].extracted_samples[c, p]
-            length = np.sum(windows)
-            start = np.argmax(windows)
-            end = start + length - 1
-            self.intwin1.location = start
-            self.intwin2.location = end
+            if e.dl1.tel[t].extracted_samples:
+                # Get Windows
+                windows = e.dl1.tel[t].extracted_samples[c, p]
+                length = np.sum(windows)
+                start = np.argmax(windows)
+                end = start + length - 1
+                self.intwin1.location = start
+                self.intwin2.location = end
         else:
             self.event_viewer.log.warning("No event has been provided")
 

@@ -15,7 +15,8 @@ class EventFileLooper(Tool):
     description = "Loop through the file and apply calibration. Intended as " \
                   "a test that the routines work, and a benchmark of speed."
 
-    aliases = Dict(dict(f='EventFileReaderFactory.input_path',
+    aliases = Dict(dict(r='EventFileReaderFactory.reader',
+                        f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
