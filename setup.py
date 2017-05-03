@@ -23,7 +23,7 @@ setup(
     description=DESCRIPTION,
     install_requires=['astropy', 'scipy', 'numpy', 'matplotlib', 'iminuit',
                       'scikit-learn', 'traitlets', 'tqdm', 'bokeh', 'pandas',
-                      'seaborn'],
+                      'seaborn', 'ctapipe'],
     setup_requires=['pytest-runner', ],
     tests_require=['pytest', ],
     author=AUTHOR,
