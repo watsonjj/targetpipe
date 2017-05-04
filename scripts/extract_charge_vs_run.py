@@ -64,7 +64,6 @@ class ChargeVsRunExtractor(Tool):
         self.extractor = None
         self.dl1 = None
 
-        self.n_events = None
         self.n_pixels = None
         self.n_samples = None
         self.n_modules = 32
@@ -95,7 +94,6 @@ class ChargeVsRunExtractor(Tool):
         self.fitter = CHECMFitterBright(**kwargs)
         self.dead = Dead()
 
-        self.n_events = self.file_looper.num_events
         file_reader_list = self.file_looper.file_reader_list
         first_event = file_reader_list[0].get_event(0)
         telid = list(first_event.r0.tels_with_data)[0]

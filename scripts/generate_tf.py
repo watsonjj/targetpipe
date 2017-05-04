@@ -5,36 +5,9 @@ class
 
 from traitlets import Dict, List, Int
 from ctapipe.core import Tool
-from targetpipe.io.eventfilereader import FileLooper
+from targetpipe.io.file_looper import TargetioFileLooper
 from targetpipe.calib.camera.makers import TFMaker
 from tqdm import tqdm
-
-
-class TFEventFileLooper(FileLooper):
-    name = 'TFEventFileLooper'
-
-    vped_list = List(Int, None, allow_none=True,
-                     help='List of the vped value for each input '
-                          'file').tag(config=True)
-
-    def __init__(self, config, tool, **kwargs):
-        super().__init__(config=config, tool=tool, **kwargs)
-        assert (len(self.file_list) == len(self.vped_list))
-
-    def read(self):
-        for fn, (filepath, vped) in enumerate(zip(self.file_list,
-                                                  self.vped_list)):
-
-            if self.max_files is not None:
-                if fn >= self.max_files:
-                    break
-
-            self.file_reader.input_path = filepath
-            self.file_reader.max_events = self.max_events
-
-            source = self.file_reader.read()
-            for event in source:
-                yield fn, event, vped
 
 
 class TFBuilder(Tool):
@@ -42,8 +15,12 @@ class TFBuilder(Tool):
     description = "Create the TargetCalib Transfer Function file from a " \
                   "list of event files"
 
-    aliases = Dict(dict(N='TFEventFileLooper.max_files',
-                        max_events='TFEventFileLooper.max_events',
+    vped_list = List(Int, None, allow_none=True,
+                     help='List of the vped value for each input '
+                          'file').tag(config=True)
+
+    aliases = Dict(dict(N='TargetioFileLooper.max_files',
+                        max_events='TargetioFileLooper.max_events',
                         P='TFMaker.pedestal_path',
                         adcstep='TFMaker.adc_step',
                         O='TFMaker.output_path',
@@ -56,7 +33,7 @@ class TFBuilder(Tool):
                              'Create a numpy file containing the input TF'
                              'array before the switch of axis')
                       ))
-    classes = List([TFEventFileLooper,
+    classes = List([TargetioFileLooper,
                     TFMaker
                     ])
 
@@ -69,22 +46,26 @@ class TFBuilder(Tool):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
 
-        self.file_looper = TFEventFileLooper(**kwargs)
+        self.file_looper = TargetioFileLooper(**kwargs)
 
-        _, first_event, _ = next(self.file_looper.read())
+        first_event = self.file_looper.file_reader_list[0].get_event(0)
         n_modules = first_event.meta['n_modules']
 
         self.tfmaker = TFMaker(**kwargs,
-                               vped_list=self.file_looper.vped_list,
+                               vped_list=self.vped_list,
                                number_tms=n_modules)
 
+        assert len(self.file_looper.file_reader_list) == len(self.vped_list)
+
     def start(self):
-        n_events = self.file_looper.num_events
-        desc = "Filling TF"
-        with tqdm(total=n_events, desc=desc) as pbar:
-            source = self.file_looper.read()
-            for fn, event, vped in source:
-                pbar.update(1)
+        desc1 = "Looping over Files"
+        desc2 = "Looping over events"
+        iterable = zip(self.file_looper.file_reader_list, self.vped_list)
+        n_readers = self.file_looper.num_readers
+        for reader, vped in tqdm(iterable, total=n_readers, desc=desc1):
+            n_events = reader.num_events
+            source = reader.read()
+            for event in tqdm(source, total=n_events, desc=desc2):
                 self.tfmaker.add_event(event, vped)
 
     def finish(self):

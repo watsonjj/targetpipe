@@ -265,7 +265,7 @@ class EventViewerWaveform(WaveformDisplay):
         c = self.channel
         p = self.pixel
         if e:
-            if e.dl1.tel[t].extracted_samples:
+            if e.dl1.tel[t].extracted_samples is not None:
                 # Get Windows
                 windows = e.dl1.tel[t].extracted_samples[c, p]
                 length = np.sum(windows)

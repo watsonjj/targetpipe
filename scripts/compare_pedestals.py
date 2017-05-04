@@ -8,8 +8,8 @@ class PedestalComparer(Tool):
     name = "PedestalComparer"
     description = "Compare between two TargetCalib pedestals."
 
-    p1_path = Unicode("", help="Path to an r0 file.").tag(config=True)
-    p2_path = Unicode("", help="Path to an r1 file.").tag(config=True)
+    p1_path = Unicode("", help="Path to the first ped file.").tag(config=True)
+    p2_path = Unicode("", help="Path to the second ped file.").tag(config=True)
 
     aliases = Dict(dict(p1='PedestalComparer.p1_path',
                         p2='PedestalComparer.p2_path',
@@ -31,9 +31,6 @@ class PedestalComparer(Tool):
     def start(self):
         p1 = self.ps1.get_ped()
         p2 = self.ps2.get_ped()
-
-        from IPython import embed
-        embed()
 
         assert np.allclose(p1, p2)
 
