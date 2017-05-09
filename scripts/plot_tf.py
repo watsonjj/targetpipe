@@ -434,7 +434,7 @@ class TargetCalibTFExplorer(Tool):
     aliases = Dict(dict(tf='TFApplier.tf_path',
                         tf_input='TargetCalibTFExplorer.tfinput_path',
                         vped='TargetCalibTFExplorer.vped_path',
-                        o='TargetCalibTFExplorer.output_dir'
+                        # o='TargetCalibTFExplorer.output_dir'
                         ))
     classes = List([TFApplier
                     ])

@@ -114,7 +114,8 @@ class ADC2PEvsHVPlotter(Tool):
 
         hv_txt_list = ['800', '900', '1000', '1100', '800gm', '900gm', '1000gm']
         for i, hv_txt in enumerate(hv_txt_list):
-            self.cfmaker.SetAll(self.adc2pe[i].astype(np.float32))
+            vals = np.ma.filled(self.adc2pe[i], 0)
+            self.cfmaker.SetAll(vals.astype(np.float32))
             path = join(output_dir, "adc2pe_{}.tcal".format(hv_txt))
             self.cfmaker.Save(path, False)
             self.log.info("ADC2PE tcal created: {}".format(path))

@@ -73,9 +73,9 @@ class TargetioFileReader(EventFileReader):
     @property
     def event_id_list(self):
         if not self._event_id_list:
-            self.log.info("Building new list of event ids...")
-            self._event_id_list = np.arange(self.num_events)
-            self.log.info("List of event ids built.")
+            # self.log.info("Building new list of event ids...")
+            self._event_id_list = self.extractor.event_id_list
+            # self.log.info("List of event ids built.")
         return self._event_id_list
 
     def read(self, allowed_tels=None, requested_event=None,

@@ -77,6 +77,9 @@ class TargetioExtractor:
                                     SKIP_SAMPLE, SKIP_END_SAMPLE,
                                     SKIP_EVENT, SKIP_END_EVENT)
         self.n_events = self.tio_reader.fNEvents
+        first_event_id = self.tio_reader.fFirstEventID
+        last_event_id = self.tio_reader.fLastEventID
+        self.event_id_list = np.arange(first_event_id, last_event_id)
         self.run_id = self.tio_reader.fRunID
         self.n_pix = self.tio_reader.fNPixels
         self.n_modules = self.tio_reader.fNModules
@@ -222,6 +225,6 @@ class TargetioExtractor:
         """
         if use_event_id:
             # Obtaining event id not implemented
-            self.event_index = requested_event
+            self.event_index = self.tio_reader.GetEventIndex(requested_event)
         else:
             self.event_index = requested_event
