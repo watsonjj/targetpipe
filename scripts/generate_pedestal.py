@@ -16,7 +16,7 @@ class PedestalBuilder(Tool):
 
     aliases = Dict(dict(f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
-                        O='PedestalMaker.output_path',
+                        # O='PedestalMaker.output_path',
                         ))
     flags = Dict(dict(compress=({'PedestalMaker': {'compress': True}},
                                 'Compress the output pedestal file (store '
@@ -47,7 +47,10 @@ class PedestalBuilder(Tool):
         n_blocks = first_event.meta['n_blocks']
         n_samples = first_event.r0.tel[0].adc_samples.shape[2]
 
+        ped_path = self.file_reader.input_path.replace("_r0.tio", "_ped.tcal")
+
         self.pedmaker = PedestalMaker(**kwargs,
+                                      output_path=ped_path,
                                       n_tms=n_modules,
                                       n_blocks=n_blocks,
                                       n_samples=n_samples)
