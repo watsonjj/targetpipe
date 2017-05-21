@@ -17,7 +17,7 @@ from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.core import Tool, Component
 from ctapipe.image.charge_extractors import SimpleIntegrator, \
     AverageWfPeakIntegrator
-from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.fitting.checm import CHECMFitterSPE, CHECMFitterBright
@@ -501,9 +501,6 @@ class BokehSPE(Tool):
     description = "Interactively explore the steps in obtaining and fitting " \
                   "SPE spectrum"
 
-    t0 = Int(None, allow_none=True,
-             help='Override the value of t0').tag(config=True)
-
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
                         max_events='EventFileReaderFactory.max_events',
@@ -511,12 +508,10 @@ class BokehSPE(Tool):
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
                         brightness='FitterWidget.brightness',
-                        t0='BokehSPE.t0'
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
                     FitterWidget,
-                    CHECMWaveformCleaner
                     ])
 
     def __init__(self, **kwargs):
@@ -574,12 +569,8 @@ class BokehSPE(Tool):
 
         self.dl0 = CameraDL0Reducer(**kwargs)
 
-        self.cleaner = CHECMWaveformCleaner(t0=self.t0, **kwargs)
-        if self.t0:
-            self.extractor = SimpleIntegrator(t0=self.t0,
-                                              **kwargs)
-        else:
-            self.extractor = AverageWfPeakIntegrator(**kwargs)
+        self.cleaner = CHECMWaveformCleanerAverage(**kwargs)
+        self.extractor = AverageWfPeakIntegrator(**kwargs)
         self.extractor_height = SimpleIntegrator(window_shift=0,
                                                  window_width=1,
                                                  **kwargs)
@@ -595,8 +586,9 @@ class BokehSPE(Tool):
 
         self.n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
-        r0 = first_event.r0.tel[0].adc_samples[0]
-        self.n_pixels, self.n_samples = r0.shape
+        self.n_pixels = first_event.inst.num_pixels[0]
+        self.n_samples = first_event.r0.tel[0].num_samples
+
         geom = CameraGeometry.guess(*first_event.inst.pixel_pos[0],
                                     first_event.inst.optical_foclen[0])
         self.neighbours2d = get_neighbours_2d(geom.pix_x, geom.pix_y)
@@ -604,11 +596,10 @@ class BokehSPE(Tool):
         # Get stage names
         self.stage_names = ['0: raw',
                             '1: baseline_sub',
-                            '2: avg_wf',
-                            '3: no_pulse',
-                            '4: smooth_baseline',
-                            '5: smooth_wf',
-                            '6: cleaned']
+                            '2: no_pulse',
+                            '3: smooth_baseline',
+                            '4: smooth_wf',
+                            '5: cleaned']
 
         # Init Plots
         self.p_camera_area = Camera(self, self.neighbours2d, "Area", geom)
@@ -731,11 +722,13 @@ class BokehSPE(Tool):
         self.update_event_index_widget()
 
         stages = self.dl1.cleaner.stages
-        pw_l = self.dl1.cleaner.stages['window_start']
-        pw_r = self.dl1.cleaner.stages['window_end']
-        windows = val.dl1.tel[0].extracted_samples[0, 0]
-        length = np.sum(windows)
-        iw_l = np.argmax(windows)
+        pulse_window = self.dl1.cleaner.stages['window']
+        length = np.sum(pulse_window)
+        pw_l = np.argmax(pulse_window)
+        pw_r = pw_l + length - 1
+        int_window = val.dl1.tel[0].extracted_samples[0, 0]
+        length = np.sum(int_window)
+        iw_l = np.argmax(int_window)
         iw_r = iw_l + length - 1
 
         self.p_camera_area.image = peak_area

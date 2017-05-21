@@ -10,7 +10,7 @@ from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.core import Tool
 from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
-from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerLocal
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.fitting.checm import CHECMFitterSPE
 from targetpipe.io.pixels import Dead
@@ -66,7 +66,7 @@ class ADC2PEResidualsExtractor(Tool):
                                                **kwargs)
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
-        self.cleaner = CHECMWaveformCleaner(**kwargs)
+        self.cleaner = CHECMWaveformCleanerLocal(**kwargs)
         self.extractor = AverageWfPeakIntegrator(**kwargs)
         self.dl0 = CameraDL0Reducer(**kwargs)
         self.dl1 = CameraDL1Calibrator(extractor=self.extractor,

@@ -16,6 +16,7 @@ class CHECR0CameraContainer(Container):
                               "(n_channels x n_pixels, n_samples)"))
     first_cell_ids = Item(ndarray, ("numpy array of the first_cell_id of each"
                                     "waveform in the camera image"))
+    num_samples = Item(None, "number of time samples for telescope")
 
 
 class CHECR0Container(Container):

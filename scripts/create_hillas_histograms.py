@@ -16,18 +16,18 @@ from ctapipe.core import Tool
 from ctapipe.image import tailcuts_clean
 from ctapipe.image.charge_extractors import ChargeExtractorFactory
 from ctapipe.image.hillas import HillasParameterizationError, \
-    hillas_parameters_4
-from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+    hillas_parameters
+from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerLocal
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from ctapipe.visualization import CameraDisplay
 from targetpipe.fitting.checm import CHECMFitterSPE
 from targetpipe.io.pixels import Dead
 
 
-class EventAnimationCreator(Tool):
-    name = "EventAnimationCreator"
-    description = "Create an animation of the camera image through timeslices"
+class HillasExtractor(Tool):
+    name = "HillasExtractor"
+    description = "Extract the hillas parameters and store them in various " \
+                  "forms."
 
     aliases = Dict(dict(r='EventFileReaderFactory.reader',
                         f='EventFileReaderFactory.input_path',
@@ -35,11 +35,9 @@ class EventAnimationCreator(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
-                        cleaner_t0='CHECMWaveformCleaner.t0',
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMWaveformCleaner,
                     CHECMFitterSPE,
                     ])
 
@@ -88,7 +86,7 @@ class EventAnimationCreator(Tool):
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
 
-        self.cleaner = CHECMWaveformCleaner(**kwargs)
+        self.cleaner = CHECMWaveformCleanerLocal(**kwargs)
 
         extractor_factory = ChargeExtractorFactory(**kwargs)
         extractor_class = extractor_factory.get_class()
@@ -119,23 +117,11 @@ class EventAnimationCreator(Tool):
         self.kurtosis = np.ma.zeros(self.n_events)
 
     def start(self):
-        images = []
-        event_list = []
-
         first_event = self.reader.get_event(0)
         telid = list(first_event.r0.tels_with_data)[0]
-        r0 = first_event.r0.tel[telid].adc_samples[0]
-        n_pixels, n_samples = r0.shape
         pos = first_event.inst.pixel_pos[telid]
         foclen = first_event.inst.optical_foclen[telid]
         geom = CameraGeometry.guess(*pos, foclen)
-
-        fig = plt.figure(figsize=(24, 10))
-        ax = fig.add_subplot(1, 1, 1)
-        camera = CameraDisplay(geom, ax=ax, image=np.zeros(2048),
-                               cmap='viridis')
-        camera.add_colorbar()
-        cb = camera.colorbar
 
         mask = np.zeros(self.n_events, dtype=bool)
 
@@ -153,27 +139,17 @@ class EventAnimationCreator(Tool):
 
                 # Cleaning
                 tc = tailcuts_clean(geom, image, 20, 10)
-                # dilate(geom, tc)
-                # dilate(geom, tc)
-                cleaned_tc = np.ma.masked_array(image, mask=~tc)
+                if not tc.any():
+                    mask[ev] = True
+                    continue
+                cleaned_dl1 = np.ma.masked_array(image, mask=~tc)
 
                 try:
-                    # hillas = hillas_parameters(*pos, cleaned_tc)
-                    hillas = hillas_parameters_4(*pos, np.ma.filled(cleaned_tc, 0))
+                    hillas = hillas_parameters(*pos, cleaned_dl1)
                 except HillasParameterizationError:
                     mask[ev] = True
                     print('HillasParameterizationError')
                     continue
-
-                # if hillas.size > 25000:
-                #     ax.cla()
-                #     camera = CameraDisplay(geom, ax=ax, image=np.zeros(2048),
-                #                            cmap='viridis')
-                #     camera.colorbar = cb
-                #     camera.image = image#cleaned_tc
-                #     camera.overlay_moments(hillas)
-                #     camera.update(True)
-                #     plt.pause(1)
 
                 self.time[ev] = event.trig.gps_time.value
                 self.size[ev] = hillas.size
@@ -205,9 +181,6 @@ class EventAnimationCreator(Tool):
         self.kurtosis.mask = mask
 
     def finish(self):
-        # from IPython import embed
-        # embed()
-
         fig = plt.figure(figsize=(24, 10))
         ax1 = fig.add_subplot(2, 3, 1)
         ax2 = fig.add_subplot(2, 3, 2)
@@ -225,7 +198,7 @@ class EventAnimationCreator(Tool):
 
         ax1.hist(self.width.compressed(), bins=60)
         ax2.hist(self.length.compressed(), bins=60)
-        ax3.hist(self.size.compressed(), bins=60)#, range=[0,6000])
+        ax3.hist(self.size.compressed(), bins=60)
         ax4.hist(self.phi.compressed(), bins=60)
         ax5.hist(self.miss.compressed(), bins=60)
         ax6.hist(self.r.compressed(), bins=60)
@@ -246,7 +219,8 @@ class EventAnimationCreator(Tool):
                  kurtosis=self.kurtosis.compressed())
 
         with open("/Users/Jason/Downloads/hillas.csv", 'w') as f:
-            f.write("time,size,cen_x,cen_y,length,width,r,phi,psi,miss,skewness,kurtosis\n")
+            f.write("time,size,cen_x,cen_y,length,width,r,phi,psi,miss,"
+                    "skewness,kurtosis\n")
             for ev in range(self.time.compressed().size):
                 f.write("{},{},{},{},{},{},{},{},{},{},{},{}\n"
                         .format(self.time.compressed()[ev],
@@ -263,6 +237,5 @@ class EventAnimationCreator(Tool):
                                 self.kurtosis.compressed()[ev]))
 
 
-
-exe = EventAnimationCreator()
+exe = HillasExtractor()
 exe.run()

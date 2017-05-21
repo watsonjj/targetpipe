@@ -199,6 +199,7 @@ class TargetioExtractor:
         data.r0.tel[chec_tel].adc_samples = self.r0_samples
         data.r1.tel[chec_tel].pe_samples = self.r1_samples
         data.r0.tel[chec_tel].first_cell_ids = self.first_cell_ids
+        data.r0.tel[chec_tel].num_samples = self.n_samples
 
         data.mc.tel[chec_tel].reference_pulse_shape = checm_refshape
         data.mc.tel[chec_tel].meta['refstep'] = checm_refstep

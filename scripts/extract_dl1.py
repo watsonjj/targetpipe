@@ -10,7 +10,7 @@ from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.core import Tool
 from ctapipe.image.charge_extractors import ChargeExtractorFactory
-from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.io.pixels import Dead
 
@@ -25,17 +25,17 @@ class DL1Extractor(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
+                        cleaner='WaveformCleanerFactory.cleaner',
                         extractor='ChargeExtractorFactory.extractor',
                         extractor_t0='ChargeExtractorFactory.t0',
                         window_width='ChargeExtractorFactory.window_width',
                         window_shift='ChargeExtractorFactory.window_shift',
                         radius='CameraDL1Calibrator.radius',
-                        cleaner_t0='CHECMWaveformCleaner.t0',
                         ))
 
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMWaveformCleaner,
+                    WaveformCleanerFactory,
                     ChargeExtractorFactory,
                     CameraDL1Calibrator
                     ])
@@ -75,6 +75,10 @@ class DL1Extractor(Tool):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
 
+        cleaner_factory = WaveformCleanerFactory(**kwargs)
+        cleaner_class = cleaner_factory.get_class()
+        self.cleaner = cleaner_class(**kwargs)
+
         reader_factory = EventFileReaderFactory(**kwargs)
         reader_class = reader_factory.get_class()
         self.reader = reader_class(**kwargs)
@@ -82,8 +86,6 @@ class DL1Extractor(Tool):
         extractor_factory = ChargeExtractorFactory(**kwargs)
         extractor_class = extractor_factory.get_class()
         self.extractor = extractor_class(**kwargs)
-
-        self.cleaner = CHECMWaveformCleaner(**kwargs)
 
         r1_factory = CameraR1CalibratorFactory(origin=self.reader.origin,
                                                **kwargs)
@@ -105,7 +107,8 @@ class DL1Extractor(Tool):
 
         n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
-        n_pixels, n_samples = first_event.r0.tel[0].adc_samples[0].shape
+        n_pixels = first_event.inst.num_pixels[0]
+        n_samples = first_event.r0.tel[0].num_samples
 
         self.tack = np.zeros(n_events)
         self.sec = np.zeros(n_events)
@@ -130,7 +133,8 @@ class DL1Extractor(Tool):
         n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
         telid = list(first_event.r0.tels_with_data)[0]
-        n_pixels, n_samples = first_event.r0.tel[telid].adc_samples[0].shape
+        n_pixels = first_event.inst.num_pixels[0]
+        n_samples = first_event.r0.tel[0].num_samples
 
         ind = np.indices((n_pixels, n_samples))[1]
         r_ind = ind[:, ::-1]

@@ -18,7 +18,7 @@ from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.core import Tool, Component
 from ctapipe.image.charge_extractors import ChargeExtractorFactory
-from ctapipe.image.waveform_cleaning import CHECMWaveformCleaner
+from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.visualization import CameraDisplay
@@ -119,7 +119,7 @@ class EventAnimationCreator(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
-                        cleaner_t0='CHECMWaveformCleaner.t0',
+                        cleaner='WaveformCleanerFactory.cleaner',
                         e='EventAnimationCreator.req_event',
                         start='Animator.start',
                         end='Animator.end',
@@ -128,7 +128,7 @@ class EventAnimationCreator(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMWaveformCleaner,
+                    WaveformCleanerFactory,
                     CHECMFitterSPE,
                     Animator
                     ])
@@ -163,7 +163,9 @@ class EventAnimationCreator(Tool):
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
 
-        self.cleaner = CHECMWaveformCleaner(**kwargs)
+        cleaner_factory = WaveformCleanerFactory(**kwargs)
+        cleaner_class = cleaner_factory.get_class()
+        self.cleaner = cleaner_class(**kwargs)
 
         extractor_factory = ChargeExtractorFactory(**kwargs)
         extractor_class = extractor_factory.get_class()

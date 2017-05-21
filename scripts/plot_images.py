@@ -88,8 +88,8 @@ class EventFileLooper(Tool):
 
         # Get first event information
         first_event = self.reader.get_event(0)
-        r0 = first_event.r0.tel[0].adc_samples[0]
-        n_pixels, n_samples = r0.shape
+        n_pixels = first_event.inst.num_pixels[0]
+        n_samples = first_event.r0.tel[0].num_samples
         pos = first_event.inst.pixel_pos[0]
         foclen = first_event.inst.optical_foclen[0]
         geom = CameraGeometry.guess(*pos, foclen)
@@ -121,6 +121,7 @@ class EventFileLooper(Tool):
         with PdfPages(output_path) as pdf:
             for event in tqdm(source, desc=desc):
                 ev = event.count
+                event_id = event.r0.event_id
                 self.r1.calibrate(event)
                 self.dl0.reduce(event)
                 self.dl1.calibrate(event)
@@ -129,13 +130,13 @@ class EventFileLooper(Tool):
 
                     # Cleaning
                     tc = tailcuts_clean(geom, dl1, 20, 10)
-                    # dilate(geom, tc)
-                    # dilate(geom, tc)
-                    cleaned_tc = np.ma.masked_array(dl1, mask=~tc)
+                    if not tc.any():
+                        continue
+                    cleaned_dl1 = np.ma.masked_array(dl1, mask=~tc)
 
                     try:
                         # hillas = hillas_parameters(*pos, cleaned_tc)
-                        hillas = hillas_parameters_4(*pos, cleaned_tc)
+                        hillas = hillas_parameters_4(*pos, cleaned_dl1)
                     except HillasParameterizationError:
                         continue
 
@@ -145,9 +146,13 @@ class EventFileLooper(Tool):
                                            cmap='viridis')
                     camera.colorbar = cb
                     camera.image = dl1
+                    max_ = cleaned_dl1.max()  # np.percentile(dl1, 99.9)
+                    min_ = np.percentile(dl1, 0.1)
+                    camera.set_limits_minmax(min_, max_)
+                    camera.highlight_pixels(tc, 'white')
                     camera.overlay_moments(hillas, color='red')
                     camera.update(True)
-                    ax_camera.set_title("Event: {}".format(ev))
+                    ax_camera.set_title("Event: {}".format(event_id))
                     ax_camera.axis('off')
 
                     pdf.savefig(fig)

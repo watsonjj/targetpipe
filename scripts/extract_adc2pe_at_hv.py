@@ -32,14 +32,7 @@ class ADC2PEvsHVPlotter(Tool):
         self.a2p = None
         self.dead = None
 
-        self.spe = None
-        self.hv = None
-
-        self.fig = None
-
         sns.set_style("whitegrid")
-
-        self.adc2pe = None
 
         self.cfmaker = None
 
@@ -50,105 +43,62 @@ class ADC2PEvsHVPlotter(Tool):
         self.a2p = TargetioADC2PECalibrator(**kwargs)
         self.dead = Dead()
 
-        hv_modules = [[819, 775, 784, 844, 772, 761, 785, 865, 863, 881, 715, 788, 725, 801, 828, 844, 793, 792, 835, 773, 774, 862, 803, 864, 788, 848, 766, 820, 773, 789, 845, 819],
-                      [914, 864, 885, 950, 869, 851, 887, 974, 977, 991, 812, 885, 819, 897, 932, 946, 892, 886, 943, 871, 866, 968, 902, 974, 883, 959, 864, 925, 873, 891, 952, 925],
-                      [1009, 954, 985, 1057, 966, 940, 989, 1084, 1092, 1101, 910, 981, 913, 992, 1035, 1048, 991, 979, 1052, 969, 957, 1075, 1001, 1085, 977, 1071, 963, 1030, 973, 993, 1059, 1032]]
-        # hv_modules = [[ 820, 771, 784, 848, 770, 759, 786, 870, 868, 887, 712, 788, 723, 802, 830, 847, 794, 793, 839, 773, 773, 867, 805, 869, 786, 853, 765, 822, 773, 782, 848, 821 ],
-        #               [ 916, 860, 885, 954, 866, 848, 887, 980, 982, 997, 809, 885, 816, 898, 934, 949, 893, 886, 947, 871, 864, 973, 904, 979, 882, 964, 864, 928, 873, 883, 955, 928 ],
-        #               [ 1011, 949, 986, 1061, 963, 937, 989, 1089, 1098, 1100, 907, 981, 909, 993, 1038, 1052, 992, 979, 1056, 969, 956, 1079, 1003, 1090, 977, 1075, 962, 1033, 973, 985, 1063, 1035 ]]
-        shape = (3, 32, 64)
-        hv_gm = (np.array(hv_modules)[..., None] *
-                 np.ones(shape)).reshape((3, 2048))
-        hv_modules = [[800]*2048,
-                      [900]*2048,
-                      [1000]*2048,
-                      [1100]*2048]
-        hv_ngm = np.array(hv_modules)
-        self.hv = np.vstack((hv_ngm, hv_gm))
-
         self.cfmaker = CfMaker(32)
 
-    def start(self):
-        self.adc2pe = self.a2p.get_adc2pe_at_hv(self.hv, np.arange(2048)[None, :])
-        self.adc2pe = self.dead.mask2d(self.adc2pe)
-        self.spe = 1/self.adc2pe
-
-        # Build Dataframe
-        hv_df = np.array([[800]*2048,
-                         [900]*2048,
-                         [1000]*2048,
-                         [1100]*2048,
-                         [800]*2048,
-                         [900]*2048,
-                         [1000]*2048]).flatten()
-        spe_df = self.spe.flatten()
-        gm_df = ['Non-gain-matched']*2048*4 + ['Gain-matched']*2048*3
-        d = dict(hv=hv_df, spe=spe_df, gm=gm_df)
-        df = DataFrame(d)
-
-        # Create Plot
-        self.fig = plt.figure(figsize=(13, 6))
-        ax = self.fig.add_subplot(1, 1, 1)
-        sns.violinplot(ax=ax, data=df, x='hv', y='spe', hue='gm',
-                       split=True, scale='count', inner='quartile')
-        ax.set_xlabel('HV')
-        ax.set_ylabel('SPE Value (ADC)')
-
-    def finish(self):
         # Save figures
-        output_dir = join(self.output_dir, "plot_adc2pe_vs_hv")
-        if not exists(output_dir):
-            self.log.info("Creating directory: {}".format(output_dir))
-            makedirs(output_dir)
+        self.output_dir = join(self.output_dir, "plot_adc2pe_vs_hv")
+        if not exists(self.output_dir):
+            self.log.info("Creating directory: {}".format(self.output_dir))
+            makedirs(self.output_dir)
 
-        numpy_path = join(output_dir, "spe_vs_hv.npz")
-        fig_path = join(output_dir, "spe_vs_hv.pdf")
+    def start(self):
+        hv_dict = dict()
+        hv_dict['800'] = [800]*2048
+        hv_dict['900'] = [900]*2048
+        hv_dict['1000'] = [1000]*2048
+        hv_dict['1100'] = [1100]*2048
+        hv_dict['800gm'] = [self.a2p.gm800[i//64] for i in range(2048)]
+        hv_dict['900gm'] = [self.a2p.gm900[i//64] for i in range(2048)]
+        hv_dict['1000gm'] = [self.a2p.gm1000[i//64] for i in range(2048)]
+        hv_dict['800gm_c1'] = [self.a2p.gm800_c1[i//64] for i in range(2048)]
 
-        x = np.array([790, 890, 990, 1090, 810, 910, 1010])
-        sort = [0, 4, 1, 5, 2, 6, 3]
-        x = x[sort]
-        spe = self.spe[sort]
+        df_list = []
 
-        self.fig.savefig(fig_path)
-        self.log.info("Figure saved to: {}".format(fig_path))
-
-        hv_txt_list = ['800', '900', '1000', '1100', '800gm', '900gm', '1000gm']
-        for i, hv_txt in enumerate(hv_txt_list):
-            vals = np.ma.filled(self.adc2pe[i], 0)
-            self.cfmaker.SetAll(vals.astype(np.float32))
-            path = join(output_dir, "adc2pe_{}.tcal".format(hv_txt))
+        for key, hv in hv_dict.items():
+            hv_group = int(key.replace("gm", "").replace("_c1", ""))
+            gm = 'gm' in key
+            gm_t = 'Gain-matched' if 'gm' in key else 'Non-gain-matched'
+            adc2pe = self.a2p.get_adc2pe_at_hv(hv, np.arange(2048))
+            adc2pe = self.dead.mask1d(adc2pe)
+            spe = 1/adc2pe
+            self.cfmaker.SetAll(np.ma.filled(adc2pe, 0).astype(np.float32))
+            path = join(self.output_dir, "adc2pe_{}.tcal".format(key))
             self.cfmaker.Save(path, False)
             self.log.info("ADC2PE tcal created: {}".format(path))
             self.cfmaker.Clear()
 
-        # np.savez(numpy_path,
-        #          charge=np.ma.filled(spe, 0),
-        #          charge_error=np.zeros(spe.shape),
-        #          rundesc=x)
-        # self.log.info("Numpy array saved to: {}".format(numpy_path))
-        #
-        # np_adc2pe_800_path = join(output_dir, "adc2pe_800.npy")
-        # np_adc2pe_900_path = join(output_dir, "adc2pe_900.npy")
-        # np_adc2pe_1000_path = join(output_dir, "adc2pe_1000.npy")
-        # np_adc2pe_1100_path = join(output_dir, "adc2pe_1100.npy")
-        # np_adc2pe_800gm_path = join(output_dir, "adc2pe_800gm.npy")
-        # np_adc2pe_900gm_path = join(output_dir, "adc2pe_900gm.npy")
-        # np_adc2pe_1000gm_path = join(output_dir, "adc2pe_1000gm.npy")
-        #
-        # np.save(np_adc2pe_800_path, np.ma.filled(self.adc2pe[0], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_800_path))
-        # np.save(np_adc2pe_900_path, np.ma.filled(self.adc2pe[1], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_900_path))
-        # np.save(np_adc2pe_1000_path, np.ma.filled(self.adc2pe[2], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_1000_path))
-        # np.save(np_adc2pe_1100_path, np.ma.filled(self.adc2pe[3], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_1100_path))
-        # np.save(np_adc2pe_800gm_path, np.ma.filled(self.adc2pe[4], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_800gm_path))
-        # np.save(np_adc2pe_900gm_path, np.ma.filled(self.adc2pe[5], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_900gm_path))
-        # np.save(np_adc2pe_1000gm_path, np.ma.filled(self.adc2pe[6], 0))
-        # self.log.info("ADC2PE array saved to: {}".format(np_adc2pe_1000gm_path))
+            for pix in range(2048):
+                if pix in self.dead.dead_pixels:
+                    continue
+                df_list.append(dict(pixel=pix, key=key, hv_group=hv_group,
+                                    gm=gm, gm_t=gm_t, hv=hv[pix],
+                                    adc2pe=adc2pe[pix], spe=spe[pix]))
+
+        df = DataFrame(df_list)
+        df = df.loc[df['key'] != '800gm_c1']
+
+        # Create Plot
+        fig = plt.figure(figsize=(13, 6))
+        ax = fig.add_subplot(1, 1, 1)
+        sns.violinplot(ax=ax, data=df, x='hv_group', y='spe', hue='gm_t',
+                       split=True, scale='count', inner='quartile')
+        ax.set_xlabel('HV')
+        ax.set_ylabel('SPE Value (ADC)')
+        fig_path = join(self.output_dir, "spe_vs_hv.pdf")
+        fig.savefig(fig_path)
+
+    def finish(self):
+        pass
 
 
 if __name__ == '__main__':
