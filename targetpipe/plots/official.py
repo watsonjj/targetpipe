@@ -4,7 +4,7 @@ from ctapipe.core import Component
 from traitlets import CaselessStrEnum as CaStEn, Unicode
 from matplotlib import pyplot as plt
 import seaborn as sns
-from os.path import join, exists
+from os.path import join, exists, dirname
 from os import makedirs
 
 
@@ -62,10 +62,16 @@ class OfficialPlotter(Component):
         figure_name = self.figure_name + "." + self.extension
         self.output_path = join(self.output_dir, figure_name)
 
-    def save(self):
-        if not exists(self.output_dir):
-            self.log.info("Creating directory: {}".format(self.output_dir))
-            makedirs(self.output_dir)
+    def save(self, output_path=None):
+        if output_path:
+            output_dir = dirname(output_path)
+        else:
+            output_path = self.output_path
+            output_dir = self.output_dir
 
-        self.fig.savefig(self.output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(self.output_path))
+        if not exists(output_dir):
+            self.log.info("Creating directory: {}".format(output_dir))
+            makedirs(output_dir)
+
+        self.fig.savefig(output_path, bbox_inches='tight')
+        self.log.info("Figure saved to: {}".format(output_path))
