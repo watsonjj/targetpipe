@@ -270,7 +270,7 @@ class StageViewer(Component):
                                 label_text_color='green')
                 fig.add_layout(legend, 'right')
 
-        self.cb = CheckboxGroup(labels=self.stage_list, active=[0, 6])
+        self.cb = CheckboxGroup(labels=self.stage_list, active=[0, 5])
         self.cb.on_click(self._on_checkbox_select)
         self.active_stages = [self.stage_list[i] for i in self.cb.active]
 
@@ -323,10 +323,18 @@ class StageViewer(Component):
                     else:
                         self.log.error("Too many dimensions in stage values")
                 cdsource.data = cdsource_d
-            self.pulsewin1[i].location = self.w_pulse[0]
-            self.pulsewin2[i].location = self.w_pulse[1]
-            self.intwin1[i].location = self.w_integration[0]
-            self.intwin2[i].location = self.w_integration[1]
+            pixel_w_pulse = w_pulse[pixel]
+            length = np.sum(pixel_w_pulse, axis=0)
+            pw_l = np.argmax(pixel_w_pulse)
+            pw_r = pw_l + length - 1
+            pixel_w_integration = w_integration[pixel]
+            length = np.sum(pixel_w_integration)
+            iw_l = np.argmax(pixel_w_integration)
+            iw_r = iw_l + length - 1
+            self.pulsewin1[i].location = pw_l
+            self.pulsewin2[i].location = pw_r
+            self.intwin1[i].location = iw_l
+            self.intwin2[i].location = iw_r
         sleep(0.1)
         self._update_yrange()
 
@@ -722,18 +730,21 @@ class BokehSPE(Tool):
         self.update_event_index_widget()
 
         stages = self.dl1.cleaner.stages
-        pulse_window = self.dl1.cleaner.stages['window']
-        length = np.sum(pulse_window)
-        pw_l = np.argmax(pulse_window)
-        pw_r = pw_l + length - 1
-        int_window = val.dl1.tel[0].extracted_samples[0, 0]
-        length = np.sum(int_window)
-        iw_l = np.argmax(int_window)
-        iw_r = iw_l + length - 1
+        pulse_window = self.dl1.cleaner.stages['window'][0]
+        # length = np.sum(pulse_window)
+        # pw_l = np.argmax(pulse_window)
+        # pw_r = pw_l + length - 1
+        int_window = val.dl1.tel[0].extracted_samples[0]
+        # length = np.sum(int_window)
+        # iw_l = np.argmax(int_window)
+        # iw_r = iw_l + length - 1
+
+        # from IPython import embed
+        # embed()
 
         self.p_camera_area.image = peak_area
         self.p_stage_viewer.update_stages(np.arange(self.n_samples), stages,
-                                          [pw_l, pw_r], [iw_l, iw_r])
+                                          pulse_window, int_window)
 
     @property
     def event_index(self):
