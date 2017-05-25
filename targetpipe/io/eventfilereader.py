@@ -74,7 +74,7 @@ class TargetioFileReader(EventFileReader):
     def event_id_list(self):
         if not self._event_id_list:
             # self.log.info("Building new list of event ids...")
-            self._event_id_list = self.extractor.event_id_list
+            self._event_id_list = self.extractor.event_id_list[:self.max_events]
             # self.log.info("List of event ids built.")
         return self._event_id_list
 
@@ -205,85 +205,3 @@ class ToyioFileReader(EventFileReader):
                                     use_event_id=use_event_id)
         self.log.debug("File reading complete")
         return source
-
-
-# class FileLooper(Component):
-#     name = 'FileLooper'
-#
-#     file_list = List(Unicode, None, allow_none=True,
-#                      help="List of event filepaths to read").tag(config=True)
-#     single_file = Unicode(None, allow_none=True,
-#                           help="Single file to read. If set then file_list is "
-#                                "ignored").tag(config=True)
-#     max_files = Int(None, allow_none=True,
-#                     help="Number of files to read").tag(config=True)
-#     max_events = Int(None, allow_none=True,
-#                      help="Max number of events to read from each "
-#                           "file").tag(config=True)
-#
-#     def __init__(self, config, tool, **kwargs):
-#         """
-#         Loop through a list of event files and supply the event containers.
-#
-#         Parameters
-#         ----------
-#         config : traitlets.loader.Config
-#             Configuration specified by config file or cmdline arguments.
-#             Used to set traitlet values.
-#             Set to None if no configuration to pass.
-#         tool : ctapipe.core.Tool
-#             Tool executable that is calling this component.
-#             Passes the correct logger to the component.
-#             Set to None if no Tool to pass.
-#         kwargs
-#         """
-#         super().__init__(config=config, parent=tool, **kwargs)
-#
-#         if self.single_file is not None:
-#             self.file_list = [self.single_file]
-#         if not self.file_list:
-#             raise ValueError("Please specify at least one input filepath")
-#
-#         self.file_reader = TargetioFileReader(config, tool,
-#                                               input_path=self.file_list[0])
-#
-#     @property
-#     def num_events(self):
-#         n = 0
-#         for fn, filepath in enumerate(self.file_list):
-#             if self.max_files is not None:
-#                 if fn >= self.max_files:
-#                     break
-#
-#             self.file_reader.input_path = filepath
-#             self.file_reader.max_events = self.max_events
-#             n += self.file_reader.num_events
-#         return n
-#
-#     def read(self):
-#         telid = 0
-#         for fn, filepath in enumerate(self.file_list):
-#
-#             if self.max_files is not None:
-#                 if fn >= self.max_files:
-#                     break
-#
-#             self.file_reader.input_path = filepath
-#             self.file_reader.max_events = self.max_events
-#
-#             first_event = self.file_reader.get_event(0)
-#
-#             # Find which TMs are connected
-#             first_waveforms = first_event.r0.tel[telid].adc_samples[0]
-#             haspixdata = (first_waveforms.sum(axis=1) != 0)
-#             n_haspixdata = sum(haspixdata)
-#             self.log.info("Number of pixels with data = {}"
-#                           .format(n_haspixdata))
-#
-#             # Setup sizes and arrays
-#             n_pixels, n_samples = first_waveforms.shape
-#             empty_wf = np.zeros((n_pixels, n_samples), dtype=np.float32)
-#
-#             source = self.file_reader.read()
-#             for event in source:
-#                 yield fn, event, haspixdata, empty_wf

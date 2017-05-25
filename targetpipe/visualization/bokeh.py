@@ -53,7 +53,7 @@ class CameraDisplay:
     @fig.setter
     def fig(self, val):
         if val is None:
-            val = figure(plot_width=440, plot_height=400, **PLOTARGS)
+            val = figure(plot_width=550, plot_height=500, **PLOTARGS)
         val.axis.visible = False
         val.grid.grid_line_color = None
         self._fig = val
@@ -153,16 +153,20 @@ class CameraDisplay:
         self._active_pixels = listval
 
         palette = palettes.Set1[9]
+        palette = [palette[0]] + palette[3:]
         self.active_colors = [palette[i % (len(palette))]
                               for i in range(len(listval))]
         self.highlight_pixels()
+
+    def reset_pixels(self):
+        self.active_pixels = [0] * len(self.active_pixels)
 
     def _draw_camera(self):
         r = self.fig.rect('x', 'y', color='image',
                           width='width', height='height',
                           line_color='outline_color',
                           line_alpha='outline_alpha',
-                          line_width=1,
+                          line_width=2,
                           nonselection_fill_color='image',
                           nonselection_fill_alpha=1,
                           nonselection_line_color='outline_color',

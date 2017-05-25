@@ -1,6 +1,6 @@
 from bokeh.io import curdoc
 from bokeh.layouts import widgetbox, layout
-from bokeh.models import Select, TextInput, PreText
+from bokeh.models import Select, TextInput, PreText, Button
 from traitlets import Dict, List
 
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
@@ -60,15 +60,19 @@ class BokehFileViewer(Tool):
         self._extractor = None
         self._cleaner = None
 
+        self.w_next_event = None
+        self.w_previous_event = None
         self.w_event_index = None
         self.w_event_id = None
+        self.w_goto_event_index = None
+        self.w_goto_event_id = None
         self.w_telid = None
         self.w_channel = None
         self.w_dl1_dict = None
         self.wb_extractor = None
         self.layout = None
 
-        self.file_reader = None
+        self.reader = None
         self.r1 = None
         self.dl0 = None
         self.dl1 = None
@@ -82,7 +86,7 @@ class BokehFileViewer(Tool):
 
         reader_factory = EventFileReaderFactory(**kwargs)
         reader_class = reader_factory.get_class()
-        self.file_reader = reader_class(**kwargs)
+        self.reader = reader_class(**kwargs)
 
         extractor_factory = ChargeExtractorFactory(**kwargs)
         extractor_class = extractor_factory.get_class()
@@ -92,7 +96,7 @@ class BokehFileViewer(Tool):
         cleaner_class = cleaner_factory.get_class()
         self._cleaner = cleaner_class(**kwargs)
 
-        r1_factory = CameraR1CalibratorFactory(origin=self.file_reader.origin,
+        r1_factory = CameraR1CalibratorFactory(origin=self.reader.origin,
                                                **kwargs)
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
@@ -108,8 +112,12 @@ class BokehFileViewer(Tool):
         # Setup widgets
         self.viewer.create()
         self.viewer.enable_automatic_index_increment()
+        self.create_previous_event_widget()
+        self.create_next_event_widget()
         self.create_event_index_widget()
+        self.create_goto_event_index_widget()
         self.create_event_id_widget()
+        self.create_goto_event_id_widget()
         self.create_telid_widget()
         self.create_channel_widget()
         self.create_dl1_widgets()
@@ -118,8 +126,9 @@ class BokehFileViewer(Tool):
         # Setup layout
         self.layout = layout([
             [self.viewer.layout],
-            [self.w_event_index, self.w_event_id, self.w_telid,
-             self.w_channel],
+            [self.w_previous_event, self.w_next_event, self.w_goto_event_index, self.w_goto_event_id],
+            [self.w_event_index, self.w_event_id],
+            [self.w_telid, self.w_channel],
             [self.wb_extractor]
         ])
 
@@ -137,7 +146,7 @@ class BokehFileViewer(Tool):
     @event_index.setter
     def event_index(self, val):
         self._event_index = val
-        self.event = self.file_reader.get_event(val, False)
+        self.event = self.reader.get_event(val, False)
 
     @property
     def event_id(self):
@@ -146,7 +155,7 @@ class BokehFileViewer(Tool):
     @event_id.setter
     def event_id(self, val):
         self._event_id = val
-        self.event = self.file_reader.get_event(val, True)
+        self.event = self.reader.get_event(val, True)
 
     @property
     def telid(self):
@@ -230,41 +239,58 @@ class BokehFileViewer(Tool):
         self.dl1.calibrate(self.event)
         self.viewer.refresh()
 
+    def create_next_event_widget(self):
+        self.w_next_event = Button(label=">", button_type="default", width=50)
+        self.w_next_event.on_click(self.on_next_event_widget_click)
+
+    def on_next_event_widget_click(self):
+        self.event_index += 1
+
+    def create_previous_event_widget(self):
+        self.w_previous_event = Button(label="<", button_type="default", width=50)
+        self.w_previous_event.on_click(self.on_previous_event_widget_click)
+
+    def on_previous_event_widget_click(self):
+        # TODO don't allow negative
+        self.event_index -= 1
+
     def create_event_index_widget(self):
-        index_vals = [str(i) for i in range(self.file_reader.num_events)]
-        self.w_event_index = Select(title="Event Index:", value='',
-                                    options=index_vals)
-        self.w_event_index.on_change('value',
-                                     self.on_event_index_widget_change)
+        self.w_event_index = TextInput(title="Event Index:", value='')
 
     def update_event_index_widget(self):
-        self.w_event_index.value = str(self.event_index)
-
-    def on_event_index_widget_change(self, attr, old, new):
-        if self.event_index != int(self.w_event_index.value):
-            self.event_index = int(self.w_event_index.value)
+        if self.w_event_index:
+            self.w_event_index.value = str(self.event_index)
 
     def create_event_id_widget(self):
-        id_vals = [str(i) for i in self.file_reader.event_id_list]
-        self.w_event_id = Select(title="Event ID:", value='',
-                                 options=id_vals)
-        self.w_event_id.on_change('value', self.on_event_id_widget_change)
+        self.w_event_id = TextInput(title="Event ID:", value='')
 
     def update_event_id_widget(self):
-        self.w_event_id.value = str(self.event_id)
+        if self.w_event_id:
+            self.w_event_id.value = str(self.event_id)
 
-    def on_event_id_widget_change(self, attr, old, new):
-        if self.event_id != int(self.w_event_id.value):
-            self.event_id = int(self.w_event_id.value)
+    def create_goto_event_index_widget(self):
+        self.w_goto_event_index = Button(label="GOTO Index", button_type="default", width=100)
+        self.w_goto_event_index.on_click(self.on_goto_event_index_widget_click)
+
+    def on_goto_event_index_widget_click(self):
+        self.event_index = int(self.w_event_index.value)
+
+    def create_goto_event_id_widget(self):
+        self.w_goto_event_id = Button(label="GOTO ID", button_type="default", width=70)
+        self.w_goto_event_id.on_click(self.on_goto_event_id_widget_click)
+
+    def on_goto_event_id_widget_click(self):
+        self.event_id = int(self.w_event_id.value)
 
     def create_telid_widget(self):
         self.w_telid = Select(title="Telescope:", value="", options=[])
         self.w_telid.on_change('value', self.on_telid_widget_change)
 
     def update_telid_widget(self):
-        tels = [str(t) for t in self.event.r0.tels_with_data]
-        self.w_telid.options = tels
-        self.w_telid.value = str(self.telid)
+        if self.w_telid:
+            tels = [str(t) for t in self.event.r0.tels_with_data]
+            self.w_telid.options = tels
+            self.w_telid.value = str(self.telid)
 
     def on_telid_widget_change(self, attr, old, new):
         if self.telid != int(self.w_telid.value):
@@ -275,10 +301,11 @@ class BokehFileViewer(Tool):
         self.w_channel.on_change('value', self.on_channel_widget_change)
 
     def update_channel_widget(self):
-        n_chan = self.event.inst.num_channels[self.telid]
-        channels = [str(c) for c in range(n_chan)]
-        self.w_channel.options = channels
-        self.w_channel.value = str(self.channel)
+        if self.channel:
+            n_chan = self.event.inst.num_channels[self.telid]
+            channels = [str(c) for c in range(n_chan)]
+            self.w_channel.options = channels
+            self.w_channel.value = str(self.channel)
 
     def on_channel_widget_change(self, attr, old, new):
         if self.channel != int(self.w_channel.value):
@@ -316,25 +343,26 @@ class BokehFileViewer(Tool):
             self.w_dl1_dict['extractor_lwt'])
 
     def update_dl1_widget_values(self):
-        for key, val in self.w_dl1_dict.items():
-            if 'extractor' in key:
-                if key == 'extractor':
-                    key = 'name'
-                else:
-                    key = key.replace("extractor_", "")
-                try:
-                    val.value = str(getattr(self.extractor, key))
-                except AttributeError:
-                    val.value = ''
-            elif 'cleaner' in key:
-                if key == 'cleaner':
-                    key = 'name'
-                else:
-                    key = key.replace("cleaner_", "")
-                try:
-                    val.value = str(getattr(self.cleaner, key))
-                except AttributeError:
-                    val.value = ''
+        if self.w_dl1_dict:
+            for key, val in self.w_dl1_dict.items():
+                if 'extractor' in key:
+                    if key == 'extractor':
+                        key = 'name'
+                    else:
+                        key = key.replace("extractor_", "")
+                    try:
+                        val.value = str(getattr(self.extractor, key))
+                    except AttributeError:
+                        val.value = ''
+                elif 'cleaner' in key:
+                    if key == 'cleaner':
+                        key = 'name'
+                    else:
+                        key = key.replace("cleaner_", "")
+                    try:
+                        val.value = str(getattr(self.cleaner, key))
+                    except AttributeError:
+                        val.value = ''
 
     def on_dl1_widget_change(self, attr, old, new):
         if self.event:

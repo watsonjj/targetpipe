@@ -24,6 +24,7 @@ class EventViewerCamera(CameraDisplay):
         self.event_viewer = event_viewer
 
     def _reset(self):
+        self.reset_pixels()
         self.event_viewer.change_time(0)
 
     def _set_image(self):
