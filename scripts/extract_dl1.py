@@ -14,6 +14,8 @@ from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.io.pixels import Dead
 
+from IPython import embed
+
 
 class DL1Extractor(Tool):
     name = "DL1Extractor"
@@ -128,6 +130,7 @@ class DL1Extractor(Tool):
         self.n_saturated = np.zeros((n_events, n_pixels))
         #Justus:
         self.n_1pe = np.zeros((n_events, n_pixels))
+        self.peak_height = np.zeros((n_events, n_pixels))
 
     def start(self):
         n_events = self.reader.num_events
@@ -165,9 +168,6 @@ class DL1Extractor(Tool):
                 baseline_rms_end = np.std(dl0[:, -32:], axis=1)
                 baseline_rms_full = np.std(dl0[:, 10:-10], axis=1)
 
-                # Justus:
-                self.n_1pe[ev] = (dl0 >= 0.6).sum(axis=1)
-
                 # max_ = np.max(cleaned, axis=1)
                 # reversed_ = cleaned[:, ::-1]
                 # peak_time_i = np.ones(cleaned.shape) * peak_time[:, None]
@@ -200,6 +200,9 @@ class DL1Extractor(Tool):
                 self.peak_time[ev] = peak_time
                 if np.ma.is_masked(dl0):
                     self.n_saturated[ev] = np.sum(dl0.mask, axis=1)
+                # Justus:
+                self.n_1pe[ev] = (dl0 >= 0.6).sum(axis=1)
+                self.peak_height[ev] = dl0.max(1)
                 # self.fwhm[ev] = fwhm
                 # self.rise_time[ev] = rise_time
 
@@ -227,7 +230,8 @@ class DL1Extractor(Tool):
                  peak_time=self.peak_time,
                  n_saturated=self.n_saturated,
                  # Justus:
-                 n_1pe = self.n_1pe
+                 n_1pe = self.n_1pe,
+                 peak_height = self.peak_height
                  # fwhm=self.fwhm,
                  # rise_time=self.rise_time
                  )
