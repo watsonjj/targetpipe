@@ -5,7 +5,7 @@ from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.calib.camera.charge_extractors import CHECMExtractor
-from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.fitting.checm import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
@@ -34,7 +34,7 @@ class DL1Extractor(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitterSPE
+                    CHECMSPEFitter
                     ])
 
     def __init__(self, **kwargs):
@@ -115,7 +115,7 @@ class DL1Extractor(Tool):
 
         self.cleaner = CHECMWaveformCleaner(**kwargs)
         self.extractor = CHECMExtractor(**kwargs)
-        self.fitter = CHECMFitterSPE(**kwargs)
+        self.fitter = CHECMSPEFitter(**kwargs)
         self.dead = Dead()
 
         self.output_dir = join(self.reader.output_directory, "extract_adc2pe")

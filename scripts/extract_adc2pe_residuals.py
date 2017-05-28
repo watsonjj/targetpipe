@@ -12,7 +12,7 @@ from ctapipe.core import Tool
 from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerLocal
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.fitting.checm import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 
 
@@ -30,7 +30,7 @@ class ADC2PEResidualsExtractor(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitterSPE,
+                    CHECMSPEFitter,
                     ])
 
     def __init__(self, **kwargs):
@@ -73,7 +73,7 @@ class ADC2PEResidualsExtractor(Tool):
                                        cleaner=self.cleaner,
                                        **kwargs)
 
-        self.fitter = CHECMFitterSPE(**kwargs)
+        self.fitter = CHECMSPEFitter(**kwargs)
         # self.fitter.nbins = 60
         self.fitter.range = [-3, 6]
         self.fitter.initial = dict(norm=None,

@@ -20,7 +20,7 @@ from ctapipe.image.charge_extractors import SimpleIntegrator, \
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMFitterSPE, CHECMFitterBright
+from targetpipe.fitting.checm import CHECMSPEFitter, CHECBrightFitter
 from targetpipe.io.pixels import get_neighbours_2d, Dead
 from targetpipe.visualization.bokeh import CameraDisplay
 
@@ -91,9 +91,9 @@ class FitterWidget(Component):
         super().__init__(config=config, parent=tool, **kwargs)
 
         if self.brightness == 'spe':
-            self.fitter = CHECMFitterSPE(config, tool)
+            self.fitter = CHECMSPEFitter(config, tool)
         else:
-            self.fitter = CHECMFitterBright(config, tool)
+            self.fitter = CHECBrightFitter(config, tool)
 
         self.i_nbins = None
         self.i_min = None
@@ -323,18 +323,18 @@ class StageViewer(Component):
                     else:
                         self.log.error("Too many dimensions in stage values")
                 cdsource.data = cdsource_d
-            pixel_w_pulse = w_pulse[pixel]
-            length = np.sum(pixel_w_pulse, axis=0)
-            pw_l = np.argmax(pixel_w_pulse)
-            pw_r = pw_l + length - 1
-            pixel_w_integration = w_integration[pixel]
-            length = np.sum(pixel_w_integration)
-            iw_l = np.argmax(pixel_w_integration)
-            iw_r = iw_l + length - 1
-            self.pulsewin1[i].location = pw_l
-            self.pulsewin2[i].location = pw_r
-            self.intwin1[i].location = iw_l
-            self.intwin2[i].location = iw_r
+                pixel_w_pulse = w_pulse[pixel]
+                length = np.sum(pixel_w_pulse, axis=0)
+                pw_l = np.argmax(pixel_w_pulse)
+                pw_r = pw_l + length - 1
+                pixel_w_integration = w_integration[pixel]
+                length = np.sum(pixel_w_integration)
+                iw_l = np.argmax(pixel_w_integration)
+                iw_r = iw_l + length - 1
+                self.pulsewin1[i].location = pw_l
+                self.pulsewin2[i].location = pw_r
+                self.intwin1[i].location = iw_l
+                self.intwin2[i].location = iw_r
         sleep(0.1)
         self._update_yrange()
 
@@ -557,7 +557,8 @@ class BokehSPE(Tool):
         self.stage_names = None
 
         self.p_camera_area = None
-        self.p_camera_fit = None
+        self.p_camera_fit_gain = None
+        self.p_camera_fit_brightness = None
         self.p_fitter = None
         self.p_stage_viewer = None
         self.p_fit_viewer = None
@@ -612,7 +613,8 @@ class BokehSPE(Tool):
 
         # Init Plots
         self.p_camera_area = Camera(self, self.neighbours2d, "Area", geom)
-        self.p_camera_fit = Camera(self, self.neighbours2d, "Gain", geom)
+        self.p_camera_fit_gain = Camera(self, self.neighbours2d, "Gain", geom)
+        self.p_camera_fit_brightness = Camera(self, self.neighbours2d, "Brightness", geom)
         self.p_fitter = FitterWidget(**kwargs)
         self.p_stage_viewer = StageViewer(**kwargs)
         self.p_fit_viewer = FitViewer(**kwargs)
@@ -641,8 +643,10 @@ class BokehSPE(Tool):
         # Setup Plots
         self.p_camera_area.enable_pixel_picker()
         self.p_camera_area.add_colorbar()
-        self.p_camera_fit.enable_pixel_picker()
-        self.p_camera_fit.add_colorbar()
+        self.p_camera_fit_gain.enable_pixel_picker()
+        self.p_camera_fit_gain.add_colorbar()
+        self.p_camera_fit_brightness.enable_pixel_picker()
+        self.p_camera_fit_brightness.add_colorbar()
         self.p_fitter.create()
         self.p_stage_viewer.create(self.neighbours2d, self.stage_names)
         self.p_fit_viewer.create(self.p_fitter.fitter.subfit_labels)
@@ -658,7 +662,8 @@ class BokehSPE(Tool):
 
         # Get bokeh layouts
         l_camera_area = self.p_camera_area.layout
-        l_camera_fit = self.p_camera_fit.layout
+        l_camera_fit_gain = self.p_camera_fit_gain.layout
+        l_camera_fit_brightness = self.p_camera_fit_brightness.layout
         l_fitter = self.p_fitter.layout
         l_stage_viewer = self.p_stage_viewer.layout
         l_fit_viewer = self.p_fit_viewer.layout
@@ -666,10 +671,10 @@ class BokehSPE(Tool):
 
         # Setup layout
         self.layout = layout([
-            [self.w_goto_event_index, self.w_event_index, self.w_hoa,
-             self.w_fitspectrum, self.w_fitcamera],
-            [l_camera_area, l_fit_viewer, l_fitter],
-            [l_camera_fit, l_fit_table],
+            [self.w_hoa, self.w_fitspectrum, self.w_fitcamera],
+            [l_camera_fit_brightness, l_fit_viewer, l_fitter],
+            [l_camera_fit_gain, l_fit_table],
+            [l_camera_area, self.w_goto_event_index, self.w_event_index],
             [Div(text="Stage Viewer")],
             [l_stage_viewer],
         ])
@@ -690,29 +695,37 @@ class BokehSPE(Tool):
         return success
 
     def fit_camera(self):
-        fitcoeff = np.ma.zeros(self.n_pixels)
-        fitcoeff.mask = np.zeros(fitcoeff.shape, dtype=np.bool)
+        gain = np.ma.zeros(self.n_pixels)
+        gain.mask = np.zeros(gain.shape, dtype=np.bool)
+        brightness = np.ma.zeros(self.n_pixels)
+        brightness.mask = np.zeros(gain.shape, dtype=np.bool)
 
-        brightness = self.p_fitter.fitter.brightness
-        if brightness == 'spe':
-            coeff = 'spe'
-        elif brightness == 'bright':
+        fitter = self.p_fitter.fitter.brightness
+        if fitter == 'spe':
+            coeff = 'lambda_'
+        elif fitter == 'bright':
             coeff = 'mean'
         else:
-            self.log.error("No case for brightness: {}".format(brightness))
+            self.log.error("No case for fitter type: {}".format(fitter))
             raise ValueError
 
         desc = "Fitting pixels"
         for pix in trange(self.n_pixels, desc=desc):
             if not self.fit_spectrum(pix):
-                fitcoeff.mask[pix] = True
+                gain.mask[pix] = True
                 continue
-            fitcoeff[pix] = self.p_fitter.fitter.coeff[coeff]
+            if fitter == 'spe':
+                gain[pix] = self.p_fitter.fitter.coeff['spe']
+            brightness[pix] = self.p_fitter.fitter.coeff[coeff]
 
-        fitcoeff = np.ma.masked_where(np.isnan(fitcoeff), fitcoeff)
-        fitcoeff = self.dead.mask1d(fitcoeff)
+        gain = np.ma.masked_where(np.isnan(gain), gain)
+        gain = self.dead.mask1d(gain)
+        brightness = np.ma.masked_where(np.isnan(brightness), brightness)
+        brightness = self.dead.mask1d(brightness)
 
-        self.p_camera_fit.image = fitcoeff
+        self.p_camera_fit_gain.image = gain
+        self.p_camera_fit_brightness.image = brightness
+
 
     @property
     def event(self):
@@ -760,7 +773,8 @@ class BokehSPE(Tool):
             self.fit_spectrum(val)
 
             self.p_camera_area.active_pixel = val
-            self.p_camera_fit.active_pixel = val
+            self.p_camera_fit_gain.active_pixel = val
+            self.p_camera_fit_brightness.active_pixel = val
             self.p_stage_viewer.active_pixel = val
 
             self.p_fit_viewer.update(self.p_fitter.fitter)

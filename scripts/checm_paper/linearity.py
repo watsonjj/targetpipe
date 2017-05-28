@@ -16,7 +16,7 @@ from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.fitting.checm import CHECMFitterBright
+from targetpipe.fitting.checm import CHECBrightFitter
 from targetpipe.io.pixels import Dead
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
 from targetpipe.plots.official import OfficialPlotter
@@ -200,7 +200,7 @@ class ADC2PEPlots(Tool):
         self.dl1 = CameraDL1Calibrator(extractor=extractor,
                                        cleaner=cleaner,
                                        **kwargs)
-        self.fitter = CHECMFitterBright(**kwargs)
+        self.fitter = CHECBrightFitter(**kwargs)
         self.dead = Dead()
 
         first_event = list(self.reader_dict.values())[0].get_event(0)

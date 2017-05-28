@@ -20,7 +20,7 @@ from ctapipe.image.hillas import HillasParameterizationError, \
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerLocal
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.fitting.checm import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 
 
@@ -38,7 +38,7 @@ class HillasExtractor(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitterSPE,
+                    CHECMSPEFitter,
                     ])
 
     def __init__(self, **kwargs):
@@ -98,7 +98,7 @@ class HillasExtractor(Tool):
                                        cleaner=self.cleaner,
                                        **kwargs)
 
-        self.fitter = CHECMFitterSPE(**kwargs)
+        self.fitter = CHECMSPEFitter(**kwargs)
         self.dead = Dead()
 
         self.n_events = self.reader.num_events

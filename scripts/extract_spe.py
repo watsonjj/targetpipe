@@ -12,7 +12,7 @@ from ctapipe.core import Tool
 from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.fitting.checm import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 
 
@@ -29,7 +29,7 @@ class BokehSPE(Tool):
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMFitterSPE,
+                    CHECMSPEFitter,
                     ])
 
     def __init__(self, **kwargs):
@@ -68,7 +68,7 @@ class BokehSPE(Tool):
                                        cleaner=self.cleaner,
                                        **kwargs)
 
-        self.fitter = CHECMFitterSPE(**kwargs)
+        self.fitter = CHECMSPEFitter(**kwargs)
         self.dead = Dead()
 
         self.output_dir = join(self.reader.output_directory, "extract_spe")

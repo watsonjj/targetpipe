@@ -12,7 +12,7 @@ from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.core import Tool
 from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
-from targetpipe.fitting.checm import CHECMFitterBright
+from targetpipe.fitting.checm import CHECBrightFitter
 from targetpipe.io.file_looper import TargetioFileLooper
 from targetpipe.io.pixels import Dead
 
@@ -88,7 +88,7 @@ class ChargeVsRunExtractor(Tool):
         self.cleaner = CHECMWaveformCleanerAverage(**kwargs)
         self.extractor = AverageWfPeakIntegrator(**kwargs)
         self.dl0 = CameraDL0Reducer(**kwargs)
-        self.fitter = CHECMFitterBright(**kwargs)
+        self.fitter = CHECBrightFitter(**kwargs)
         self.dead = Dead()
 
         file_reader_list = self.file_looper.file_reader_list

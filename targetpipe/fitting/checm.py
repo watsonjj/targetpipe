@@ -7,8 +7,8 @@ from targetpipe.fitting.mapm_spe import mapm_spe_fit, pedestal_signal, \
 from scipy.stats.distributions import poisson
 
 
-class CHECMFitterSPE(Component):
-    name = 'CHECMFitterSPE'
+class CHECMSPEFitter(Component):
+    name = 'CHECMSPEFitter'
     brightness = 'spe'
 
     def __init__(self, config, tool, **kwargs):
@@ -140,8 +140,8 @@ class CHECMFitterSPE(Component):
         return subfits
 
 
-class CHECMFitterBright(Component):
-    name = 'CHECMFitterBright'
+class CHECBrightFitter(Component):
+    name = 'CHECBrightFitter'
     brightness = 'bright'
 
     def __init__(self, config, tool, **kwargs):

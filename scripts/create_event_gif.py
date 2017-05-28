@@ -22,7 +22,7 @@ from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from ctapipe.visualization import CameraDisplay
-from targetpipe.fitting.checm import CHECMFitterSPE
+from targetpipe.fitting.checm import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 
 
@@ -129,7 +129,7 @@ class EventAnimationCreator(Tool):
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
                     WaveformCleanerFactory,
-                    CHECMFitterSPE,
+                    CHECMSPEFitter,
                     Animator
                     ])
 
@@ -177,7 +177,7 @@ class EventAnimationCreator(Tool):
                                        cleaner=self.cleaner,
                                        **kwargs)
 
-        self.fitter = CHECMFitterSPE(**kwargs)
+        self.fitter = CHECMSPEFitter(**kwargs)
         self.dead = Dead()
 
         self.animator = Animator(**kwargs)
