@@ -530,6 +530,7 @@ class BokehSPE(Tool):
         self._active_pixel = 0
 
         self.w_event_index = None
+        self.w_goto_event_index = None
         self.w_hoa = None
         self.w_fitspectrum = None
         self.w_fitcamera = None
@@ -649,6 +650,7 @@ class BokehSPE(Tool):
 
         # Setup widgets
         self.create_event_index_widget()
+        self.create_goto_event_index_widget()
         self.event_index = 0
         self.create_hoa_widget()
         self.create_fitspectrum_widget()
@@ -664,7 +666,7 @@ class BokehSPE(Tool):
 
         # Setup layout
         self.layout = layout([
-            [self.w_event_index, self.w_hoa,
+            [self.w_goto_event_index, self.w_event_index, self.w_hoa,
              self.w_fitspectrum, self.w_fitcamera],
             [l_camera_area, l_fit_viewer, l_fitter],
             [l_camera_fit, l_fit_table],
@@ -731,16 +733,7 @@ class BokehSPE(Tool):
 
         stages = self.dl1.cleaner.stages
         pulse_window = self.dl1.cleaner.stages['window'][0]
-        # length = np.sum(pulse_window)
-        # pw_l = np.argmax(pulse_window)
-        # pw_r = pw_l + length - 1
         int_window = val.dl1.tel[0].extracted_samples[0]
-        # length = np.sum(int_window)
-        # iw_l = np.argmax(int_window)
-        # iw_r = iw_l + length - 1
-
-        # from IPython import embed
-        # embed()
 
         self.p_camera_area.image = peak_area
         self.p_stage_viewer.update_stages(np.arange(self.n_samples), stages,
@@ -774,14 +767,18 @@ class BokehSPE(Tool):
             self.p_fit_table.update(self.p_fitter.fitter)
 
     def create_event_index_widget(self):
-        index_vals = [str(i) for i in range(self.reader.num_events)]
-        self.w_event_index = Select(title="Event Index:", value='',
-                                    options=index_vals)
-        self.w_event_index.on_change('value',
-                                     self.on_event_index_widget_change)
+        self.w_event_index = TextInput(title="Event Index:", value='')
 
     def update_event_index_widget(self):
-        self.w_event_index.value = str(self.event_index)
+        if self.w_event_index:
+            self.w_event_index.value = str(self.event_index)
+
+    def create_goto_event_index_widget(self):
+        self.w_goto_event_index = Button(label="GOTO Index", width=100)
+        self.w_goto_event_index.on_click(self.on_goto_event_index_widget_click)
+
+    def on_goto_event_index_widget_click(self):
+        self.event_index = int(self.w_event_index.value)
 
     def on_event_index_widget_change(self, attr, old, new):
         if self.event_index != int(self.w_event_index.value):
