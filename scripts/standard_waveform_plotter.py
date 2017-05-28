@@ -5,7 +5,7 @@ from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from targetpipe.calib.camera.waveform_cleaning import CHECMWaveformCleaner
 from targetpipe.calib.camera.charge_extractors import CHECMExtractor
-from targetpipe.fitting.checm import CHECMSPEFitter
+from targetpipe.fitting.chec import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection

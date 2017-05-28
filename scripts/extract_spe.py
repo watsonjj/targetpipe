@@ -12,12 +12,12 @@ from ctapipe.core import Tool
 from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMSPEFitter
+from targetpipe.fitting.chec import SPEFitterFactory
 from targetpipe.io.pixels import Dead
 
 
-class BokehSPE(Tool):
-    name = "BokehSPE"
+class SPEExtractor(Tool):
+    name = "SPEExtractor"
     description = "Extract the conversion from adc to pe and save as a " \
                   "numpy array"
 
@@ -26,10 +26,11 @@ class BokehSPE(Tool):
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
+                        fitter='SPEFitterFactory.fitter',
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    CHECMSPEFitter,
+                    SPEFitterFactory,
                     ])
 
     def __init__(self, **kwargs):
@@ -68,8 +69,11 @@ class BokehSPE(Tool):
                                        cleaner=self.cleaner,
                                        **kwargs)
 
-        self.fitter = CHECMSPEFitter(**kwargs)
         self.dead = Dead()
+
+        fitter_factory = SPEFitterFactory(**kwargs)
+        fitter_class = fitter_factory.get_class()
+        self.fitter = fitter_class(**kwargs)
 
         self.output_dir = join(self.reader.output_directory, "extract_spe")
         if not exists(self.output_dir):
@@ -122,5 +126,5 @@ class BokehSPE(Tool):
         self.log.info("spe array saved: {}".format(output_path))
 
 
-exe = BokehSPE()
+exe = SPEExtractor()
 exe.run()

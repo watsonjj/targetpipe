@@ -20,7 +20,7 @@ from ctapipe.image.hillas import HillasParameterizationError, \
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerLocal
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMSPEFitter
+from targetpipe.fitting.chec import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 
 

@@ -20,7 +20,7 @@ from ctapipe.image.charge_extractors import SimpleIntegrator, \
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.instrument import CameraGeometry
 from ctapipe.io.eventfilereader import EventFileReaderFactory
-from targetpipe.fitting.checm import CHECMSPEFitter, CHECBrightFitter
+from targetpipe.fitting.chec import ChargeFitterFactory
 from targetpipe.io.pixels import get_neighbours_2d, Dead
 from targetpipe.visualization.bokeh import CameraDisplay
 
@@ -71,10 +71,7 @@ class Camera(CameraDisplay):
 class FitterWidget(Component):
     name = 'FitterWidget'
 
-    brightness = CaStEn(['spe', 'bright'], 'spe',
-                        help='Brightness of run').tag(config=True)
-
-    def __init__(self, config, tool, **kwargs):
+    def __init__(self, config, tool, fitter, **kwargs):
         """
         Parameters
         ----------
@@ -90,10 +87,7 @@ class FitterWidget(Component):
         """
         super().__init__(config=config, parent=tool, **kwargs)
 
-        if self.brightness == 'spe':
-            self.fitter = CHECMSPEFitter(config, tool)
-        else:
-            self.fitter = CHECBrightFitter(config, tool)
+        self.fitter = fitter
 
         self.i_nbins = None
         self.i_min = None
@@ -515,11 +509,11 @@ class BokehSPE(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
-                        brightness='FitterWidget.brightness',
+                        fitter='ChargeFitterFactory.fitter',
                         ))
     classes = List([EventFileReaderFactory,
                     CameraR1CalibratorFactory,
-                    FitterWidget,
+                    ChargeFitterFactory,
                     ])
 
     def __init__(self, **kwargs):
@@ -552,6 +546,7 @@ class BokehSPE(Tool):
         self.extractor = None
         self.extractor_height = None
         self.dead = None
+        self.fitter = None
 
         self.neighbours2d = None
         self.stage_names = None
@@ -594,6 +589,10 @@ class BokehSPE(Tool):
 
         self.dead = Dead()
 
+        fitter_factory = ChargeFitterFactory(**kwargs)
+        fitter_class = fitter_factory.get_class()
+        self.fitter = fitter_class(**kwargs)
+
         self.n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
         self.n_pixels = first_event.inst.num_pixels[0]
@@ -615,7 +614,7 @@ class BokehSPE(Tool):
         self.p_camera_area = Camera(self, self.neighbours2d, "Area", geom)
         self.p_camera_fit_gain = Camera(self, self.neighbours2d, "Gain", geom)
         self.p_camera_fit_brightness = Camera(self, self.neighbours2d, "Brightness", geom)
-        self.p_fitter = FitterWidget(**kwargs)
+        self.p_fitter = FitterWidget(fitter=self.fitter, **kwargs)
         self.p_stage_viewer = StageViewer(**kwargs)
         self.p_fit_viewer = FitViewer(**kwargs)
         self.p_fit_table = FitTable(**kwargs)
@@ -700,7 +699,7 @@ class BokehSPE(Tool):
         brightness = np.ma.zeros(self.n_pixels)
         brightness.mask = np.zeros(gain.shape, dtype=np.bool)
 
-        fitter = self.p_fitter.fitter.brightness
+        fitter = self.p_fitter.fitter.fitter_type
         if fitter == 'spe':
             coeff = 'lambda_'
         elif fitter == 'bright':

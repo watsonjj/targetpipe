@@ -12,7 +12,7 @@ from ctapipe.image.charge_extractors import AverageWfPeakIntegrator
 from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.fitting.checm import CHECBrightFitter
+from targetpipe.fitting.chec import CHECBrightFitter
 from targetpipe.io.pixels import Dead
 from targetpipe.plots.official import OfficialPlotter
 
