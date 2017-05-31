@@ -18,6 +18,10 @@ class CHECR0CameraContainer(Container):
                                     "waveform in the camera image"))
     blockphase = Item(ndarray, ("numpy array of the blockphase of each "
                                 "waveform in the camera image"))
+    row = Item(ndarray, ("numpy array of the row of each "
+                         "waveform in the camera image"))
+    column = Item(ndarray, ("numpy array of the column of each "
+                            "waveform in the camera image"))
     num_samples = Item(None, "number of time samples for telescope")
 
 

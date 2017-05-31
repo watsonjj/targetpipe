@@ -14,24 +14,14 @@ from targetpipe.io.pixels import checm_pixel_pos, optical_foclen, \
     checm_refshape, checm_refstep, checm_time_slice
 
 # CHEC-M
-# N_ROWS = 8
-# N_COLUMNS = 64
-# N_BLOCKS = N_ROWS * N_COLUMNS
-# N_CELLS = N_ROWS * N_COLUMNS * N_BLOCKSAMPLES
-# SKIP_SAMPLE = 32
-# SKIP_END_SAMPLE = 0
-# SKIP_EVENT = 2
-# SKIP_END_EVENT = 1
-
-# OTHER
 N_ROWS = 8
-N_COLUMNS = 16
+N_COLUMNS = 64
 N_BLOCKS = N_ROWS * N_COLUMNS
 N_CELLS = N_ROWS * N_COLUMNS * N_BLOCKSAMPLES
-SKIP_SAMPLE = 0
+SKIP_SAMPLE = 32
 SKIP_END_SAMPLE = 0
-SKIP_EVENT = 0
-SKIP_END_EVENT = 0
+SKIP_EVENT = 2
+SKIP_END_EVENT = 1
 
 # CHEC-S
 # N_ROWS = 8
@@ -40,8 +30,8 @@ SKIP_END_EVENT = 0
 # N_CELLS = N_ROWS * N_COLUMNS * N_BLOCKSAMPLES
 # SKIP_SAMPLE = 0
 # SKIP_END_SAMPLE = 0
-# SKIP_EVENT = 0
-# SKIP_END_EVENT = 0
+# SKIP_EVENT = 2
+# SKIP_END_EVENT = 1
 
 def get_bp_r_c(cells):
     blockphase = cells % N_BLOCKSAMPLES
@@ -210,6 +200,8 @@ class TargetioExtractor:
         data.r0.tel[chec_tel].first_cell_ids = self.first_cell_ids
         bp, r, c = get_bp_r_c(self.first_cell_ids)
         data.r0.tel[chec_tel].blockphase = bp
+        data.r0.tel[chec_tel].row = r
+        data.r0.tel[chec_tel].column = c
         data.r0.tel[chec_tel].num_samples = self.n_samples
 
         data.mc.tel[chec_tel].reference_pulse_shape = checm_refshape
