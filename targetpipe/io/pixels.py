@@ -50,8 +50,10 @@ def get_pixel_2d(x_pix, y_pix, values=None):
 
     gx = np.histogram2d(x_pix, y_pix, weights=x_pix, bins=[53, 53])[0]
     gy = np.histogram2d(x_pix, y_pix, weights=y_pix, bins=[53, 53])[0]
-    xc = gx[:, 10][gx[:, 10].nonzero()]
-    yc = gy[10, :][gy[10, :].nonzero()]
+    i = np.bincount(gx.nonzero()[0]).argmax()
+    j = np.bincount(gy.nonzero()[0]).argmax()
+    xc = gx[:, i][gx[:, i].nonzero()]
+    yc = gy[j, :][gy[j, :].nonzero()]
 
     dist = _get_min_pixel_seperation(xc, yc)
     edges_x = np.zeros(xc.size + 1)
@@ -61,7 +63,7 @@ def get_pixel_2d(x_pix, y_pix, values=None):
     edges_y[0:yc.size] = yc - dist / 2
     edges_y[-1] = yc[-1] + dist / 2
 
-    camera = np.histogram2d(-y_pix, x_pix, bins=[edges_x, edges_y],
+    camera = np.histogram2d(-y_pix, x_pix, bins=[-edges_y[::-1], edges_x],
                             weights=values+1)[0]
     camera[camera == 0] = np.nan
     camera -= 1
@@ -72,7 +74,7 @@ def get_neighbours_2d(x_pix, y_pix):
     _2d = get_pixel_2d(x_pix, y_pix)
     pad = np.pad(_2d, 1, 'constant', constant_values=np.nan)
     neighbours = []
-    for pix in range(2048):
+    for pix in range(x_pix.size):
         i, j = np.where(_2d == pix)
         i = i[0] + 1
         j = j[0] + 1
