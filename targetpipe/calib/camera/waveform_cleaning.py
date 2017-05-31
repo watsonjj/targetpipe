@@ -252,8 +252,8 @@ class Filter(Component):
         return b, a
 
 
-class CHECMWaveformCleaner(Component):
-    name = 'CHECMWaveformCleaner'
+class CHECMWaveformCleanerOld(Component):
+    name = 'CHECMWaveformCleanerOld'
 
     width = Int(15, help='Define the width of the peak '
                          'window').tag(config=True)
@@ -334,3 +334,72 @@ class CHECMWaveformCleaner(Component):
         self.stages['7: cleaned'] = cleaned
 
         return cleaned, t0
+
+
+class CHECSSPECleaner(Component):
+    name = 'CHECSSPECleaner'
+
+    def __init__(self, config, tool, **kwargs):
+        """
+        Use a method for filtering the signal
+
+        Parameters
+        ----------
+        config : traitlets.loader.Config
+            Configuration specified by config file or cmdline arguments.
+            Used to set traitlet values.
+            Set to None if no configuration to pass.
+        tool : ctapipe.core.Tool
+            Tool executable that is calling this component.
+            Passes the correct logger to the component.
+            Set to None if no Tool to pass.
+        kwargs
+        """
+        super().__init__(config=config, parent=tool, **kwargs)
+
+        # Cleaning steps for plotting
+        self.stage_names = ['0: raw',
+                            '1: convolved (fast)',
+                            '2: no pulse',
+                            '3: smooth baseline',
+                            '4: cleaned',
+                            ]
+        self.stages = {}
+
+        self.kernel_fast = general_gaussian(3, p=1.0, sig=1)
+        self.kernel_slow = general_gaussian(10, p=1.0, sig=32)
+
+    def apply(self, waveforms):
+        samples = waveforms[0]
+
+        smooth_flat = np.convolve(samples.ravel(), self.kernel_fast, "same")
+        smoothed = np.reshape(smooth_flat, samples.shape)
+        samples_std = np.std(samples, axis=1)
+        smooth_baseline_std = np.std(smoothed, axis=1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            smoothed *= (samples_std / smooth_baseline_std)[:, None]
+            smoothed[~np.isfinite(smoothed)] = 0
+
+        no_pulse = np.ma.masked_where(np.abs(smoothed) > 3, smoothed)
+        no_pulse = np.ma.filled(no_pulse, 0)
+
+        # Get smooth baseline (no pulse)
+        smooth_flat = np.convolve(no_pulse.ravel(), self.kernel_slow, "same")
+        smooth_baseline = np.reshape(smooth_flat, samples.shape)
+        no_pulse_std = np.std(no_pulse, axis=1)
+        smooth_baseline_std = np.std(smooth_baseline, axis=1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            smooth_baseline *= (no_pulse_std / smooth_baseline_std)[:, None]
+            smooth_baseline[~np.isfinite(smooth_baseline)] = 0
+
+        cleaned = smoothed - smooth_baseline
+
+        self.stages['window'] = np.zeros(waveforms.shape, dtype=np.bool)
+        self.stages['0: raw'] = samples
+        self.stages['1: convolved (fast)'] = smoothed
+        self.stages['2: no pulse'] = no_pulse
+        self.stages['3: smooth baseline'] = smooth_baseline
+        self.stages['4: cleaned'] = cleaned
+
+        return smoothed[None, :]
+
