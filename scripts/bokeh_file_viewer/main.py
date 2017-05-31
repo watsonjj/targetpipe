@@ -315,7 +315,6 @@ class BokehFileViewer(Tool):
         self.w_dl1_dict = dict(
             cleaner=Select(title="Cleaner:", value='', width=5,
                            options=WaveformCleanerFactory.subclass_names),
-            cleaner_t0=TextInput(title="T0:", value=''),
             extractor=Select(title="Extractor:", value='', width=5,
                              options=ChargeExtractorFactory.subclass_names),
             extractor_t0=TextInput(title="T0:", value=''),
@@ -333,7 +332,6 @@ class BokehFileViewer(Tool):
         self.wb_extractor = widgetbox(
             PreText(text="Charge Extractor Configuration"),
             self.w_dl1_dict['cleaner'],
-            self.w_dl1_dict['cleaner_t0'],
             self.w_dl1_dict['extractor'],
             self.w_dl1_dict['extractor_t0'],
             self.w_dl1_dict['extractor_window_width'],

@@ -78,7 +78,7 @@ class ImagePlotter(OfficialPlotter):
 
                 pdf.savefig(self.fig)
 
-    def save(self):
+    def save(self, output_path=None):
         pass
 
 
@@ -742,77 +742,77 @@ class HillasBuilder(Tool):
         self.p_width = WidthPlotter(**p_kwargs, shape='wide')
 
     def start(self):
-        # df_list = []
-        #
-        # it = self.reader_df.iterrows()
-        # n_rows = len(self.reader_df.index)
-        # desc = "Looping over files"
-        # for index, row in tqdm(it, total=n_rows, desc=desc):
-        #     type_ = row['type']
-        #     reader = row['reader']
-        #     calibrator = row['calibrator']
-        #     pos = row['pos']
-        #     geom = row['geom']
-        #     t1 = row['t1']
-        #     t2 = row['t2']
-        #
-        #     desc = "Processing Events"
-        #     source = reader.read()
-        #     n_events = reader.num_events
-        #     for event in tqdm(source, total=n_events, desc=desc):
-        #         for telid in event.r0.tels_with_data:
-        #             ev = event.count
-        #             event_id = event.r0.event_id
-        #             time = event.trig.gps_time.value
-        #             calibrator.calibrate(event)
-        #             image = event.dl1.tel[telid].image[0]
-        #
-        #             # Cleaning
-        #             tc = tailcuts_clean(geom, image, t1, t2)
-        #             if not tc.any():
-        #                 # self.log.warning('No image')
-        #                 continue
-        #             cleaned_dl1 = np.ma.masked_array(image, mask=~tc)
-        #
-        #             wf = event.dl1.tel[telid].cleaned[0]
-        #             peak_time = np.ma.argmax(wf, axis=1)
-        #             peak_time_m = np.ma.masked_array(peak_time, mask=~tc)
-        #             shower_duration = peak_time_m.max() - peak_time_m.min()
-        #
-        #             try:
-        #                 hillas = hillas_parameters(*pos, cleaned_dl1)
-        #             except HillasParameterizationError:
-        #                 # self.log.warning('HillasParameterizationError')
-        #                 continue
-        #
-        #             if np.isnan(hillas.width):
-        #                 # self.log.warning("Hillas width == NaN")
-        #                 continue
-        #
-        #             d = dict(type=type_,
-        #                      index=ev, id=event_id, time=time, tel=telid,
-        #                      image=image, tc=tc, peak_time=peak_time,
-        #                      duration=shower_duration,
-        #                      hillas=hillas,
-        #                      h_size=hillas.size,
-        #                      h_cen_x=hillas.cen_x.value,
-        #                      h_cen_y=hillas.cen_y.value,
-        #                      h_length=hillas.length.value,
-        #                      h_width=hillas.width.value,
-        #                      h_r=hillas.r.value,
-        #                      h_phi=hillas.phi.value,
-        #                      h_psi=hillas.psi.value,
-        #                      h_miss=hillas.miss.value,
-        #                      h_skewness=hillas.skewness,
-        #                      h_kurtosis=hillas.kurtosis
-        #                      )
-        #             df_list.append(d)
-        #
-        # self.df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Users/Jason/Downloads/df.h5')
-        # store['df'] = self.df
+        df_list = []
 
-        store = pd.HDFStore('/Users/Jason/Downloads/df.h5')
+        it = self.reader_df.iterrows()
+        n_rows = len(self.reader_df.index)
+        desc = "Looping over files"
+        for index, row in tqdm(it, total=n_rows, desc=desc):
+            type_ = row['type']
+            reader = row['reader']
+            calibrator = row['calibrator']
+            pos = row['pos']
+            geom = row['geom']
+            t1 = row['t1']
+            t2 = row['t2']
+
+            desc = "Processing Events"
+            source = reader.read()
+            n_events = reader.num_events
+            for event in tqdm(source, total=n_events, desc=desc):
+                for telid in event.r0.tels_with_data:
+                    ev = event.count
+                    event_id = event.r0.event_id
+                    time = event.trig.gps_time.value
+                    calibrator.calibrate(event)
+                    image = event.dl1.tel[telid].image[0]
+
+                    # Cleaning
+                    tc = tailcuts_clean(geom, image, t1, t2)
+                    if not tc.any():
+                        # self.log.warning('No image')
+                        continue
+                    cleaned_dl1 = np.ma.masked_array(image, mask=~tc)
+
+                    wf = event.dl1.tel[telid].cleaned[0]
+                    peak_time = np.ma.argmax(wf, axis=1)
+                    peak_time_m = np.ma.masked_array(peak_time, mask=~tc)
+                    shower_duration = peak_time_m.max() - peak_time_m.min()
+
+                    try:
+                        hillas = hillas_parameters(*pos, cleaned_dl1)
+                    except HillasParameterizationError:
+                        # self.log.warning('HillasParameterizationError')
+                        continue
+
+                    if np.isnan(hillas.width):
+                        # self.log.warning("Hillas width == NaN")
+                        continue
+
+                    d = dict(type=type_,
+                             index=ev, id=event_id, time=time, tel=telid,
+                             image=image, tc=tc, peak_time=peak_time,
+                             duration=shower_duration,
+                             hillas=hillas,
+                             h_size=hillas.size,
+                             h_cen_x=hillas.cen_x.value,
+                             h_cen_y=hillas.cen_y.value,
+                             h_length=hillas.length.value,
+                             h_width=hillas.width.value,
+                             h_r=hillas.r.value,
+                             h_phi=hillas.phi.value,
+                             h_psi=hillas.psi.value,
+                             h_miss=hillas.miss.value,
+                             h_skewness=hillas.skewness,
+                             h_kurtosis=hillas.kurtosis
+                             )
+                    df_list.append(d)
+
+        self.df = pd.DataFrame(df_list)
+        store = pd.HDFStore('/Users/Jason/Downloads/hillas.h5')
+        store['df'] = self.df
+
+        store = pd.HDFStore('/Users/Jason/Downloads/hillas.h5')
         self.df = store['df']
         self.df.loc[:, 'h_width'] /= 40.344e-3
         self.df.loc[:, 'h_length'] /= 40.344e-3
