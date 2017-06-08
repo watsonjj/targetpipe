@@ -86,9 +86,9 @@ class DL1Extractor(Tool):
                 self.baseline_rms_full[ev] = baseline_rms_full
 
     def finish(self):
-        output_path = self.reader.input_path.replace("_r0.tio", "_rms_runavg.npz")
-        output_path = output_path.replace("_r1.tio", "_rms_runavg.npy")
-        np.save(output_path, np.mean(self.baseline_rms_full, axis=0))
+        output_path = self.reader.input_path.replace("_r0.tio", "_rms.npz")
+        output_path = output_path.replace("_r1.tio", "_rms.npy")
+        np.save(output_path, self.baseline_rms_full)
         self.log.info("RMS Numpy array saved to: {}".format(output_path))
 
 exe = DL1Extractor()
