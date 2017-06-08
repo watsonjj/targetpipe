@@ -157,7 +157,7 @@ class DL1Extractor(Tool):
                 t0 = event.dl1.tel[telid].peakpos[0]
                 dl0 = event.dl0.tel[telid].pe_samples[0]
                 peak_time = np.argmax(dl0, axis=1)
-                cleaned = event.dl1.tel[telid].cleaned[0]
+                # cleaned = event.dl1.tel[telid].cleaned[0]
 
                 # sb_sub_wf = np.ma.masked_where(sb_sub_wf < -200, sb_sub_wf)
 
@@ -168,22 +168,26 @@ class DL1Extractor(Tool):
                 baseline_rms_end = np.std(dl0[:, -32:], axis=1)
                 baseline_rms_full = np.std(dl0[:, 10:-10], axis=1)
 
-                # max_ = np.max(cleaned, axis=1)
-                # reversed_ = cleaned[:, ::-1]
-                # peak_time_i = np.ones(cleaned.shape) * peak_time[:, None]
-                # mask_before = np.ma.masked_less(ind, peak_time_i).mask
-                # mask_after = np.ma.masked_greater(r_ind, peak_time_i).mask
-                # masked_bef = np.ma.masked_array(cleaned, mask_before)
-                # masked_aft = np.ma.masked_array(reversed_, mask_after)
-                # half_max = max_/2
-                # d_l = np.diff(np.sign(half_max[:, None] - masked_aft))[:, ::-1]
-                # d_r = np.diff(np.sign(half_max[:, None] - masked_bef))
-                # fwhm = np.argmax(d_r, axis=1) - np.argmax(d_l, axis=1)
-                # _10percent = 0.1 * max_
-                # _90percent = 0.9 * max_
-                # d10 = np.diff(np.sign(_10percent[:, None] - masked_aft))
-                # d90 = np.diff(np.sign(_90percent[:, None] - masked_aft))
-                # rise_time = np.argmax(d10, axis=1) - np.argmax(d90, axis=1)
+                max_ = np.max(dl0, axis=1)
+                reversed_ = dl0[:, ::-1]
+                peak_time_i = np.ones(dl0.shape) * peak_time[:, None]
+                mask_before = np.ma.masked_less(ind, peak_time_i).mask
+                mask_after = np.ma.masked_greater(r_ind, peak_time_i).mask
+                masked_bef = np.ma.masked_array(dl0, mask_before)
+                masked_aft = np.ma.masked_array(reversed_, mask_after)
+                half_max = max_/2
+                d_l = np.diff(np.sign(half_max[:, None] - masked_aft))
+                d_r = np.diff(np.sign(half_max[:, None] - masked_bef))
+                t_l = r_ind[0, np.argmax(d_l, axis=1) + 1]
+                t_r = ind[0, np.argmax(d_r, axis=1) + 1]
+                fwhm = t_r - t_l
+                _10percent = 0.1 * max_
+                _90percent = 0.9 * max_
+                d10 = np.diff(np.sign(_10percent[:, None] - masked_aft))
+                d90 = np.diff(np.sign(_90percent[:, None] - masked_aft))
+                t10 = r_ind[0, np.argmax(d10, axis=1) + 1]
+                t90 = r_ind[0, np.argmax(d90, axis=1) + 1]
+                rise_time = t90 - t10
 
                 self.tack[ev] = event.meta['tack']
                 self.sec[ev] = event.meta['sec']
@@ -203,8 +207,8 @@ class DL1Extractor(Tool):
                 # Justus:
                 self.n_1pe[ev] = (dl0 >= 0.6).sum(axis=1)
                 self.peak_height[ev] = dl0.max(1)
-                # self.fwhm[ev] = fwhm
-                # self.rise_time[ev] = rise_time
+                self.fwhm[ev] = fwhm
+                self.rise_time[ev] = rise_time
 
                 #from IPython import embed
                 #embed()
@@ -231,9 +235,9 @@ class DL1Extractor(Tool):
                  n_saturated=self.n_saturated,
                  # Justus:
                  n_1pe = self.n_1pe,
-                 peak_height = self.peak_height
-                 # fwhm=self.fwhm,
-                 # rise_time=self.rise_time
+                 peak_height = self.peak_height,
+                 fwhm=self.fwhm,
+                 rise_time=self.rise_time
                  )
         self.log.info("DL1 Numpy array saved to: {}".format(output_path))
 

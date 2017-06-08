@@ -48,8 +48,8 @@ class Reader:
         self.first_cell_ids = np.zeros(self.n_pix, dtype=np.uint16)
 
         directory = dirname(path)
-        filename = splitext(basename(path))[0]
-        self.plot_directory = join(directory, filename)
+        self.filename = splitext(basename(path))[0]
+        self.plot_directory = join(directory, self.filename)
 
     def get_event(self, iev):
         self.reader.GetR1Event(iev, self.samples, self.first_cell_ids)
@@ -70,13 +70,32 @@ def main():
     reader = Reader(args.input_path)
     source = reader.event_generator()
 
+    n_events = reader.n_events
+    n_samples = reader.n_samples
+    waveforms = np.zeros((n_events, n_samples))
+    mask = np.zeros((n_events, n_samples), dtype=np.bool)
+
+    pixel = 22
+
     for ev in source:
         # Skip first row due to problem in pedestal subtraction
         bp, r, c = get_bp_r_c(reader.first_cell_ids[0])
         if r == 0:
+            mask[ev] = True
             continue
 
-        waveforms = reader.samples
+        waveforms_ev = reader.samples
+
+        waveforms_pix = waveforms_ev[pixel]
+        waveforms[ev] = waveforms_pix
+
+    waveforms = np.ma.masked_array(waveforms, mask=mask).compressed()
+    waveforms = waveforms.reshape((waveforms.size // n_samples, n_samples))
+
+    output_dir = reader.plot_directory
+    run_name = reader.filename
+    output_path = join(output_dir, "{}_wf_ch{}.csv".format(run_name, pixel))
+    np.savetxt(output_path, waveforms, delimiter=",", fmt='%.6f')
 
 
 if __name__ == '__main__':
