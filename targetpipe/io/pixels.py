@@ -6,6 +6,8 @@ import numpy as np
 from astropy import log
 from os.path import dirname, realpath, join
 from ctapipe.instrument.camera import _get_min_pixel_seperation
+from ctapipe.instrument import CameraGeometry
+from astropy import units as u
 
 log.info("Initialising pixel geometry and ids and reference pulse shapes")
 
@@ -20,6 +22,10 @@ checm_refstep = file['refstep']
 checm_time_slice = file['time_slice']
 
 optical_foclen = 2.283
+
+
+def get_geometry():
+    return CameraGeometry.guess(*checm_pixel_pos * u.m, optical_foclen * u.m)
 
 
 def pixel_sizes(x_pix, y_pix):
