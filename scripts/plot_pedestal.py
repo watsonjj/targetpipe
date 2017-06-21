@@ -37,13 +37,16 @@ class HitsPlotter(OfficialPlotter):
         self.fig = plt.figure(figsize=(14, 10))
         self.ax = self.fig.add_subplot(1, 1, 1)
 
-    def create(self, pixel_hits):
-        n_blks, n_bps = pixel_hits.shape
-        pixel_hits_0 = np.ma.masked_where(pixel_hits == 0, pixel_hits)
+    def create(self, value, value_title):
+        n_blks, n_bps = value.shape
+        pixel_hits_0 = np.ma.masked_where(value == 0, value)
 
         im = self.ax.pcolor(pixel_hits_0, cmap="viridis", edgecolors='white', linewidths=0.1)
-        self.fig.colorbar(im)
+        cbar = self.fig.colorbar(im)
         self.ax.patch.set(hatch='xx')
+        self.ax.set_xlabel("Blockphase + Waveform position")
+        self.ax.set_ylabel("Block")
+        cbar.set_label(value_title)
 
 
 class PedestalBuilder(Tool):
@@ -66,6 +69,7 @@ class PedestalBuilder(Tool):
         self.bps = None
 
         self.p_hits = None
+        self.p_pedestalpix2d = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -90,6 +94,7 @@ class PedestalBuilder(Tool):
 
         script = "plot_pedestal_hits"
         self.p_hits = HitsPlotter(**kwargs, shape="wide")
+        self.p_pedestalpix2d = HitsPlotter(**kwargs, shape="wide")
 
     def start(self):
         n_events = self.reader.num_events
@@ -104,7 +109,10 @@ class PedestalBuilder(Tool):
             self.pedmaker.add_event(event)
 
     def finish(self):
+        self.log.info("Extracting hits into numpy array")
         hits = np.array(self.pedmaker.ped_obj.GetHits())
+        self.log.info("Extracting pedestal into numpy array")
+        pedestal = np.array(self.pedmaker.ped_obj.GetPed())
 
         minimum = hits.min()
         maximum = hits.max()
@@ -124,13 +132,18 @@ class PedestalBuilder(Tool):
 
         self.log.info("Using tm {} tmpix {}".format(tm, tmpix))
         pixel_hits = hits[tm, tmpix]
+        pixel_pedestal = pedestal[tm, tmpix]
 
-        self.p_hits.create(pixel_hits)
+        self.p_hits.create(pixel_hits, "Hits")
+        self.p_pedestalpix2d.create(pixel_pedestal, "Pedestal (ADC)")
 
         output_dir = join(self.reader.output_directory, "plot_pedestal_hits")
+
         output_path = join(output_dir, "hits.pdf")
         self.p_hits.save(output_path)
 
+        output_path = join(output_dir, "pedestal.pdf")
+        self.p_pedestalpix2d.save(output_path)
 
 exe = PedestalBuilder()
 exe.run()
