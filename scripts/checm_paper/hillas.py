@@ -8,6 +8,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
 from traitlets import Dict, List
 from os.path import join
+from traitlets.config.loader import Config
 
 from ctapipe.calib.camera import CameraCalibrator
 from ctapipe.core import Tool
@@ -45,6 +46,7 @@ class ImagePlotter(OfficialPlotter):
 
         self.fig = plt.figure(figsize=(8, 8))
         self.ax = self.fig.add_subplot(1, 1, 1)
+        self.fig.subplots_adjust(right=0.85)
 
     def create(self, df, geom):
         super().save()
@@ -53,7 +55,7 @@ class ImagePlotter(OfficialPlotter):
                                image=np.zeros(2048),
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label("Amplitude (p.e.)")
+        camera.colorbar.set_label("Amplitude (p.e.)", fontsize=20)
 
         with PdfPages(self.output_path) as pdf:
             n_rows = len(df.index)
@@ -72,9 +74,10 @@ class ImagePlotter(OfficialPlotter):
                 camera.image = image
                 camera.set_limits_minmax(min_, max_)
                 camera.highlight_pixels(tc, 'white')
-                camera.overlay_moments_update(hillas, color='red')
+                camera.overlay_moments_update(hillas, color='red', linewidth=2)
                 self.ax.set_title("Event: {}, Tel: {}".format(event_id, tel))
                 self.ax.axis('off')
+                camera.colorbar.ax.tick_params(labelsize=30)
 
                 pdf.savefig(self.fig)
 
@@ -105,6 +108,7 @@ class PeakTimePlotter(OfficialPlotter):
 
         self.fig = plt.figure(figsize=(8, 8))
         self.ax = self.fig.add_subplot(1, 1, 1)
+        self.fig.subplots_adjust(right=0.85)
 
     def create(self, df, geom):
         super().save()
@@ -113,7 +117,7 @@ class PeakTimePlotter(OfficialPlotter):
                                image=np.ma.zeros(2048),
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label("Peak Time (ns)")
+        camera.colorbar.set_label("Peak Time (ns)", fontsize=20)
 
         with PdfPages(self.output_path) as pdf:
             n_rows = len(df.index)
@@ -136,6 +140,7 @@ class PeakTimePlotter(OfficialPlotter):
                 # camera.overlay_moments_update(hillas, color='red')
                 self.ax.set_title("Event: {}, Tel: {}".format(event_id, tel))
                 self.ax.axis('off')
+                camera.colorbar.ax.tick_params(labelsize=30)
 
                 pdf.savefig(self.fig)
 
@@ -672,19 +677,24 @@ class HillasBuilder(Tool):
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
-        kwargs = dict(config=self.config, tool=self)
+
+        data_config = self.config.copy()
+        data_config['WaveformCleanerFactory'] = Config(cleaner='CHECMWaveformCleanerLocal')
+        mc_config = self.config.copy()
+
+        data_kwargs = dict(config=data_config, tool=self)
+        mc_kwargs = dict(config=mc_config, tool=self)
 
         filepath = '/Volumes/gct-jason/data/170330/onsky-mrk501/Run05477_r1.tio'
-        reader = TargetioFileReader(input_path=filepath, **kwargs)
-        filepath = '/Users/Jason/Software/outputs/sim_telarray/meudon_cr/simtel_proton_nsb50_thrs30.gz'
-        reader_mc = HessioFileReader(input_path=filepath, **kwargs)
+        reader = TargetioFileReader(input_path=filepath, **data_kwargs)
+        filepath = '/Users/Jason/Software/outputs/sim_telarray/meudon_cr/simtel_proton_nsb50_thrs30_1petal_rndm015_heide.gz'
+        # filepath = '/Users/Jason/Software/outputs/sim_telarray/meudon_cr/simtel_proton_nsb50_thrs30.gz'
+        reader_mc = HessioFileReader(input_path=filepath, **mc_kwargs)
 
         calibrator = CameraCalibrator(origin=reader.origin,
-                                      cleaner='CHECMWaveformCleaner',
-                                      cleaner_t0=40,
-                                      **kwargs)
+                                      **data_kwargs)
         calibrator_mc = CameraCalibrator(origin=reader_mc.origin,
-                                         **kwargs)
+                                         **mc_kwargs)
 
         first_event = reader.get_event(0)
         telid = list(first_event.r0.tels_with_data)[0]
@@ -704,7 +714,7 @@ class HillasBuilder(Tool):
                   pos=pos_mc, geom=geom_mc, t1=20, t2=10)
         self.reader_df = pd.DataFrame([d1, d2])
 
-        p_kwargs = kwargs
+        p_kwargs = data_kwargs
         p_kwargs['script'] = "checm_paper_hillas"
         p_kwargs['figure_name'] = "all_images"
         self.p_allimage = AllImagePlotter(**p_kwargs)
@@ -826,12 +836,12 @@ class HillasBuilder(Tool):
 
         # self.p_allimage.create(df_data, geom_data)
         # self.p_alltimeimage.create(df_data, geom_data)
-        # self.p_allmcimage.create(df_mc, geom_mc)
-        # self.p_zwimage.create(df_data, geom_data)
-        # self.p_zwmcimage.create(df_mc, geom_mc)
-        # self.p_muonimage.create(df_data, geom_data)
-        # self.p_brightimage.create(df_data, geom_data)
-        # self.p_countimage.create(df_data, geom_data)
+        self.p_allmcimage.create(df_mc, geom_mc)
+        self.p_zwimage.create(df_data, geom_data)
+        self.p_zwmcimage.create(df_mc, geom_mc)
+        self.p_muonimage.create(df_data, geom_data)
+        self.p_brightimage.create(df_data, geom_data)
+        self.p_countimage.create(df_data, geom_data)
         self.p_whole_dist.create(df_data)
         self.p_widthvslength.create(self.df)
         self.p_sizevslength.create(self.df)
@@ -844,12 +854,12 @@ class HillasBuilder(Tool):
 
         # self.p_allimage.save()
         # self.p_alltimeimage.save()
-        # self.p_allmcimage.save()
-        # self.p_zwimage.save()
-        # self.p_zwmcimage.save()
-        # self.p_muonimage.save()
-        # self.p_brightimage.save()
-        # self.p_countimage.save()
+        self.p_allmcimage.save()
+        self.p_zwimage.save()
+        self.p_zwmcimage.save()
+        self.p_muonimage.save()
+        self.p_brightimage.save()
+        self.p_countimage.save()
         self.p_whole_dist.save()
         self.p_widthvslength.save()
         self.p_sizevslength.save()
