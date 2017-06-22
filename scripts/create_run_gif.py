@@ -44,7 +44,8 @@ class Animator(Component):
         self.fig.suptitle(title + " - " + self.description)
 
         # Create animation
-        interval = 100
+        interval = 25  # Fast
+        # interval = 100  # Slow
 
         def animation_generator():
             for index, row in df.iterrows():
@@ -59,6 +60,8 @@ class Animator(Component):
                 tc_2d = np.ones(images.shape, dtype=np.bool) * tc[None, :]
                 cleaned_events = np.ma.masked_array(images, mask=~tc_2d)
                 max_ = cleaned_events.max()  # np.percentile(dl1, 99.9)
+                if max_ < 6:
+                    max_ = 6
                 min_ = np.percentile(images, 0.1)
 
                 camera.set_limits_minmax(min_, max_)
