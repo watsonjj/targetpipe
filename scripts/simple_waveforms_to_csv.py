@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
-from os.path import join, dirname, basename, splitext
+from os.path import join, dirname, basename, splitext, exists
+from os import makedirs
 from target_io import TargetIOEventReader as TIOReader
 from target_io import T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
 
@@ -75,7 +76,7 @@ def main():
     waveforms = np.zeros((n_events, n_samples))
     mask = np.zeros((n_events, n_samples), dtype=np.bool)
 
-    pixel = 22
+    pixel = 35
 
     for ev in source:
         # Skip first row due to problem in pedestal subtraction
@@ -93,6 +94,10 @@ def main():
     waveforms = waveforms.reshape((waveforms.size // n_samples, n_samples))
 
     output_dir = reader.plot_directory
+    if not exists(output_dir):
+        print("Creating directory: {}".format(output_dir))
+        makedirs(output_dir)
+
     run_name = reader.filename
     output_path = join(output_dir, "{}_wf_ch{}.csv".format(run_name, pixel))
     np.savetxt(output_path, waveforms, delimiter=",", fmt='%.6f')
