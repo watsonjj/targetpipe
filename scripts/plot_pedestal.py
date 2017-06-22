@@ -137,7 +137,7 @@ class PedestalBuilder(Tool):
         self.p_hits.create(pixel_hits, "Hits")
         self.p_pedestalpix2d.create(pixel_pedestal, "Pedestal (ADC)")
 
-        output_dir = join(self.reader.output_directory, "plot_pedestal_hits")
+        output_dir = join(self.reader.output_directory, "plot_pedestal")
 
         output_path = join(output_dir, "hits.pdf")
         self.p_hits.save(output_path)
