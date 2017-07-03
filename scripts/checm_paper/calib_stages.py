@@ -36,6 +36,7 @@ class ImagePlotter(OfficialPlotter):
 
         self.fig = plt.figure(figsize=(8, 8))
         self.ax = self.fig.add_subplot(1, 1, 1)
+        self.fig.subplots_adjust(right=0.85)
 
     def create(self, title, units, image, geom, tc,
                hl, hlc='white', hla=0.75, hillas=None):
@@ -43,7 +44,7 @@ class ImagePlotter(OfficialPlotter):
                                image=image,
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label("Amplitude ({})".format(units))
+        camera.colorbar.set_label("Amplitude ({})".format(units), fontsize=20)
         camera.image = image
 
         # from IPython import embed
@@ -55,10 +56,11 @@ class ImagePlotter(OfficialPlotter):
         camera.set_limits_minmax(min_, max_)
         camera.highlight_pixels(hl, hlc, 1, hla)
         if hillas:
-            camera.overlay_moments_update(hillas, color='red')
+            camera.overlay_moments_update(hillas, color='red', linewidth=2)
 
         self.ax.set_title(title)
         self.ax.axis('off')
+        camera.colorbar.ax.tick_params(labelsize=30)
 
 
 class WaveformPlotter(OfficialPlotter):
@@ -83,8 +85,8 @@ class WaveformPlotter(OfficialPlotter):
     def create(self, waveform, title, units):
         self.ax.plot(waveform)
         self.ax.set_title(title)
-        self.ax.set_xlabel("Time (ns)")
-        self.ax.set_ylabel("Amplitude ({})".format(units))
+        self.ax.set_xlabel("Time (ns)", fontsize=20)
+        self.ax.set_ylabel("Amplitude ({})".format(units), fontsize=20)
 
 
 class CalibStages(Tool):
@@ -110,11 +112,13 @@ class CalibStages(Tool):
         self.p_charge = None
         self.p_cleaned = None
         self.p_hillas = None
+        self.p_charge_hillas = None
 
         self.p_raw_wf = None
         self.p_calibpedestal_wf = None
         self.p_calibadc_wf = None
         self.p_calibpe_wf = None
+        self.p_cleaned_wf = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -159,6 +163,8 @@ class CalibStages(Tool):
         self.p_cleaned = ImagePlotter(**p_kwargs)
         p_kwargs['figure_name'] = "6_hillas"
         self.p_hillas = ImagePlotter(**p_kwargs)
+        p_kwargs['figure_name'] = "7_dl1_charge_hillas"
+        self.p_charge_hillas = ImagePlotter(**p_kwargs)
 
         p_kwargs['figure_name'] = "0_r0_raw_wf"
         self.p_raw_wf = WaveformPlotter(**p_kwargs, shape='wide')
@@ -168,10 +174,12 @@ class CalibStages(Tool):
         self.p_calibadc_wf = WaveformPlotter(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "3_r1_calib_pe_wf"
         self.p_calibpe_wf = WaveformPlotter(**p_kwargs, shape='wide')
+        p_kwargs['figure_name'] = "4_cleaned_wf"
+        self.p_cleaned_wf = WaveformPlotter(**p_kwargs, shape='wide')
 
     def start(self):
 
-        event_id = 138
+        event_id = 91 #138
         t0 = 40
 
         event = self.reader.get_event(event_id, True)
@@ -193,7 +201,8 @@ class CalibStages(Tool):
 
         r0 = event.r0.tel[telid].adc_samples
         r1 = event.r1.tel[telid].pe_samples
-        dl1 = event.dl1.tel[telid].image[0, :]
+        dl1 = event.dl1.tel[telid].image[0]
+        cleaned = event.dl1.tel[telid].cleaned[0]
 
         pix = np.argmax(dl1)
 
@@ -205,6 +214,7 @@ class CalibStages(Tool):
         pix_r1 = r1[0, pix, :]
         pix_r1_adc = r1_adc[0, pix, :]
         pix_r1_pedestal = r1_pedestal[0, pix, :]
+        pix_cleaned = cleaned[pix]
 
         tc = tailcuts_clean(geom, dl1, 20, 10)
         cleaned_dl1 = np.ma.masked_array(dl1, mask=~tc)
@@ -227,6 +237,8 @@ class CalibStages(Tool):
         t = "Hillas"
         self.p_hillas.create(t, "p.e.", cleaned_dl1, geom, tc,
                              np.arange(2048), 'black', 0.2, hillas)
+        t = "DL1 Extracted Charge"
+        self.p_charge_hillas.create(t, "p.e.", dl1, geom, tc, tc, 'white', 0.75, hillas)
 
         t = "Raw, pix={}".format(pix)
         self.p_raw_wf.create(pix_r0, t, 'ADC')
@@ -236,6 +248,8 @@ class CalibStages(Tool):
         self.p_calibadc_wf.create(pix_r1_adc, t, 'ADC')
         t = "R1 Calibrated p.e., pix={}".format(pix)
         self.p_calibpe_wf.create(pix_r1, t, 'p.e.')
+        t = "Cleaned Wf, pix={}".format(pix)
+        self.p_cleaned_wf.create(pix_cleaned, t, 'p.e.')
 
     def finish(self):
         self.p_raw.save()
@@ -245,11 +259,13 @@ class CalibStages(Tool):
         self.p_charge.save()
         self.p_cleaned.save()
         self.p_hillas.save()
+        self.p_charge_hillas.save()
 
         self.p_raw_wf.save()
         self.p_calibpedestal_wf.save()
         self.p_calibadc_wf.save()
         self.p_calibpe_wf.save()
+        self.p_cleaned_wf.save()
 
 
 exe = CalibStages()
