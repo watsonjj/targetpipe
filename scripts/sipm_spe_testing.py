@@ -78,7 +78,7 @@ class SiPMSPETesting(Tool):
         ignore_pixels = [25, 26, 18, 19, 13, 14, 5, 6, 49, 37]
         connected = [i for i in connected if i not in ignore_pixels]
         self.n_pixels = len(connected)
-        pix = 22
+        pix = 35
         pix_index = connected.index(pix)
         shift = 4
         width = 8
@@ -266,6 +266,7 @@ class SiPMSPETesting(Tool):
         t0 = remove_events(t0)
         t0_chk = remove_events(t0_chk)
         fwhm = remove_events(fwhm)
+        fwhm = np.ma.masked_where(fwhm < 0, fwhm).compressed()
         rise_time = remove_events(rise_time)
         waveform_pix = remove_events_samples(waveform_pix)
         waveform_avg = remove_events_samples(waveform_avg)
