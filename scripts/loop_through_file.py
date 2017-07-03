@@ -1,5 +1,8 @@
 from tqdm import tqdm
 from traitlets import Dict, List
+from matplotlib import pyplot as plt
+import numpy as np
+from IPython import embed
 
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
@@ -42,7 +45,7 @@ class EventFileLooper(Tool):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.file_reader = None
+        self.reader = None
         self.r1 = None
         self.dl0 = None
         self.dl1 = None
@@ -53,7 +56,7 @@ class EventFileLooper(Tool):
 
         reader_factory = EventFileReaderFactory(**kwargs)
         reader_class = reader_factory.get_class()
-        self.file_reader = reader_class(**kwargs)
+        self.reader = reader_class(**kwargs)
 
         extractor_factory = ChargeExtractorFactory(**kwargs)
         extractor_class = extractor_factory.get_class()
@@ -63,7 +66,7 @@ class EventFileLooper(Tool):
         cleaner_class = cleaner_factory.get_class()
         cleaner = cleaner_class(**kwargs)
 
-        r1_factory = CameraR1CalibratorFactory(origin=self.file_reader.origin,
+        r1_factory = CameraR1CalibratorFactory(origin=self.reader.origin,
                                                **kwargs)
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
@@ -75,9 +78,11 @@ class EventFileLooper(Tool):
                                        **kwargs)
 
     def start(self):
-        source = self.file_reader.read()
+        n_events = self.reader.num_events
+        source = self.reader.read()
         desc = "Looping through file"
-        for event in tqdm(source, desc=desc):
+        for event in tqdm(source, desc=desc, total=n_events):
+            ev = event.count
             self.r1.calibrate(event)
             self.dl0.reduce(event)
             self.dl1.calibrate(event)
