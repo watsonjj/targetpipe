@@ -51,8 +51,8 @@ class PixelSPEFitPlotter(OfficialPlotter):
         edges_tops = np.insert(edges, np.arange(edges.shape[0]),
                                edges, axis=0)[1:-1]
 
-        self.ax.semilogy(edges_tops, hist_tops, color='b', alpha=0.2)
-        self.ax.semilogy(fitx, fit_n, color='r')
+        self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.2)
+        self.ax.semilogy(fitx, fit_n, color='black')
         self.ax.set_ylim(ymin=1e-4)
         self.ax.set_title("SPE Spectrum, Pixel 1559")
         self.ax.set_xlabel("Amplitude (ADC)")
@@ -98,7 +98,7 @@ class TMSPEFitPlotter(OfficialPlotter):
         hist_tops = np.insert(hist_r, np.arange(nbins), hist_r, axis=0)
         edges_tops = np.insert(e, np.arange(e.shape[0]), e, axis=0)[1:-1]
 
-        self.ax.semilogy(edges_tops, hist_tops, color='b', alpha=0.2)
+        self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.2)
         # self.ax.set_ylim(ymin=1e-4)
         self.ax.set_title("SPE Spectrum, TM 24")
         self.ax.set_xlabel("Amplitude ({})".format(x_unit))
@@ -220,7 +220,7 @@ class ADC2PE1100VTMStatsPlotter(OfficialPlotter):
         means = df_1100.groupby('tm')['spe'].mean()
         stds = df_1100.groupby('tm')['spe'].std()
         fracspreads = stds/means
-        sns.distplot(fracspreads, ax=self.ax, color="blue", rug=True)
+        sns.distplot(fracspreads, ax=self.ax, color="black", rug=True)
         self.ax.set_title("Fractional spread of SPE Value (ADC) "
                           "between TMs at 1100V")
         self.ax.set_xlabel('Fractional spread')
@@ -411,9 +411,9 @@ class ADC2PEPlots(Tool):
 
     def finish(self):
         # Save figures
-        # self.p_pixelspe.save()
-        # self.p_tmspe.save()
-        # self.p_tmspe_pe.save()
+        self.p_pixelspe.save()
+        self.p_tmspe.save()
+        self.p_tmspe_pe.save()
         self.p_adc2pe.save()
         self.p_adc2pe_1100tm.save()
         self.p_adc2pe_1100tm_stats.save()

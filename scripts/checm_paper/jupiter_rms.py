@@ -26,6 +26,7 @@ import iminuit
 from scipy import optimize
 from scipy.interpolate import griddata
 
+
 class Coordinates:
     def __init__(self, deg=False):
         self.pix_x, self.pix_y = checm_pixel_pos
@@ -89,8 +90,9 @@ class ImagePlotter(OfficialPlotter):
                                image=image,
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label("Residual RMS (p.e.)")
+        camera.colorbar.set_label("Residual RMS (p.e.)", fontsize=20)
         camera.image = image
+        camera.colorbar.ax.tick_params(labelsize=30)
 
         self.fig.suptitle("Jupiter RMS ON-OFF")
         self.ax.set_title(title)
@@ -322,8 +324,9 @@ class ZoomedImagePlotter(OfficialPlotter):
                                image=image,
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label("Residual RMS (p.e.)")
+        camera.colorbar.set_label("Residual RMS (p.e.)", fontsize=20)
         camera.image = image
+        camera.colorbar.ax.tick_params(labelsize=30)
 
         amplitude, x0, y0, sigma, offset = coeff
         radius = fitter.find_containment_radius(coords, coeff, 0.8)

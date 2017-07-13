@@ -341,23 +341,23 @@ class WidthVsLength(OfficialPlotter):
 
         df_8 = df_data.loc[df_data['id'] == 8]
         self.ax.plot(df_8[x], df_8[y], color="black",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 8: NSB? Grazing CR?")
         df_48 = df_data.loc[df_data['id'] == 48]
         self.ax.plot(df_48[x], df_48[y], color="green",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 48: Direct CR Entry&Exit")
         df_119 = df_data.loc[df_data['id'] == 119]
         self.ax.plot(df_119[x], df_119[y], color="red",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 119: Bright Shower")
         df_126 = df_data.loc[df_data['id'] == 126]
         self.ax.plot(df_126[x], df_126[y], color="purple",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 126: Direct CR")
         df_138 = df_data.loc[df_data['id'] == 138]
         self.ax.plot(df_138[x], df_138[y], color="yellow",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 138: Shower")
 
         self.ax.legend(loc="upper right", prop={'size': 10})
@@ -412,23 +412,23 @@ class SizeVsLength(OfficialPlotter):
 
         df_8 = df_data.loc[df_data['id'] == 8]
         self.ax.plot(df_8[x], df_8[y], color="black",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 8: NSB? Grazing CR?")
         df_48 = df_data.loc[df_data['id'] == 48]
         self.ax.plot(df_48[x], df_48[y], color="green",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 48: Direct CR Entry&Exit")
         df_119 = df_data.loc[df_data['id'] == 119]
         self.ax.plot(df_119[x], df_119[y], color="red",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 119: Bright Shower")
         df_126 = df_data.loc[df_data['id'] == 126]
         self.ax.plot(df_126[x], df_126[y], color="purple",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 126: Direct CR")
         df_138 = df_data.loc[df_data['id'] == 138]
         self.ax.plot(df_138[x], df_138[y], color="yellow",
-                     marker='o', markersize=10,
+                     marker='o', markersize=6,
                      label="Event 138: Shower")
 
         self.ax.legend(loc="upper right", prop={'size': 10})
@@ -834,8 +834,8 @@ class HillasBuilder(Tool):
         geom_data = rdf.loc[rdf['type'] == "Data", "geom"].iloc[0]
         geom_mc = rdf.loc[rdf['type'] == "MC", "geom"].iloc[0]
 
-        # self.p_allimage.create(df_data, geom_data)
-        # self.p_alltimeimage.create(df_data, geom_data)
+        self.p_allimage.create(df_data, geom_data)
+        self.p_alltimeimage.create(df_data, geom_data)
         self.p_allmcimage.create(df_mc, geom_mc)
         self.p_zwimage.create(df_data, geom_data)
         self.p_zwmcimage.create(df_mc, geom_mc)
@@ -852,8 +852,8 @@ class HillasBuilder(Tool):
         self.p_length.create(self.df)
         self.p_width.create(self.df)
 
-        # self.p_allimage.save()
-        # self.p_alltimeimage.save()
+        self.p_allimage.save()
+        self.p_alltimeimage.save()
         self.p_allmcimage.save()
         self.p_zwimage.save()
         self.p_zwmcimage.save()

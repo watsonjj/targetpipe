@@ -83,7 +83,7 @@ class WaveformPlotter(OfficialPlotter):
         super().__init__(config=config, tool=tool, **kwargs)
 
     def create(self, waveform, title, units):
-        self.ax.plot(waveform)
+        self.ax.plot(waveform, color='black')
         self.ax.set_title(title)
         self.ax.set_xlabel("Time (ns)", fontsize=20)
         self.ax.set_ylabel("Amplitude ({})".format(units), fontsize=20)
@@ -180,7 +180,7 @@ class CalibStages(Tool):
     def start(self):
 
         event_id = 91 #138
-        t0 = 40
+        t0 = 48
 
         event = self.reader.get_event(event_id, True)
 
@@ -221,13 +221,13 @@ class CalibStages(Tool):
 
         hillas = hillas_parameters(*pos, cleaned_dl1)
 
-        t = "Raw, T=40ns"
+        t = "Raw, T={}ns".format(t0)
         self.p_raw.create(t, "ADC", t0_r0, geom, tc, tc)
-        t = "R1 Calibrated Pedestal, T=40ns"
+        t = "R1 Calibrated Pedestal, T={}ns".format(t0)
         self.p_calibpedestal.create(t, "ADC", t0_r1_pedestal, geom, tc, tc)
-        t = "R1 Calibrated ADC, T=40ns"
+        t = "R1 Calibrated ADC, T={}ns".format(t0)
         self.p_calibadc.create(t, "ADC", t0_r1_adc, geom, tc, tc)
-        t = "R1 Calibrated p.e., T=40ns"
+        t = "R1 Calibrated p.e., T={}ns".format(t0)
         self.p_calibpe.create(t, "p.e.", t0_r1, geom, tc, tc)
         t = "DL1 Extracted Charge"
         self.p_charge.create(t, "p.e.", dl1, geom, tc, tc)

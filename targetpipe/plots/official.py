@@ -11,7 +11,7 @@ from os import makedirs
 class OfficialPlotter(Component):
     name = 'OfficialPlotter'
 
-    type = CaStEn(['paper', 'talk'], 'talk',
+    type = CaStEn(['paper', 'talk'], 'paper',
                   help="Intended publishment of plot").tag(config=True)
     shape = CaStEn(['square', 'wide'], 'square',
                    help="Shape of plot").tag(config=True)

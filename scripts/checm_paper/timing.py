@@ -40,8 +40,8 @@ class Scatter(OfficialPlotter):
         """
         super().__init__(config=config, tool=tool, **kwargs)
 
-        self.fig = plt.figure(figsize=(12, 8))
-        self.ax = self.fig.add_subplot(1, 1, 1)
+        # self.fig = plt.figure(figsize=(12, 8))
+        # self.ax = self.fig.add_subplot(1, 1, 1)
 
     def create(self, x, y, x_label="", y_label="", title=""):
 
@@ -83,8 +83,8 @@ class Hist2D(OfficialPlotter):
         """
         super().__init__(config=config, tool=tool, **kwargs)
 
-        self.fig = plt.figure(figsize=(14, 10))
-        self.ax = self.fig.add_subplot(1, 1, 1)
+        # self.fig = plt.figure(figsize=(14, 10))
+        # self.ax = self.fig.add_subplot(1, 1, 1)
 
     def create(self, x, x_n, y, y_n, x_label="", y_label="", log=False):
         assert x.shape == y.shape
@@ -130,8 +130,8 @@ class WaveformHist1D(OfficialPlotter):
         """
         super().__init__(config=config, tool=tool, **kwargs)
 
-        self.fig = plt.figure(figsize=(14, 10))
-        self.ax = self.fig.add_subplot(1, 1, 1)
+        # self.fig = plt.figure(figsize=(14, 10))
+        # self.ax = self.fig.add_subplot(1, 1, 1)
 
     def add(self, vals, label):
         mean, std = norm.fit(vals)
@@ -187,8 +187,9 @@ class ImagePlotter(OfficialPlotter):
                                image=image,
                                cmap='viridis')
         camera.add_colorbar()
-        camera.colorbar.set_label(label)
+        camera.colorbar.set_label(label, fontsize=20)
         camera.image = image
+        camera.colorbar.ax.tick_params(labelsize=30)
 
         self.ax.set_title(title)
         self.ax.axis('off')
@@ -260,23 +261,23 @@ class TimingExtractor(Tool):
         p_kwargs = kwargs
         p_kwargs['script'] = "checm_paper_timing"
         p_kwargs['figure_name'] = "eid_vs_fci"
-        self.p_eidvsfci = Scatter(**p_kwargs)
+        self.p_eidvsfci = Scatter(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "time_vs_tack"
-        self.p_timevstack = Scatter(**p_kwargs)
+        self.p_timevstack = Scatter(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "bp_vs_tack"
-        self.p_bpvstack = Hist2D(**p_kwargs)
+        self.p_bpvstack = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "eid_vs_t"
-        self.p_eidvst = Hist2D(**p_kwargs)
+        self.p_eidvst = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "eid_vs_tgrad"
-        self.p_eidvstgrad = Hist2D(**p_kwargs)
+        self.p_eidvstgrad = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "t_vs_tgrad"
-        self.p_tvstgrad = Hist2D(**p_kwargs)
+        self.p_tvstgrad = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "t_vs_charge"
-        self.p_tvscharge = Hist2D(**p_kwargs)
+        self.p_tvscharge = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "tgrad_vs_charge"
-        self.p_tgradvscharge = Hist2D(**p_kwargs)
+        self.p_tgradvscharge = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "1D_comparison_eid{}".format(self.eoi)
-        self.p_1deoicomp = WaveformHist1D(**p_kwargs)
+        self.p_1deoicomp = WaveformHist1D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "image_tgrad_eid{}".format(self.eoi)
         self.p_imageeoitgrad = ImagePlotter(**p_kwargs)
 
