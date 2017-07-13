@@ -19,6 +19,8 @@ class PedestalMaker(Component):
     n_samples = Int(96, help='Number of samples').tag(config=True)
     diagnosis = Bool(False, help='Run diagnosis while creating '
                                  'file?').tag(config=True)
+    std = Bool(False, help='Track standard deviation while creating '
+                           'file?').tag(config=True)
     compress = Bool(False, help='Compress the pedestal file? (store in uint16 '
                                 'instead of floats').tag(config=True)
     stddev = Bool(False, help='Create a numpy file containing the standard '
@@ -46,7 +48,8 @@ class PedestalMaker(Component):
                              "pedestal file")
 
         self.ped_obj = TCPedestalMaker(self.n_tms, self.n_blocks,
-                                       self.n_samples, self.diagnosis)
+                                       self.n_samples, self.diagnosis,
+                                       self.std)
         self.ped_stats = None
         # if self.stddev:
         #     self.ped_stats = PedestalMeanStdDev(self.n_tms * 64,

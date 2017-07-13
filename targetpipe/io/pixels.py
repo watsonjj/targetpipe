@@ -95,6 +95,11 @@ class Dead:
         self.dead_pixels = [96, 276, 1906, 1910, 1916]
         self.npix = 2048
 
+    def get_pixel_mask(self):
+        mask = np.zeros(self.npix, dtype=np.bool)
+        mask[self.dead_pixels] = True
+        return mask
+
     def mask1d(self, array):
         if not array.shape[0] == self.npix:
             print("[ERROR] array does not contain {} pixels, "

@@ -128,8 +128,8 @@ class ResidualStatsPlotter(OfficialPlotter):
         self.ax = self.fig.add_subplot(1, 1, 1)
 
     def create(self, x, x_n, y, y_n, x_label, y_label):
-        x_range = (x.min(), x.max())
-        y_range = (y.min(), y.max())
+        x_range = (x.min(), x.max()+1)
+        y_range = (y.min(), y.max()+1)
         hist, xedges, yedges = np.histogram2d(x, y, bins=[x_n, y_n], range=[x_range, y_range])
         hist = np.ma.masked_where(hist == 0, hist)
         z = hist
@@ -163,6 +163,8 @@ class PedestalBuilder(Tool):
         self.reader = None
         self.pedmaker = None
 
+        self.pedestal_std = None
+
         self.bps = None
 
         self.n_modules = None
@@ -173,6 +175,7 @@ class PedestalBuilder(Tool):
         self.n_blockphases = None
         self.n_pixels = None
         self.n_samples = None
+        self.n_bphsam = None
 
         self.output_dir = None
         self.ped_path = None
@@ -182,6 +185,7 @@ class PedestalBuilder(Tool):
 
         self.p_hits = None
         self.p_pedestalpix2d = None
+        self.p_std = None
         self.p_res_eventindex = None
         self.p_res_pixel = None
         self.p_res_tm = None
@@ -232,6 +236,7 @@ class PedestalBuilder(Tool):
         self.n_columns = first_event.meta['n_columns']
         self.n_blockphases = first_event.meta['n_blockphases']
         self.n_pixels, self.n_samples = first_event.r0.tel[0].adc_samples[0].shape
+        self.n_bphsam = self.n_blockphases + self.n_samples
 
         self.output_dir = join(self.reader.output_directory, "plot_pedestal")
 
@@ -242,11 +247,13 @@ class PedestalBuilder(Tool):
                                       output_path=self.ped_path,
                                       n_tms=self.n_modules,
                                       n_blocks=self.n_blocks,
-                                      n_samples=self.n_samples)
+                                      n_samples=self.n_samples,
+                                      std=True)
 
         script = "plot_pedestal_hits"
         self.p_hits = BlockPlotter(**kwargs, shape="wide")
         self.p_pedestalpix2d = BlockPlotter(**kwargs, shape="wide")
+        self.p_std = BlockPlotter(**kwargs, shape="wide")
         self.p_res_eventindex = ResidualPlotter(**kwargs, shape="wide")
         self.p_res_pixel = ResidualPlotter(**kwargs, shape="wide")
         self.p_res_tm = ResidualPlotter(**kwargs, shape="wide")
@@ -282,15 +289,83 @@ class PedestalBuilder(Tool):
         self.p_max_res_bph = ResidualStatsPlotter(**kwargs, shape="wide")
 
     def start(self):
+        skip_events = [32,    93,   234,   375,   657,   878,   958,  1099,  1240,
+         1381,  1522,  1602,  1743,  1823,  1964,  2044,  2124,  2204,
+         2425,  2505,  2585,  2726,  2867,  2947,  3088,  3229,  3370,
+         3511,  3652,  3732,  3873,  4014,  4094,  4155,  4376,  4456,
+         4597,  4677,  4818,  4959,  5039,  5119,  5260,  5340,  5481,
+         5561,  5702,  5843,  5984,  6266,  6407,  6548,  6609,  6872,
+         6933,  7196,  7257,  7459,  7520,  7581,  7722,  7863,  7924,
+         8065,  8126,  8267,  8469,  8610,  8671,  8812,  8873,  9136,
+         9197,  9338,  9399,  9742,  9803,  9944, 10005, 10146, 10207,
+        10470, 10672, 10733, 10874, 11015, 11095, 11236, 11377, 11518,
+        11659, 11800, 11941, 12021, 12082, 12425, 12627, 12768, 12909,
+        13050, 13191, 13332, 13473, 13534, 13675, 13736, 13877, 13938,
+        14018, 14159, 14300, 14441, 14643, 14704, 15047, 15108, 15249,
+        15310, 15451, 15653, 15714, 15855, 15996, 16057, 16198, 16339,
+        16400, 16602, 16663, 16724, 16865, 16926, 16987, 17128, 17189,
+        17330, 17471, 17551, 17612, 17753, 17814, 18279, 18340, 18481,
+        18542, 18683, 18824, 18885, 18965, 19026, 19167, 19308, 19449,
+        19529, 19670, 19891, 20032, 20112, 20192, 20413, 20493, 20573,
+        20794, 20935]
+
         n_events = self.reader.num_events
         self.bps = np.zeros(n_events)
+
+        storage_shape = (self.n_pixels, self.n_blocks, self.n_bphsam)
+        index_shape = (self.n_pixels, self.n_blocks, self.n_samples)
+        index_empty = np.ones(index_shape, dtype=np.int)
+        n = np.zeros(storage_shape)
+        S = np.zeros(storage_shape)
+        m = np.zeros(storage_shape)
+
+        pix = np.arange(self.n_pixels)
+        pix_i = pix[:, None, None] * index_empty
+        samples = np.arange(self.n_samples)
 
         desc = "Filling pedestal"
         source = self.reader.read()
         for event in tqdm(source, total=n_events, desc=desc):
             ev = event.count
+            # if ev not in skip_events:
+            #     continue
+
+            # r = event.r0.tel[0].row
+            # c = event.r0.tel[0].column
+            # blk = c * 8 + r
+            # blk_i = blk[:, None, None] * index_empty
+            # bph = event.r0.tel[0].blockphase
+            # bphsam = bph[:, None] + samples[None, :]
+            # bphsam_i = bphsam[:, None, :] * index_empty
+            # i = [pix_i, blk_i, bphsam_i]
+            # val = event.r0.tel[0].adc_samples[0][:, None, :] * index_empty
+
+            # n[i] += 1
+            # m_prev = m
+            # m[i] += ((val - m[i]) / n[i])
+            # S[i] += ((val - m[i]) * (val - m_prev[i]))
+
+            # self.pedestal_min[np.where(self.pedestal_n[i] == 0)] = val[self.pedestal_n[i] == 0]
+            # self.pedestal_max[np.where(self.pedestal_n[i] == 0)] = val[self.pedestal_n[i] == 0]
+            # self.pedestal_n[i] += 1
+            # self.pedestal_min[np.where(val < self.pedestal_min[i])] = val[val < self.pedestal_min[i]]
+            # self.pedestal_max[np.where(val > self.pedestal_max[i])] = val[val > self.pedestal_max[i]]
+
+
+            # fci = event.r0.tel[0].first_cell_ids[0]
+            # r = event.r0.tel[0].row[0]
+            # c = event.r0.tel[0].column[0]
+            # blk = c * 8 + r
+            # bph = event.r0.tel[0].blockphase[0]
+            # if r == 0:
+            #     continue
+            # if not bph >= 29:
+            #     continue
+
             self.bps[ev] = event.r0.tel[0].blockphase[0]
             self.pedmaker.add_event(event)
+
+        self.pedestal_std = np.sqrt(S/n)
 
         if self.residual_flag:
             self.pedmaker.save()
@@ -299,17 +374,17 @@ class PedestalBuilder(Tool):
             r1_calibrator = TargetioR1Calibrator(**kwargs)
 
             size = 500
-            shape = (size, self.n_pixels, self.n_samples)
-            r1_container = np.zeros(shape)
-            event_arr = np.zeros(shape)
-            pixel_arr = np.arange(self.n_pixels)[None, :, None] * np.ones(shape)
-            tm_arr = (np.arange(self.n_pixels)[None, :, None] // 64) * np.ones(shape)
-            tmpix_arr = (np.arange(self.n_pixels)[None, :, None] % 64) * np.ones(shape)
-            fci_arr = np.zeros(shape)
-            blk_arr = np.zeros(shape)
-            row_arr = np.zeros(shape)
-            col_arr = np.zeros(shape)
-            bph_arr = np.zeros(shape)
+            storage_shape = (size, self.n_pixels, self.n_samples)
+            r1_container = np.zeros(storage_shape)
+            event_arr = np.zeros(storage_shape)
+            pixel_arr = np.arange(self.n_pixels)[None, :, None] * np.ones(storage_shape)
+            tm_arr = (np.arange(self.n_pixels)[None, :, None] // 64) * np.ones(storage_shape)
+            tmpix_arr = (np.arange(self.n_pixels)[None, :, None] % 64) * np.ones(storage_shape)
+            fci_arr = np.zeros(storage_shape)
+            blk_arr = np.zeros(storage_shape)
+            row_arr = np.zeros(storage_shape)
+            col_arr = np.zeros(storage_shape)
+            bph_arr = np.zeros(storage_shape)
 
             event_mean = np.zeros(n_events)
             event_std = np.zeros(n_events)
@@ -351,14 +426,22 @@ class PedestalBuilder(Tool):
 
                 r1_calibrator.calibrate(event)
                 r1 = event.r1.tel[0].pe_samples[0]
-
                 r1_container[ev%size] = r1
                 event_arr[ev%size, :, :] = ev
+
+                # if ev not in skip_events:
+                #     continue
+
                 fci = event.r0.tel[0].first_cell_ids[0]
                 r = event.r0.tel[0].row[0]
                 c = event.r0.tel[0].column[0]
                 blk = c * 8 + r
                 bph = event.r0.tel[0].blockphase[0]
+                # if not r == 0:
+                #     continue
+                # if not bph >= 29:
+                #     continue
+
                 fci_arr[ev%size, :, :] = fci
                 blk_arr[ev%size, :, :] = blk
                 row_arr[ev%size, :, :] = r
@@ -387,30 +470,35 @@ class PedestalBuilder(Tool):
             self.p_res_col.add(col_arr[:count].ravel(), r1_container[:count].ravel())
             self.p_res_bph.add(bph_arr[:count].ravel(), r1_container[:count].ravel())
 
+            n_blk = event_blk.max() - event_blk.min() + 1
+            n_row = event_row.max() - event_row.min() + 1
+            n_col = event_col.max() - event_col.min() + 1
+            n_bph = event_bph.max() - event_bph.min() + 1
+
             self.p_avg_res_eventindex.create(np.arange(n_events), 500, event_mean, 200, "Event Index", "Residual ADC Samples (Event Average)")
             self.p_avg_res_fci.create(event_fci, 500, event_mean, 200, "First Cell ID", "Residual ADC Samples (Event Average)")
-            self.p_avg_res_blk.create(event_blk, self.n_blocks, event_mean, 200, "Block", "Residual ADC Samples (Event Average)")
-            self.p_avg_res_row.create(event_row, self.n_rows, event_mean, 200, "Row", "Residual ADC Samples (Event Average)")
-            self.p_avg_res_col.create(event_col, self.n_columns, event_mean, 200, "Column", "Residual ADC Samples (Event Average)")
-            self.p_avg_res_bph.create(event_bph, self.n_blockphases, event_mean, 200, "Blockphase", "Residual ADC Samples (Event Average)")
+            self.p_avg_res_blk.create(event_blk, n_blk, event_mean, 200, "Block", "Residual ADC Samples (Event Average)")
+            self.p_avg_res_row.create(event_row, n_row, event_mean, 200, "Row", "Residual ADC Samples (Event Average)")
+            self.p_avg_res_col.create(event_col, n_col, event_mean, 200, "Column", "Residual ADC Samples (Event Average)")
+            self.p_avg_res_bph.create(event_bph, n_bph, event_mean, 200, "Blockphase", "Residual ADC Samples (Event Average)")
             self.p_std_res_eventindex.create(np.arange(n_events), 500, event_std, 200, "Event Index", "Residual ADC Samples (Event Standard Deviation)")
             self.p_std_res_fci.create(event_fci, 500, event_std, 200, "First Cell ID", "Residual ADC Samples (Event Standard Deviation)")
-            self.p_std_res_blk.create(event_blk, self.n_blocks, event_std, 200, "Block", "Residual ADC Samples (Event Standard Deviation)")
-            self.p_std_res_row.create(event_row, self.n_rows, event_std, 200, "Row", "Residual ADC Samples (Event Standard Deviation)")
-            self.p_std_res_col.create(event_col, self.n_columns, event_std, 200, "Column", "Residual ADC Samples (Event Standard Deviation)")
-            self.p_std_res_bph.create(event_bph, self.n_blockphases, event_std, 200, "Blockphase", "Residual ADC Samples (Event Standard Deviation)")
+            self.p_std_res_blk.create(event_blk, n_blk, event_std, 200, "Block", "Residual ADC Samples (Event Standard Deviation)")
+            self.p_std_res_row.create(event_row, n_row, event_std, 200, "Row", "Residual ADC Samples (Event Standard Deviation)")
+            self.p_std_res_col.create(event_col, n_col, event_std, 200, "Column", "Residual ADC Samples (Event Standard Deviation)")
+            self.p_std_res_bph.create(event_bph, n_bph, event_std, 200, "Blockphase", "Residual ADC Samples (Event Standard Deviation)")
             self.p_min_res_eventindex.create(np.arange(n_events), 500, event_min, 200, "Event Index", "Residual ADC Samples (Event Minimum)")
             self.p_min_res_fci.create(event_fci, 500, event_min, 200, "First Cell ID", "Residual ADC Samples (Event Minimum)")
-            self.p_min_res_blk.create(event_blk, self.n_blocks, event_min, 200, "Block", "Residual ADC Samples (Event Minimum)")
-            self.p_min_res_row.create(event_row, self.n_rows, event_min, 200, "Row", "Residual ADC Samples (Event Minimum)")
-            self.p_min_res_col.create(event_col, self.n_columns, event_min, 200, "Column", "Residual ADC Samples (Event Minimum)")
-            self.p_min_res_bph.create(event_bph, self.n_blockphases, event_min, 200, "Blockphase", "Residual ADC Samples (Event Minimum)")
+            self.p_min_res_blk.create(event_blk, n_blk, event_min, 200, "Block", "Residual ADC Samples (Event Minimum)")
+            self.p_min_res_row.create(event_row, n_row, event_min, 200, "Row", "Residual ADC Samples (Event Minimum)")
+            self.p_min_res_col.create(event_col, n_col, event_min, 200, "Column", "Residual ADC Samples (Event Minimum)")
+            self.p_min_res_bph.create(event_bph, n_bph, event_min, 200, "Blockphase", "Residual ADC Samples (Event Minimum)")
             self.p_max_res_eventindex.create(np.arange(n_events), 500, event_max, 200, "Event Index", "Residual ADC Samples (Event Maximum)")
             self.p_max_res_fci.create(event_fci, 500, event_max, 200, "First Cell ID", "Residual ADC Samples (Event Maximum)")
-            self.p_max_res_blk.create(event_blk, self.n_blocks, event_max, 200, "Block", "Residual ADC Samples (Event Maximum)")
-            self.p_max_res_row.create(event_row, self.n_rows, event_max, 200, "Row", "Residual ADC Samples (Event Maximum)")
-            self.p_max_res_col.create(event_col, self.n_columns, event_max, 200, "Column", "Residual ADC Samples (Event Maximum)")
-            self.p_max_res_bph.create(event_bph, self.n_blockphases, event_max, 200, "Blockphase", "Residual ADC Samples (Event Maximum)")
+            self.p_max_res_blk.create(event_blk, n_blk, event_max, 200, "Block", "Residual ADC Samples (Event Maximum)")
+            self.p_max_res_row.create(event_row, n_row, event_max, 200, "Row", "Residual ADC Samples (Event Maximum)")
+            self.p_max_res_col.create(event_col, n_col, event_max, 200, "Column", "Residual ADC Samples (Event Maximum)")
+            self.p_max_res_bph.create(event_bph, n_bph, event_max, 200, "Blockphase", "Residual ADC Samples (Event Maximum)")
 
             ps = self.n_pixels * self.n_samples
             self.residual_mean = np.sum(ps * event_mean) / (n_events * ps)
@@ -421,6 +509,11 @@ class PedestalBuilder(Tool):
         hits = np.array(self.pedmaker.ped_obj.GetHits())
         self.log.info("Extracting pedestal into numpy array")
         pedestal = np.array(self.pedmaker.ped_obj.GetPed())
+        self.log.info("Extracting std into numpy array")
+        std = np.array(self.pedmaker.ped_obj.GetStd())
+
+        shape = (self.n_modules, 64, self.n_blocks, self.n_bphsam)
+        self.pedestal_std = self.pedestal_std.reshape(shape)
 
         minimum = hits.min()
         maximum = hits.max()
@@ -441,6 +534,8 @@ class PedestalBuilder(Tool):
         self.log.info("Using tm {} tmpix {}".format(tm, tmpix))
         pixel_hits = hits[tm, tmpix]
         pixel_pedestal = pedestal[tm, tmpix]
+        pixel_std = std[tm, tmpix]
+        # pixel_range = self.pedestal_range[tm, tmpix]
 
         self.p_hits.create(pixel_hits, "Hits")
         output_path = join(self.output_dir, "hits.pdf")
@@ -449,6 +544,10 @@ class PedestalBuilder(Tool):
         self.p_pedestalpix2d.create(pixel_pedestal, "Pedestal (ADC)")
         output_path = join(self.output_dir, "pedestal.pdf")
         self.p_pedestalpix2d.save(output_path)
+
+        self.p_std.create(pixel_std, "Standard Deviation")
+        output_path = join(self.output_dir, "std.pdf")
+        self.p_std.save(output_path)
 
         if self.residual_flag:
             self.p_res_eventindex.create("Event Index", "Residual ADC Samples", self.residual_mean, self.residual_stddev)
