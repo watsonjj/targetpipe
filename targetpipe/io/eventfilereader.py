@@ -4,11 +4,12 @@ Handles reading of different event/waveform containing files
 
 import numpy as np
 from copy import deepcopy
-from traitlets import Unicode, List, Int, observe
+from traitlets import Unicode, List, Int, observe, CaselessStrEnum
 from ctapipe.core import Component
 from ctapipe.io.eventfilereader import EventFileReader
 from targetpipe.io.targetio import TargetioExtractor
 from targetpipe.io.toyio import toyio_event_source, toyio_get_num_events
+from targetpipe.io.camera import Config
 
 
 class TargetioFileReader(EventFileReader):
@@ -18,6 +19,10 @@ class TargetioFileReader(EventFileReader):
     input_path = Unicode(None, allow_none=True,
                          help='Path to the input file containing '
                               'events.').tag(config=True)
+    cameraconfig = Config()
+    camera_id = CaselessStrEnum(list(cameraconfig.options.keys())+[''],
+                                '',
+                                help='Camera configuration').tag(config=True)
 
     def __init__(self, config, tool, **kwargs):
         """
@@ -36,6 +41,8 @@ class TargetioFileReader(EventFileReader):
             Set to None if no Tool to pass.
         kwargs
         """
+        if self.camera_id:
+            self.cameraconfig.id = self.camera_id
         super().__init__(config=config, tool=tool, **kwargs)
         self.extractor = TargetioExtractor(self.input_path, self.max_events)
 

@@ -164,7 +164,7 @@ class CHECMSPEFitter(ChargeFitter):
         self.add_parameter("eped_sigma", 5, 0, 100)
         self.add_parameter("spe", 20, 0, 90)
         self.add_parameter("spe_sigma", 20, 0, 100)
-        self.add_parameter("lambda_", 20, 0, 10)
+        self.add_parameter("lambda_", 1, 0, 10)
 
         self.k = np.arange(1, 11)
         self.subfit_labels = ['pedestal']

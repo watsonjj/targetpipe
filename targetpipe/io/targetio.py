@@ -2,36 +2,14 @@
 containers defined in `ctapipe.io.containers`.
 """
 
-from target_io import TargetIOEventReader as TIOReader, \
-    T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
 import numpy as np
-
 from astropy import units as u
 from astropy.time import Time
-
+from target_io import TargetIOEventReader as TIOReader, \
+    T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
+from targetpipe.io.camera import Config
 from targetpipe.io.containers import CHECDataContainer as DataContainer
-from targetpipe.io.pixels import checm_pixel_pos, optical_foclen, \
-    checm_refshape, checm_refstep, checm_time_slice
 
-# CHEC-M
-N_ROWS = 8
-N_COLUMNS = 64
-N_BLOCKS = N_ROWS * N_COLUMNS
-N_CELLS = N_ROWS * N_COLUMNS * N_BLOCKSAMPLES
-SKIP_SAMPLE = 32
-SKIP_END_SAMPLE = 0
-SKIP_EVENT = 2
-SKIP_END_EVENT = 1
-
-# CHEC-S
-# N_ROWS = 8
-# N_COLUMNS = 16
-# N_BLOCKS = N_ROWS * N_COLUMNS
-# N_CELLS = N_ROWS * N_COLUMNS * N_BLOCKSAMPLES
-# SKIP_SAMPLE = 0
-# SKIP_END_SAMPLE = 0
-# SKIP_EVENT = 2
-# SKIP_END_EVENT = 1
 
 def get_bp_r_c(cells):
     blockphase = cells % N_BLOCKSAMPLES
@@ -72,9 +50,14 @@ class TargetioExtractor:
         self.time_sec = None
         self.time_ns = None
 
-        self.tio_reader = TIOReader(self.url, N_CELLS,
-                                    SKIP_SAMPLE, SKIP_END_SAMPLE,
-                                    SKIP_EVENT, SKIP_END_EVENT)
+        self.cameraconfig = Config()
+
+        self.tio_reader = TIOReader(self.url,
+                                    self.cameraconfig.n_cells,
+                                    self.cameraconfig.skip_sample,
+                                    self.cameraconfig.skip_end_sample,
+                                    self.cameraconfig.skip_event,
+                                    self.cameraconfig.skip_end_event)
         self.n_events = self.tio_reader.fNEvents
         first_event_id = self.tio_reader.fFirstEventID
         last_event_id = self.tio_reader.fLastEventID
@@ -87,8 +70,17 @@ class TargetioExtractor:
         self.n_cells = self.tio_reader.fNCells
 
         # Setup camera geom
-        self.pixel_pos = checm_pixel_pos[:, :self.n_pix]
-        self.optical_foclen = optical_foclen
+        if self.n_pix == self.n_tmpix:
+            self.cameraconfig.switch_to_single_module()
+        self.pixel_pos = self.cameraconfig.pixel_pos
+        self.optical_foclen = self.cameraconfig.optical_foclen
+
+        self.n_rows = self.cameraconfig.n_rows
+        self.n_columns = self.cameraconfig.n_columns
+        self.n_blocks = self.cameraconfig.n_blocks
+        self.refshape = self.cameraconfig.refshape
+        self.refstep = self.cameraconfig.refstep
+        self.time_slice = self.cameraconfig.time_slice
 
         # Init arrays
         self.r0_samples = None
@@ -139,9 +131,9 @@ class TargetioExtractor:
         # some targetio_event_source specific parameters
         data.meta['input'] = url
         data.meta['max_events'] = max_events
-        data.meta['n_rows'] = N_ROWS
-        data.meta['n_columns'] = N_COLUMNS
-        data.meta['n_blocks'] = N_BLOCKS
+        data.meta['n_rows'] = self.n_rows
+        data.meta['n_columns'] = self.n_columns
+        data.meta['n_blocks'] = self.n_blocks
         data.meta['n_blockphases'] = N_BLOCKSAMPLES
         data.meta['n_cells'] = self.n_cells
         data.meta['n_modules'] = self.n_modules
@@ -205,9 +197,11 @@ class TargetioExtractor:
         data.r0.tel[chec_tel].column = c
         data.r0.tel[chec_tel].num_samples = self.n_samples
 
-        data.mc.tel[chec_tel].reference_pulse_shape = checm_refshape
-        data.mc.tel[chec_tel].meta['refstep'] = checm_refstep
-        data.mc.tel[chec_tel].time_slice = checm_time_slice
+        data.mc.tel[chec_tel].reference_pulse_shape = self.refshape
+        data.mc.tel[chec_tel].meta['refstep'] = self.refstep
+        data.mc.tel[chec_tel].time_slice = self.time_slice
+
+        data.meta['n_blocks'] = self.n_blocks
 
     def read_generator(self):
         data = self.data

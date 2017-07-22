@@ -8,7 +8,7 @@ from astropy import units as u
 from astropy.time import Time
 
 from targetpipe.io.containers import CHECDataContainer as DataContainer
-from targetpipe.io.pixels import checm_pixel_pos
+from targetpipe.io.camera import Config
 
 
 def toyio_get_num_events(url, max_events=None):
@@ -63,7 +63,8 @@ def toyio_event_source(url, max_events=None, allowed_tels=None,
     n_events, n_pix, _, n_samples = waveforms_cells.shape
     chec_tel = 0
     run_id = 0
-    pix_pos = checm_pixel_pos
+    cameraconfig = Config()
+    pix_pos = cameraconfig.pixel_pos
 
     counter = 0
     if allowed_tels is not None:
