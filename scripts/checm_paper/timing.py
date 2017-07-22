@@ -139,9 +139,9 @@ class WaveformHist1D(OfficialPlotter):
         fit = norm.pdf(fit_x, mean, std)
         label = "{} (Mean = {:.3}, Stddev = {:.3})".format(label, mean, std)
 
-        n = vals.max() - vals.min()
+        n = int((vals.max() - vals.min())*1.5+1)
         c = self.ax._get_lines.get_next_color()
-        self.ax.hist(vals-0.5, n, normed=True, color=c, alpha=0.5, rwidth=0.5)
+        self.ax.hist(vals, n, normed=True, color=c, alpha=0.5)#, rwidth=0.5)
         self.ax.plot(fit_x, fit, color=c, alpha=0.8, label=label)
 
     def create(self, vals, label, title=""):
@@ -152,8 +152,8 @@ class WaveformHist1D(OfficialPlotter):
         self.ax.set_ylabel("Probability Density")
         self.ax.set_title(title)
 
-        self.ax.xaxis.set_minor_locator(MultipleLocator(1))
-        self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        # self.ax.xaxis.set_minor_locator(MultipleLocator(0.5))
+        # self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     def save(self, output_path=None):
         self.ax.legend(loc=2)
@@ -228,6 +228,7 @@ class TimingExtractor(Tool):
         self.p_tvscharge = None
         self.p_tgradvscharge = None
         self.p_1deoicomp = None
+        self.p_1dcomp = None
         self.p_imageeoitgrad = None
 
         self.eoi = 4
@@ -278,6 +279,8 @@ class TimingExtractor(Tool):
         self.p_tgradvscharge = Hist2D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "1D_comparison_eid{}".format(self.eoi)
         self.p_1deoicomp = WaveformHist1D(**p_kwargs, shape='wide')
+        p_kwargs['figure_name'] = "1D_comparison_allevents".format(self.eoi)
+        self.p_1dcomp = WaveformHist1D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "image_tgrad_eid{}".format(self.eoi)
         self.p_imageeoitgrad = ImagePlotter(**p_kwargs)
 
@@ -309,8 +312,23 @@ class TimingExtractor(Tool):
             low_pe = np.all(r1 < 10, 1)
             mask = dead | saturated | low_pe
 
-            t = np.argmax(r1, 1)
-            t_grad = np.argmax(grad, 1)
+            ind = np.indices(r1.shape)[1]
+
+            t_max = np.argmax(r1, 1)
+            t_start = t_max - 2
+            t_end = t_max + 2
+            t_window = (ind >= t_start[..., None]) & (ind < t_end[..., None])
+            t_windowed = np.ma.array(r1, mask=~t_window)
+            t_windowed_ind = np.ma.array(ind, mask=~t_window)
+            t = np.ma.average(t_windowed_ind, weights=t_windowed, axis=1)
+
+            t_grad_max = np.argmax(grad, 1)
+            t_grad_start = t_grad_max - 2
+            t_grad_end = t_grad_max + 2
+            t_grad_window = (ind >= t_grad_start[..., None]) & (ind < t_grad_end[..., None])
+            t_grad_windowed = np.ma.array(grad, mask=~t_grad_window)
+            t_grad_windowed_ind = np.ma.array(ind, mask=~t_grad_window)
+            t_grad = np.ma.average(t_grad_windowed_ind, weights=t_grad_windowed, axis=1)
 
             # if (t_grad > 60).any():
             #     print(event_id)
@@ -373,9 +391,9 @@ class TimingExtractor(Tool):
         dl1_c = dl1.compressed()
         t_c = t.compressed()
         t_grad_c = t_grad.compressed()
-        n_bp = bp_c.max() - bp_c.min()
-        n_t = t_c.max() - t_c.min()
-        n_tgrad = t_grad_c.max() - t_grad_c.min()
+        n_bp = int(bp_c.max() - bp_c.min())
+        n_t = int(t_c.max() - t_c.min())
+        n_tgrad = int(t_grad_c.max() - t_grad_c.min())
         self.p_bpvstack.create(bp_c, n_bp, tack_pix_c, self.n_events, 'Blockphase', 'Tack')
         self.p_eidvst.create(eid_pix_c, self.n_events, t_c, n_t, 'Event ID', 'Peak Time')
         self.p_eidvstgrad.create(eid_pix_c, self.n_events, t_grad_c, n_tgrad, 'Event ID', 'Gradient Peak Time')
@@ -389,21 +407,27 @@ class TimingExtractor(Tool):
         eoi_tgrad = t_grad[index].compressed()
         self.p_1deoicomp.create(eoi_tgrad, "Gradient Peak Time", "Peak Time Method Comparison (EventID = {})".format(self.eoi))
         self.p_1deoicomp.add(eoi_t, "Peak Time")
+        t_shifted = (t - t.mean(1)[:, None]).compressed()
+        t_grad_shifted = (t_grad - t_grad.mean(1)[:, None]).compressed()
+        self.p_1dcomp.create(t_shifted, "Gradient Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
+        self.p_1dcomp.add(t_grad_shifted, "Peak Time")
+
 
         # Camera Image
         eoi_tgrad = t_grad[index]
         self.p_imageeoitgrad.create(eoi_tgrad, "Gradient Peak Time", "Gradient Peak Time Across Camera")
 
-        self.p_eidvsfci.save()
-        self.p_timevstack.save()
-        self.p_bpvstack.save()
-        self.p_eidvst.save()
-        self.p_eidvstgrad.save()
-        self.p_tvstgrad.save()
-        self.p_tvscharge.save()
-        self.p_tgradvscharge.save()
+        # self.p_eidvsfci.save()
+        # self.p_timevstack.save()
+        # self.p_bpvstack.save()
+        # self.p_eidvst.save()
+        # self.p_eidvstgrad.save()
+        # self.p_tvstgrad.save()
+        # self.p_tvscharge.save()
+        # self.p_tgradvscharge.save()
         self.p_1deoicomp.save()
-        self.p_imageeoitgrad.save()
+        self.p_1dcomp.save()
+        # self.p_imageeoitgrad.save()
 
 
 exe = TimingExtractor()
