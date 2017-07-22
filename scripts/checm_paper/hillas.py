@@ -1,3 +1,6 @@
+from targetpipe.io.camera import Config
+Config('checm')
+
 import numpy as np
 from matplotlib.ticker import AutoMinorLocator
 from numpy.linalg.linalg import LinAlgError

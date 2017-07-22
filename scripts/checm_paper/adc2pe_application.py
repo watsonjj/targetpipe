@@ -1,3 +1,6 @@
+from targetpipe.io.camera import Config
+Config('checm')
+
 from tqdm import tqdm, trange
 from traitlets import Dict, List
 import numpy as np

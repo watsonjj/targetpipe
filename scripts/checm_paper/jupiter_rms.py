@@ -1,3 +1,6 @@
+from targetpipe.io.camera import Config
+Config('checm')
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt

@@ -1,3 +1,6 @@
+from targetpipe.io.camera import Config
+Config('checm')
+
 import numpy as np
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
