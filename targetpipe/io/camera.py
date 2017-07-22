@@ -1,11 +1,7 @@
 import numpy as np
 from astropy import log
 from os.path import dirname, realpath, join
-from ctapipe.instrument.camera import _get_min_pixel_seperation
-from ctapipe.instrument import CameraGeometry
-from astropy import units as u
-from target_io import TargetIOEventReader as TIOReader, \
-    T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
+from target_io import T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
 
 
 class Borg:
@@ -70,13 +66,13 @@ class Config(Borg):
         if not self.id == val:
             self.switch_camera(val)
 
-    def switch_camera(self, id):
-        log.info("Loading camera config: {}".format(id))
-        self._id = id
+    def switch_camera(self, camera_id):
+        log.info("Loading camera config: {}".format(camera_id))
+        self._id = camera_id
         try:
-            self.options[id]()
+            self.options[camera_id]()
         except KeyError:
-            log.error("No camera with id: {}".format(id))
+            log.error("No camera with id: {}".format(camera_id))
             raise
 
         self.pixel_id = np.load(self.pixel_id_path)[:self.n_pix]
