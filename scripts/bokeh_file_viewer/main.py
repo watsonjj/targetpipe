@@ -23,6 +23,7 @@ class BokehFileViewer(Tool):
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
                         pe='CameraR1CalibratorFactory.adc2pe_path',
+                        ff='CameraR1CalibratorFactory.ff_path',
                         extractor='ChargeExtractorFactory.extractor',
                         extractor_t0='ChargeExtractorFactory.t0',
                         extractor_window_width='ChargeExtractorFactory.'
