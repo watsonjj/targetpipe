@@ -1,3 +1,4 @@
+from targetpipe.calib.camera.filter_wheel import FWCalibrator
 from targetpipe.io.camera import Config
 Config('checm')
 
@@ -102,13 +103,12 @@ class FWInvestigator(Tool):
         self.dl1 = None
         self.fitter = None
         self.dead = None
-
-        self.n_pixels = None
-        self.n_samples = None
+        self.fw_calibrator = None
 
         directory = join(realpath(dirname(__file__)), "../targetpipe/io")
         self.fw_txt_path = join(directory, "FW.txt")
         self.fw_storage_path = join(directory, "FW.h5")
+        self.fw_storage_path_spe = join(directory, "FW_spe_LS62.h5")
         self.spe_fw = 1210
 
         self.p_attenuation = None
@@ -130,6 +130,7 @@ class FWInvestigator(Tool):
         self.fitter = CHECMSPEFitter(**kwargs)
         self.fitter.range = [-30, 160]
         self.dead = Dead()
+        self.fw_calibrator = FWCalibrator(**kwargs)
 
         script = "filter_wheel"
         self.p_attenuation = Scatter(**kwargs, script=script, figure_name="attenuation")
@@ -167,13 +168,10 @@ class FWInvestigator(Tool):
         lambda_ = self.dead.mask1d(lambda_)
         avg_lamda = np.mean(lambda_)
 
-        df = pd.read_table(self.fw_txt_path, sep=' ', names=['position', 'attenuation_mean', 'attenuation_rms'], usecols=[0,1,2], skiprows=1)
-        df = df.groupby('position').apply(np.mean)
-
-        spe_att = 10**np.interp(self.spe_fw, df['position'], np.log10(df['attenuation_mean']))
-        i0 = avg_lamda/(1 - spe_att)
-        df = df.assign(pe=(1-df['attenuation_mean']) * i0)
-        df = df.assign(pe_err=df['attenuation_rms'] * i0)
+        self.fw_calibrator.load_from_txt(self.fw_txt_path)
+        self.fw_calibrator.save(self.fw_storage_path)
+        self.fw_calibrator.set_calibration(self.spe_fw, avg_lamda)
+        df = self.fw_calibrator.df
 
         x = df['position']
         y = df['attenuation_mean']
@@ -187,14 +185,11 @@ class FWInvestigator(Tool):
         self.p_pe.ax.set_yscale('log')
         self.p_pe.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
 
-        self.log.info("Storing fw calibration file: {}".format(self.fw_storage_path))
-        store = pd.HDFStore(self.fw_storage_path)
-        store['df'] = df
-
     def finish(self):
         # Save figures
         self.p_attenuation.save()
         self.p_pe.save()
+        self.fw_calibrator.save(self.fw_storage_path_spe)
 
 
 if __name__ == '__main__':

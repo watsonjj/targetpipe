@@ -292,6 +292,8 @@ class TimingExtractor(Tool):
         self.p_laser_1dcomp = None
         self.p_laser_imageeoitgrad = None
 
+        self.p_laser_fwhm = None
+
         self.eoi = 4
 
     def setup(self):
@@ -367,84 +369,105 @@ class TimingExtractor(Tool):
         p_kwargs['figure_name'] = "laser_image_tgrad_eid{}".format(self.eoi)
         self.p_laser_imageeoitgrad = ImagePlotter(**p_kwargs)
 
+        p_kwargs['figure_name'] = "laser_fwhm_allevents"
+        self.p_laser_fwhm = WaveformHist1DInt(**p_kwargs, shape='wide')
+
     def start(self):
         dead = self.dead.get_pixel_mask()
 
-        df_list = []
+        ind = np.indices((self.n_pixels, self.n_samples))[1]
+        r_ind = ind[:, ::-1]
 
-        readers = [self.reader_led, self.reader_laser]
-        r1s = [self.r1_led, self.r1_laser]
-        run_type = ['led', 'laser']
-
-        for reader, r1_cal, rt in zip(readers, r1s, run_type):
-            run = reader.filename
-            n_events = reader.num_events
-            source = reader.read()
-            desc = "Processing Events for {} run".format(rt)
-            for event in tqdm(source, total=n_events, desc=desc):
-                ev = event.count
-                event_id = event.r0.event_id
-                time = event.trig.gps_time.value
-                tack = event.meta['tack']
-                fci = np.copy(event.r0.tel[0].first_cell_ids)
-                bp = event.r0.tel[0].blockphase
-
-                r1_cal.calibrate(event)
-                self.dl0.reduce(event)
-                self.dl1.calibrate(event)
-                r0 = event.r0.tel[0].adc_samples[0]
-                r1 = event.r1.tel[0].pe_samples[0]
-                dl1 = event.dl1.tel[0].image[0]
-                grad = np.gradient(r1)[1]
-
-                saturated = np.any(r0 < 10, 1)
-                low_pe = np.all(r1 < 10, 1)
-                mask = dead | saturated | low_pe
-
-                ind = np.indices(r1.shape)[1]
-
-                t_max = np.argmax(r1, 1)
-                t_start = t_max - 2
-                t_end = t_max + 2
-                t_window = (ind >= t_start[..., None]) & (ind < t_end[..., None])
-                t_windowed = np.ma.array(r1, mask=~t_window)
-                t_windowed_ind = np.ma.array(ind, mask=~t_window)
-                t_avg = np.ma.average(t_windowed_ind, weights=t_windowed, axis=1)
-
-                t_grad_max = np.argmax(grad, 1)
-                t_grad_start = t_grad_max - 2
-                t_grad_end = t_grad_max + 2
-                t_grad_window = (ind >= t_grad_start[..., None]) & (ind < t_grad_end[..., None])
-                t_grad_windowed = np.ma.array(grad, mask=~t_grad_window)
-                t_grad_windowed_ind = np.ma.array(ind, mask=~t_grad_window)
-                t_grad_avg = np.ma.average(t_grad_windowed_ind, weights=t_grad_windowed, axis=1)
-
-                # if (t_grad > 60).any():
-                #     print(event_id)
-                #
-                if event_id == 23:
-                    continue
-
-                d = dict(run=run,
-                         type=rt,
-                         index=ev,
-                         id=event_id,
-                         time=time,
-                         tack=tack,
-                         fci=fci,
-                         bp=bp,
-                         mask=mask,
-                         dl1=dl1,
-                         t=t_max,
-                         t_grad=t_grad_max,
-                         t_avg=t_avg,
-                         t_grad_avg=t_grad_avg
-                         )
-                df_list.append(d)
-
-        self.df = pd.DataFrame(df_list)
-        store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
-        store['df'] = self.df
+        # df_list = []
+        #
+        # readers = [self.reader_led, self.reader_laser]
+        # r1s = [self.r1_led, self.r1_laser]
+        # run_type = ['led', 'laser']
+        #
+        # for reader, r1_cal, rt in zip(readers, r1s, run_type):
+        #     run = reader.filename
+        #     n_events = reader.num_events
+        #     source = reader.read()
+        #     desc = "Processing Events for {} run".format(rt)
+        #     for event in tqdm(source, total=n_events, desc=desc):
+        #         ev = event.count
+        #         event_id = event.r0.event_id
+        #         time = event.trig.gps_time.value
+        #         tack = event.meta['tack']
+        #         fci = np.copy(event.r0.tel[0].first_cell_ids)
+        #         bp = event.r0.tel[0].blockphase
+        #
+        #         r1_cal.calibrate(event)
+        #         self.dl0.reduce(event)
+        #         self.dl1.calibrate(event)
+        #         r0 = event.r0.tel[0].adc_samples[0]
+        #         r1 = event.r1.tel[0].pe_samples[0]
+        #         dl1 = event.dl1.tel[0].image[0]
+        #         grad = np.gradient(r1)[1]
+        #
+        #         saturated = np.any(r0 < 10, 1)
+        #         low_pe = np.all(r1 < 10, 1)
+        #         mask = dead | saturated | low_pe
+        #
+        #         ind = np.indices(r1.shape)[1]
+        #
+        #         t_max = np.argmax(r1, 1)
+        #         t_start = t_max - 2
+        #         t_end = t_max + 2
+        #         t_window = (ind >= t_start[..., None]) & (ind < t_end[..., None])
+        #         t_windowed = np.ma.array(r1, mask=~t_window)
+        #         t_windowed_ind = np.ma.array(ind, mask=~t_window)
+        #         t_avg = np.ma.average(t_windowed_ind, weights=t_windowed, axis=1)
+        #
+        #         t_grad_max = np.argmax(grad, 1)
+        #         t_grad_start = t_grad_max - 2
+        #         t_grad_end = t_grad_max + 2
+        #         t_grad_window = (ind >= t_grad_start[..., None]) & (ind < t_grad_end[..., None])
+        #         t_grad_windowed = np.ma.array(grad, mask=~t_grad_window)
+        #         t_grad_windowed_ind = np.ma.array(ind, mask=~t_grad_window)
+        #         t_grad_avg = np.ma.average(t_grad_windowed_ind, weights=t_grad_windowed, axis=1)
+        #
+        #         max_ = np.max(r1, axis=1)
+        #         reversed_ = r1[:, ::-1]
+        #         peak_time_i = np.ones(r1.shape) * t_max[:, None]
+        #         mask_before = np.ma.masked_less(ind, peak_time_i).mask
+        #         mask_after = np.ma.masked_greater(r1, peak_time_i).mask
+        #         masked_bef = np.ma.masked_array(r1, mask_before)
+        #         masked_aft = np.ma.masked_array(reversed_, mask_after)
+        #         half_max = max_/2
+        #         d_l = np.diff(np.sign(half_max[:, None] - masked_aft))
+        #         d_r = np.diff(np.sign(half_max[:, None] - masked_bef))
+        #         t_l = r_ind[0, np.argmax(d_l, axis=1) + 1]
+        #         t_r = ind[0, np.argmax(d_r, axis=1) + 1]
+        #         fwhm = t_r - t_l
+        #
+        #         # if (t_grad > 60).any():
+        #         #     print(event_id)
+        #         #
+        #         if event_id == 23:
+        #             continue
+        #
+        #         d = dict(run=run,
+        #                  type=rt,
+        #                  index=ev,
+        #                  id=event_id,
+        #                  time=time,
+        #                  tack=tack,
+        #                  fci=fci,
+        #                  bp=bp,
+        #                  mask=mask,
+        #                  dl1=dl1,
+        #                  t=t_max,
+        #                  t_grad=t_grad_max,
+        #                  t_avg=t_avg,
+        #                  t_grad_avg=t_grad_avg,
+        #                  fwhm=fwhm
+        #                  )
+        #         df_list.append(d)
+        #
+        # self.df = pd.DataFrame(df_list)
+        # store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
+        # store['df'] = self.df
 
         store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
         self.df = store['df']
@@ -506,8 +529,8 @@ class TimingExtractor(Tool):
         self.p_led_1deoicomp_wavg.add(eoi_t, "Peak Time")
         t_shifted = (t_avg - t_avg.mean(1)[:, None]).compressed()
         t_grad_shifted = (t_grad_avg - t_grad_avg.mean(1)[:, None]).compressed()
-        self.p_led_1dcomp_wavg.create(t_shifted, "Gradient Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
-        self.p_led_1dcomp_wavg.add(t_grad_shifted, "Peak Time")
+        self.p_led_1dcomp_wavg.create(t_shifted, "Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
+        self.p_led_1dcomp_wavg.add(t_grad_shifted, "Gradient Peak Time")
 
         # 1D histograms
         index = eid[eid == self.eoi].index[0]
@@ -517,8 +540,8 @@ class TimingExtractor(Tool):
         self.p_led_1deoicomp.add(eoi_t, "Peak Time")
         t_shifted = (t - t.mean(1)[:, None]).compressed()
         t_grad_shifted = (t_grad - t_grad.mean(1)[:, None]).compressed()
-        self.p_led_1dcomp.create(t_shifted, "Gradient Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
-        self.p_led_1dcomp.add(t_grad_shifted, "Peak Time")
+        self.p_led_1dcomp.create(t_shifted, "Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
+        self.p_led_1dcomp.add(t_grad_shifted, "Gradient Peak Time")
 
         # Camera Image
         eoi_tgrad = t_grad[index]
@@ -538,6 +561,7 @@ class TimingExtractor(Tool):
         t_grad_avg = np.ma.vstack(df['t_grad_avg'])
         t = np.ma.vstack(df['t'])
         t_grad = np.ma.vstack(df['t_grad'])
+        fwhm = np.ma.vstack(df['fwhm'])
         mask = np.vstack(df['mask'])
 
         # bp.mask = mask
@@ -546,6 +570,7 @@ class TimingExtractor(Tool):
         t_grad_avg.mask = mask
         t.mask = mask
         t_grad.mask = mask
+        fwhm.mask = mask
 
         # 1D histograms wavg
         index = eid[eid == self.eoi].index[0]
@@ -555,8 +580,9 @@ class TimingExtractor(Tool):
         self.p_laser_1deoicomp_wavg.add(eoi_t, "Peak Time")
         t_shifted = (t_avg - t_avg.mean(1)[:, None]).compressed()
         t_grad_shifted = (t_grad_avg - t_grad_avg.mean(1)[:, None]).compressed()
-        self.p_laser_1dcomp_wavg.create(t_shifted, "Gradient Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
-        self.p_laser_1dcomp_wavg.add(t_grad_shifted, "Peak Time")
+        self.p_laser_1dcomp_wavg.create(t_shifted, "Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
+        self.p_laser_1dcomp_wavg.add(t_grad_shifted, "Gradient Peak Time")
+        self.p_laser_1dcomp_wavg.ax.set_xlim([-5, 5])
 
         # 1D histograms
         index = eid[eid == self.eoi].index[0]
@@ -566,12 +592,17 @@ class TimingExtractor(Tool):
         self.p_laser_1deoicomp.add(eoi_t, "Peak Time")
         t_shifted = (t - t.mean(1)[:, None]).compressed()
         t_grad_shifted = (t_grad - t_grad.mean(1)[:, None]).compressed()
-        self.p_laser_1dcomp.create(t_shifted, "Gradient Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
-        self.p_laser_1dcomp.add(t_grad_shifted, "Peak Time")
+        self.p_laser_1dcomp.create(t_shifted, "Peak Time", "Peak Time Method Comparison (all events, shifted by mean of each event)")
+        self.p_laser_1dcomp.add(t_grad_shifted, "Gradient Peak Time")
 
         # Camera Image
         eoi_tgrad = t_grad[index]
         self.p_laser_imageeoitgrad.create(eoi_tgrad, "Gradient Peak Time", "Gradient Peak Time Across Camera")
+
+        # 1D histograms fwhm
+        fwhm = fwhm.compressed()
+        fwhm = fwhm[fwhm > 0]
+        self.p_laser_fwhm.create(fwhm, "FWHM", "FWHM Distribution")
 
         # self.p_led_eidvsfci.save()
         # self.p_led_timevstack.save()
@@ -592,6 +623,8 @@ class TimingExtractor(Tool):
         self.p_laser_1deoicomp.save()
         self.p_laser_1dcomp.save()
         self.p_laser_imageeoitgrad.save()
+
+        self.p_laser_fwhm.save()
 
 
 exe = TimingExtractor()
