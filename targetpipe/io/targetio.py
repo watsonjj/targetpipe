@@ -7,6 +7,8 @@ from astropy import units as u
 from astropy.time import Time
 from target_io import TargetIOEventReader as TIOReader, \
     T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
+
+from ctapipe.instrument import TelescopeDescription
 from targetpipe.io.camera import Config
 from targetpipe.io.containers import CHECDataContainer as DataContainer
 
@@ -142,8 +144,12 @@ class TargetioExtractor:
         data.meta['tmpix'] = np.arange(self.n_pix,
                                        dtype=np.uint16) % self.n_tmpix
 
-        data.inst.pixel_pos[chec_tel] = self.pixel_pos * u.m
-        data.inst.optical_foclen[chec_tel] = self.optical_foclen * u.m
+        pix_pos = self.pixel_pos * u.m
+        foclen = self.optical_foclen * u.m
+        teldesc = TelescopeDescription.guess(*pix_pos, foclen)
+        data.inst.subarray.tels[chec_tel] = teldesc
+        data.inst.pixel_pos[chec_tel] = pix_pos
+        data.inst.optical_foclen[chec_tel] = foclen
         data.inst.num_channels[chec_tel] = 1
         data.inst.num_pixels[chec_tel] = self.n_pix
         # data.inst.num_samples[chec_tel] = targetio_extractor.n_samples
