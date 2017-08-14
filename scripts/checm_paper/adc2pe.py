@@ -20,6 +20,7 @@ from targetpipe.fitting.chec import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
 from targetpipe.plots.official import OfficialPlotter
+from targetpipe.utils.dactov import checm_dac_to_volts
 
 
 class PixelSPEFitPlotter(OfficialPlotter):
@@ -42,7 +43,6 @@ class PixelSPEFitPlotter(OfficialPlotter):
         super().__init__(config=config, tool=tool, **kwargs)
 
     def create(self, hist, edges, between, fit, fitx):
-
         # Normalise histogram
         norm = np.sum(np.diff(edges) * hist)
         hist_n = hist/norm
@@ -54,18 +54,18 @@ class PixelSPEFitPlotter(OfficialPlotter):
         edges_tops = np.insert(edges, np.arange(edges.shape[0]),
                                edges, axis=0)[1:-1]
 
-        self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.2)
+        self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.5)
         self.ax.semilogy(fitx, fit_n, color='black')
-        self.ax.set_ylim(ymin=1e-4)
+        self.ax.set_ylim(ymin=3e-2)
         self.ax.set_title("SPE Spectrum, Pixel 1559")
-        self.ax.set_xlabel("Amplitude (ADC)")
+        self.ax.set_xlabel("Pulse Area (V*ns)")
         self.ax.set_ylabel("Probability Density")
 
-        major_locator = MultipleLocator(50)
-        major_formatter = FormatStrFormatter('%d')
-        minor_locator = MultipleLocator(10)
+        major_locator = MultipleLocator(0.05)
+        # major_formatter = FormatStrFormatter('%d')
+        minor_locator = MultipleLocator(0.01)
         self.ax.xaxis.set_major_locator(major_locator)
-        self.ax.xaxis.set_major_formatter(major_formatter)
+        # self.ax.xaxis.set_major_formatter(major_formatter)
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
@@ -88,7 +88,7 @@ class TMSPEFitPlotter(OfficialPlotter):
         """
         super().__init__(config=config, tool=tool, **kwargs)
 
-    def create(self, hist, edges, between, x_unit, x_major=50):
+    def create(self, hist, edges, between, x_unit, x_major=0.05):
 
         # Normalise histogram
         norm = np.sum(np.diff(edges, axis=1) * hist, axis=1)
@@ -104,14 +104,14 @@ class TMSPEFitPlotter(OfficialPlotter):
         self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.2)
         # self.ax.set_ylim(ymin=1e-4)
         self.ax.set_title("SPE Spectrum, TM 24")
-        self.ax.set_xlabel("Amplitude ({})".format(x_unit))
+        self.ax.set_xlabel("Pulse Area ({})".format(x_unit))
         self.ax.set_ylabel("Probability Density")
 
         major_locator = MultipleLocator(x_major)
-        major_formatter = FormatStrFormatter('%d')
+        # major_formatter = FormatStrFormatter('%d')
         minor_locator = MultipleLocator(x_major/5)
         self.ax.xaxis.set_major_locator(major_locator)
-        self.ax.xaxis.set_major_formatter(major_formatter)
+        # self.ax.xaxis.set_major_formatter(major_formatter)
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
@@ -136,12 +136,12 @@ class ADC2PEPlotter(OfficialPlotter):
 
     def create(self, df):
 
-        sns.violinplot(ax=self.ax, data=df, x='hv', y='spe', hue='gm_t',
+        sns.violinplot(ax=self.ax, data=df, x='hv', y='spe_mv', hue='gm_t',
                        split=True, scale='count', inner='quartile',
                        legend=False)
         self.ax.set_title("SPE Values for different HV Settings")
         self.ax.set_xlabel('HV')
-        self.ax.set_ylabel('SPE Value (ADC)')
+        self.ax.set_ylabel('SPE Value (V*ns)')
         self.ax.legend(loc="upper left")
 
         for key in ['800', '800gm', '900', '900gm', '1000', '1000gm', '1100']:
@@ -171,31 +171,31 @@ class ADC2PE1100VTMPlotter(OfficialPlotter):
     def create(self, df):
         df_1100 = df[df['key'] == '1100']
         for tm in range(32):
-            vals = df_1100[df['tm'] == tm]['spe']
+            vals = df_1100.loc[df['tm'] == tm, 'spe_mv']
             sns.kdeplot(vals, ax=self.ax,
-                        color="black", alpha=0.2, legend=False)
-            self.log.info("ADC2PE 1100V TM{} mean = {:.2f}, "
-                          "median = {:.2f}, stddev = {:.2f}"
+                        color="black", alpha=0.5, legend=False)
+            self.log.info("ADC2PE 1100V TM{} mean = {:.4f}, "
+                          "median = {:.4f}, stddev = {:.4f}"
                           .format(tm, np.mean(vals), np.median(vals),
                                   np.std(vals)))
-        vals = df_1100['spe']
-        sns.kdeplot(vals, ax=self.ax, color="blue", legend=False)
+        vals = df_1100['spe_mv']
+        sns.kdeplot(vals, ax=self.ax, color="blue", legend=False, lw=3)
         self.ax.set_title("Distribution of SPE Values Across "
                           "the Camera with HV=1100V")
-        self.ax.set_xlabel('SPE Value (ADC)')
+        self.ax.set_xlabel('SPE Value (V*ns)')
         self.ax.set_ylabel('Density')
 
-        black_line = mlines.Line2D([], [], color='black', alpha=0.2,
+        black_line = mlines.Line2D([], [], color='black', alpha=0.5,
                                    label="Distribution within TM")
         blue_line = mlines.Line2D([], [], color='blue',
                                   label="Distribution across Camera")
         self.ax.legend(handles=[black_line, blue_line], loc="upper right")
 
-        major_locator = MultipleLocator(10)
-        major_formatter = FormatStrFormatter('%d')
-        minor_locator = MultipleLocator(2)
+        major_locator = MultipleLocator(0.01)
+        # major_formatter = FormatStrFormatter('%d')
+        minor_locator = MultipleLocator(0.002)
         self.ax.xaxis.set_major_locator(major_locator)
-        self.ax.xaxis.set_major_formatter(major_formatter)
+        # self.ax.xaxis.set_major_formatter(major_formatter)
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
@@ -220,11 +220,11 @@ class ADC2PE1100VTMStatsPlotter(OfficialPlotter):
 
     def create(self, df):
         df_1100 = df[df['key'] == '1100']
-        means = df_1100.groupby('tm')['spe'].mean()
-        stds = df_1100.groupby('tm')['spe'].std()
+        means = df_1100.groupby('tm')['spe_mv'].mean()
+        stds = df_1100.groupby('tm')['spe_mv'].std()
         fracspreads = stds/means
         sns.distplot(fracspreads, ax=self.ax, color="black", rug=True)
-        self.ax.set_title("Fractional spread of SPE Value (ADC) "
+        self.ax.set_title("Fractional spread of SPE Value (V*ns) "
                           "between TMs at 1100V")
         self.ax.set_xlabel('Fractional spread')
         self.ax.set_ylabel('Density')
@@ -253,6 +253,7 @@ class ADC2PEPlots(Tool):
         self.dl0 = None
         self.dl1 = None
         self.fitter = None
+        self.fitter_pe = None
         self.dead = None
 
         self.n_pixels = None
@@ -362,6 +363,12 @@ class ADC2PEPlots(Tool):
             edges_tm24[tmpix] = self.fitter.edges
             between_tm24[tmpix] = self.fitter.between
 
+        edges_pix1559 = checm_dac_to_volts(edges_pix1559)
+        between_pix1559 = checm_dac_to_volts(between_pix1559)
+        fitx_pix1559 = checm_dac_to_volts(fitx_pix1559)
+        edges_tm24 = checm_dac_to_volts(edges_tm24)
+        between_tm24 = checm_dac_to_volts(edges_tm24)
+
         desc = "Fitting pixels (pe)"
         for pix in trange(n_pixels, desc=desc):
             tm = pix // 64
@@ -401,11 +408,12 @@ class ADC2PEPlots(Tool):
 
         df = pd.DataFrame(df_list)
         df = df.sort_values(by='gm', ascending=True)
+        df = df.assign(spe_mv=checm_dac_to_volts(df['spe']))
 
         # Create figures
         self.p_pixelspe.create(hist_pix1559, edges_pix1559, between_pix1559,
                                fit_pix1559, fitx_pix1559)
-        self.p_tmspe.create(hist_tm24, edges_tm24, between_tm24, "ADC")
+        self.p_tmspe.create(hist_tm24, edges_tm24, between_tm24, "V*ns")
         self.p_tmspe_pe.create(hist_tm24_pe, edges_tm24_pe, between_tm24_pe,
                                "p.e.", 1)
         self.p_adc2pe.create(df)

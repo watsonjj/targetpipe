@@ -1,3 +1,5 @@
+from scipy.signal import general_gaussian
+
 from targetpipe.io.camera import Config
 Config('checm')
 
@@ -10,6 +12,7 @@ from matplotlib.ticker import MultipleLocator, FormatStrFormatter, \
     AutoMinorLocator, ScalarFormatter, FuncFormatter
 import seaborn as sns
 from scipy.stats import norm
+from scipy import interpolate
 
 from os.path import exists, join
 from os import makedirs
@@ -27,6 +30,7 @@ from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
 from targetpipe.plots.official import OfficialPlotter
 from targetpipe.io.pixels import Dead, get_geometry
 from targetpipe.calib.camera.filter_wheel import FWCalibrator
+from targetpipe.utils.dactov import checm_dac_to_volts
 
 from IPython import embed
 
@@ -184,12 +188,13 @@ class Scatter(OfficialPlotter):
         # self.fig = plt.figure(figsize=(12, 8))
         # self.ax = self.fig.add_subplot(1, 1, 1)
 
-    def add(self, x, y, y_err=None, label=''):
-        c = self.ax._get_lines.get_next_color()
+    def add(self, x, y, x_err=None, y_err=None, label='', c=None):
+        if not c:
+            c = self.ax._get_lines.get_next_color()
         # no_err = y_err == 0
         # err = ~no_err
         # self.ax.errorbar(x[no_err], y[no_err], fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3)
-        (_, caps, _) = self.ax.errorbar(x, y, yerr=y_err, fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3, label=label)
+        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3, label=label)
 
         for cap in caps:
             cap.set_markeredgewidth(1)
@@ -222,9 +227,6 @@ class Scatter(OfficialPlotter):
     def add_legend(self, loc=2):
         self.ax.legend(loc=loc)
 
-    def save(self, output_path=None):
-        super().save(output_path)
-
 
 class WaveformPlotter(OfficialPlotter):
     name = 'WaveformPlotter'
@@ -232,10 +234,10 @@ class WaveformPlotter(OfficialPlotter):
     def add(self, waveform, label):
         self.ax.plot(waveform, label=label)
 
-    def create(self, title):
+    def create(self, title, y_label):
         self.ax.set_title(title)
         self.ax.set_xlabel("Time (ns)", fontsize=20)
-        self.ax.set_ylabel("Amplitude (p.e.)", fontsize=20)
+        self.ax.set_ylabel(y_label, fontsize=20)
 
     def save(self, output_path=None):
         self.ax.legend(loc=2)
@@ -259,6 +261,7 @@ class ADC2PEPlots(Tool):
         self.dl0 = None
         self.dl1 = None
         self.dead = None
+        self.dummy_event = None
         self.fw_calibrator = None
 
         self.n_pixels = None
@@ -274,10 +277,15 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix = None
         self.p_scatter_camera = None
         self.p_scatter_led = None
+        self.p_scatter_led_width = None
         self.p_time_res = None
         self.p_time_res_pix = None
+        self.p_fwhm_camera = None
+        self.p_rt_camera = None
         self.p_wf_dict = {}
+        self.p_wf_zoom_dict = {}
         self.p_avgwf_dict = {}
+        self.p_avgwf_zoom_dict = {}
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -433,9 +441,9 @@ class ADC2PEPlots(Tool):
                                        **kwargs)
         self.dead = Dead()
 
-        first_event = dfl[0]['reader'].get_event(0)
-        telid = list(first_event.r0.tels_with_data)[0]
-        r1 = first_event.r1.tel[telid].pe_samples[0]
+        self.dummy_event = dfl[0]['reader'].get_event(0)
+        telid = list(self.dummy_event.r0.tels_with_data)[0]
+        r1 = self.dummy_event.r1.tel[telid].pe_samples[0]
         self.n_pixels, self.n_samples = r1.shape
 
         script = "checm_paper_linearity"
@@ -445,16 +453,32 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix = Scatter(**kwargs, script=script, figure_name="scatter_pix")
         self.p_scatter_camera = Scatter(**kwargs, script=script, figure_name="scatter_camera")
         self.p_scatter_led = Scatter(**kwargs, script=script, figure_name="scatter_led", shape='wide')
+        self.p_scatter_led_width = Scatter(**kwargs, script=script, figure_name="scatter_led_width", shape='wide')
         self.p_time_res = Scatter(**kwargs, script=script, figure_name="time_resolution")
         self.p_time_res_pix = Scatter(**kwargs, script=script, figure_name="time_resolution_pix")
+        self.p_fwhm_camera = Scatter(**kwargs, script=script, figure_name="fwhm_camera")
+        self.p_rt_camera = Scatter(**kwargs, script=script, figure_name="rise_time_camera")
         for p in self.poi:
             self.p_wf_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="wfs_pix{}".format(p), shape='wide')
+            self.p_wf_zoom_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="wfs_zoom_pix{}".format(p), shape='wide')
             self.p_avgwf_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="avgwfs_pix{}".format(p), shape='wide')
+            self.p_avgwf_zoom_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="avgwfs_zoom_pix{}".format(p), shape='wide')
 
     def start(self):
         # df_list = []
         #
         # dead = self.dead.get_pixel_mask()
+        # kernel = general_gaussian(3, p=1.0, sig=1)
+        # x_base = np.arange(self.n_samples)
+        # x_interp = np.linspace(0, self.n_samples - 1, 300)
+        # ind = np.indices((self.n_pixels, x_interp.size))[1]
+        # r_ind = ind[:, ::-1]
+        # ind_x = x_interp[ind]
+        # r_ind_x = x_interp[r_ind]
+        #
+        # saturation_recovery_file = np.load("/Volumes/gct-jason/plots/checm_paper/checm_paper_recovery/saturation_recovery.npz")
+        # gradient = saturation_recovery_file['gradient']
+        # intercept = saturation_recovery_file['intercept']
         #
         # desc1 = 'Looping through files'
         # n_rows = len(self.df_file.index)
@@ -474,8 +498,12 @@ class ADC2PEPlots(Tool):
         #     t0 = np.zeros((n_events, self.n_pixels))
         #     t0_grad = np.zeros((n_events, self.n_pixels))
         #     t0_avg = np.zeros((n_events, self.n_pixels))
+        #     fwhm = np.zeros((n_events, self.n_pixels))
+        #     rise_time = np.zeros((n_events, self.n_pixels))
+        #     width = np.zeros((n_events, self.n_pixels))
         #     t0_mask = np.zeros((n_events, self.n_pixels))
         #     wfs = np.zeros((n_events, self.n_pixels, self.n_samples))
+        #     low_max = np.zeros((n_events, self.n_pixels), dtype=np.bool)
         #
         #     desc2 = "Extracting Charge"
         #     for event in tqdm(source, desc=desc2, total=n_events):
@@ -484,33 +512,80 @@ class ADC2PEPlots(Tool):
         #         self.dl1.calibrate(event)
         #         dl1[ev] = event.dl1.tel[0].image[0]
         #         dl0 = event.dl0.tel[0].pe_samples[0]
-        #         ev_avg = np.mean(dl0, 0)
-        #         peak_time = np.argmax(ev_avg)
+        #         cleaned = event.dl1.tel[0].cleaned[0]
+        #
+        #         smooth_flat = np.convolve(dl0.ravel(), kernel, "same")
+        #         smoothed = np.reshape(smooth_flat, dl0.shape)
+        #         samples_std = np.std(dl0, axis=1)
+        #         smooth_baseline_std = np.std(smoothed, axis=1)
+        #         with np.errstate(divide='ignore', invalid='ignore'):
+        #             smoothed *= (samples_std / smooth_baseline_std)[:, None]
+        #             smoothed[~np.isfinite(smoothed)] = 0
+        #         dl0 = smoothed
+        #
+        #         f = interpolate.interp1d(x_base, dl0, kind=3, axis=1)
+        #         dl0 = f(x_interp)
+        #
         #         grad = np.gradient(dl0)[1]
         #
-        #         ind = np.indices(dl0.shape)[1]
-        #         t_max = np.argmax(dl0, 1)
+        #         t_max = x_interp[np.argmax(dl0, 1)]
         #         t_start = t_max - 2
         #         t_end = t_max + 2
-        #         t_window = (ind >= t_start[..., None]) & (ind < t_end[..., None])
+        #         t_window = (ind_x >= t_start[..., None]) & (ind_x < t_end[..., None])
         #         t_windowed = np.ma.array(dl0, mask=~t_window)
-        #         t_windowed_ind = np.ma.array(ind, mask=~t_window)
+        #         t_windowed_ind = np.ma.array(ind_x, mask=~t_window)
         #
         #         t0[ev] = t_max
-        #         t0_grad[ev] = np.argmax(grad, 1)
+        #         t0_grad[ev] = x_interp[np.argmax(grad, 1)]
         #         t0_avg[ev] = np.ma.average(t_windowed_ind, weights=t_windowed, axis=1)
+        #
+        #         max_ = np.max(dl0, axis=1)
+        #         reversed_ = dl0[:, ::-1]
+        #         peak_time_i = np.ones(dl0.shape) * t_max[:, None]
+        #         mask_before = np.ma.masked_less(ind_x, peak_time_i).mask
+        #         mask_after = np.ma.masked_greater(r_ind_x, peak_time_i).mask
+        #         masked_bef = np.ma.masked_array(dl0, mask_before)
+        #         masked_aft = np.ma.masked_array(reversed_, mask_after)
+        #         half_max = max_/2
+        #         d_l = np.diff(np.sign(half_max[:, None] - masked_aft))
+        #         d_r = np.diff(np.sign(half_max[:, None] - masked_bef))
+        #         t_l = x_interp[r_ind[0, np.argmax(d_l, axis=1) + 1]]
+        #         t_r = x_interp[ind[0, np.argmax(d_r, axis=1) + 1]]
+        #         fwhm[ev] = t_r - t_l
+        #         _10percent = 0.1 * max_
+        #         _90percent = 0.9 * max_
+        #         d10 = np.diff(np.sign(_10percent[:, None] - masked_aft))
+        #         d90 = np.diff(np.sign(_90percent[:, None] - masked_aft))
+        #         t10 = x_interp[r_ind[0, np.argmax(d10, axis=1) + 1]]
+        #         t90 = x_interp[r_ind[0, np.argmax(d90, axis=1) + 1]]
+        #         rise_time[ev] = t90 - t10
+        #         pe_width = 20
+        #         d_l = np.diff(np.sign(pe_width - masked_aft))
+        #         d_r = np.diff(np.sign(pe_width - masked_bef))
+        #         t_l = x_interp[r_ind[0, np.argmax(d_l, axis=1) + 1]]
+        #         t_r = x_interp[ind[0, np.argmax(d_r, axis=1) + 1]]
+        #         width[ev] = t_r - t_l
+        #         low_max[ev] = (max_ < pe_width)
+        #         width[ev, low_max[ev]] = 0
         #
         #         low_pe = dl1[ev] < 0.7
         #         t0_mask[ev] = dead | low_pe
         #
         #         # Shift waveform to match t0 between events
+        #         ev_avg = np.mean(cleaned, 0)
+        #         peak_time = np.argmax(ev_avg)
         #         pts = peak_time - 50
-        #         dl0_shift = np.zeros((self.n_pixels, self.n_samples))
+        #         wf_shift = np.zeros((self.n_pixels, self.n_samples))
         #         if pts >= 0:
-        #             dl0_shift[:, :dl0[:, pts:].shape[1]] = dl0[:, pts:]
+        #             wf_shift[:, :cleaned[:, pts:].shape[1]] = cleaned[:, pts:]
         #         else:
-        #             dl0_shift[:, dl0[:, pts:].shape[1]:] = dl0[:, :pts]
-        #         wfs[ev] = dl0_shift
+        #             wf_shift[:, cleaned[:, pts:].shape[1]:] = cleaned[:, :pts]
+        #         wfs[ev] = wf_shift
+        #
+        #     avgwfs = np.mean(wfs, 0)
+        #     self.dummy_event.dl0.tel[0].pe_samples = avgwfs[None, ...]
+        #     self.dl1.calibrate(self.dummy_event)
+        #     avgwfs_charge = self.dummy_event.dl1.tel[0].image[0]
         #
         #     t0_shifted = t0 - t0.mean(1)[:, None]
         #     t0_shifted = np.ma.masked_array(t0_shifted, mask=t0_mask)
@@ -522,6 +597,16 @@ class ADC2PEPlots(Tool):
         #     tgradres_camera = np.ma.std(t0_grad_shifted)
         #     tavgres_camera = np.ma.std(t0_avg_shifted)
         #     tres_camera_n = t0_shifted.count()
+        #     fwhm = np.ma.masked_array(fwhm, mask=t0_mask)
+        #     fwhm_mean_camera = np.ma.mean(fwhm)
+        #     fwhm_std_camera = np.ma.std(fwhm)
+        #     rise_time = np.ma.masked_array(rise_time, mask=t0_mask)
+        #     rise_time_mean_camera = np.ma.mean(rise_time)
+        #     rise_time_std_camera = np.ma.std(rise_time)
+        #     width = np.ma.masked_array(width, mask=low_max)
+        #
+        #     ch = gradient[None, :] * width + intercept[None, :]
+        #     recovered_charge = 10 ** (ch ** 2)
         #
         #     desc3 = "Aggregate charge per pixel"
         #     for pix in trange(self.n_pixels, desc=desc3):
@@ -530,7 +615,12 @@ class ADC2PEPlots(Tool):
         #         t0_grad_pix = t0_grad_shifted[:, pix]
         #         t0_avg_pix = t0_avg_shifted[:, pix]
         #         wf = wfs[10, pix]
-        #         avgwf = np.mean(wfs[:, pix], 0)
+        #         wf_charge = dl1[10, pix]
+        #         avgwf = avgwfs[pix]
+        #         avgwf_charge = avgwfs_charge[pix]
+        #         pixel_width = width[:, pix]
+        #         pixel_low_max = low_max[:, pix].all()
+        #         pixel_rec_ch = recovered_charge[:, pix]
         #         if pix in self.dead.dead_pixels:
         #             continue
         #
@@ -542,6 +632,12 @@ class ADC2PEPlots(Tool):
         #         tgradres_pix = np.ma.std(t0_grad_pix)
         #         tavgres_pix = np.ma.std(t0_avg_pix)
         #         tres_pix_n = t0_pix.count()
+        #         w = np.mean(pixel_width)
+        #         w_err = np.std(pixel_width)
+        #         rec_charge = np.mean(pixel_rec_ch)
+        #         q75, q25 = np.percentile(pixel_rec_ch, [75, 25])
+        #         rec_charge_err_top = q75 - rec_charge
+        #         rec_charge_err_bottom = rec_charge - q25
         #         df_list.append(dict(type=type_, level=level,
         #                             cal=cal, cal_t=cal_t,
         #                             pixel=pix, tm=pix//64,
@@ -556,56 +652,72 @@ class ADC2PEPlots(Tool):
         #                             tgradres_pix=tgradres_pix,
         #                             tavgres_pix=tavgres_pix,
         #                             tres_pix_n=tres_pix_n,
+        #                             fwhm_mean_camera=fwhm_mean_camera,
+        #                             fwhm_std_camera=fwhm_std_camera,
+        #                             rise_time_mean_camera=rise_time_mean_camera,
+        #                             rise_time_std_camera=rise_time_std_camera,
+        #                             width=w,
+        #                             width_err=w_err,
+        #                             low_max=pixel_low_max,
+        #                             recovered_charge=rec_charge,
+        #                             rec_charge_err_top=rec_charge_err_top,
+        #                             rec_charge_err_bottom=rec_charge_err_bottom,
         #                             wf=wf,
-        #                             avgwf=avgwf))
+        #                             wf_charge=wf_charge,
+        #                             avgwf=avgwf,
+        #                             avgwf_charge=avgwf_charge))
         #
         # df = pd.DataFrame(df_list)
         # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
         # store['df'] = df
-
-        store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
-        df = store['df']
-
-        # Scale ADC values to match p.e.
-        type_list = np.unique(df['type'])
-        for t in type_list:
-            df_t = df.loc[df['type'] == t]
-            level_list = np.unique(df_t['level'])
-            for l in level_list:
-                df_l = df_t.loc[df_t['level'] == l]
-                median_cal = np.median(df_l.loc[df_l['cal'], 'charge'])
-                median_uncal = np.median(df_l.loc[~df_l['cal'], 'charge'])
-                ratio = median_cal / median_uncal
-                b = (df['type'] == t) & (df['level'] == l) & (~df['cal'])
-                df.loc[b, 'charge'] *= ratio
-
-        df_cal = df.loc[df['cal']]
-
+        #
+        # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
+        # df = store['df']
+        #
+        # # Scale ADC values to match p.e.
+        # type_list = np.unique(df['type'])
+        # for t in type_list:
+        #     df_t = df.loc[df['type'] == t]
+        #     level_list = np.unique(df_t['level'])
+        #     for l in level_list:
+        #         df_l = df_t.loc[df_t['level'] == l]
+        #         median_cal = np.median(df_l.loc[df_l['cal'], 'charge'])
+        #         median_uncal = np.median(df_l.loc[~df_l['cal'], 'charge'])
+        #         ratio = median_cal / median_uncal
+        #         b = (df['type'] == t) & (df['level'] == l) & (~df['cal'])
+        #         df.loc[b, 'charge'] *= ratio
+        #
         # fw_cal = 2450
-        # df_laser = df_cal.loc[(df_cal['type'] == 'LS62') | (df_cal['type'] == 'LS64')]
-        # df_laser['illumination'] = 0
+        # df_laser = df.loc[(df['type'] == 'LS62') | (df['type'] == 'LS64')]
+        # df['illumination'] = 0
+        # df['illumination_err'] = 0
         # type_list = np.unique(df_laser['type'])
         # for t in type_list:
         #     df_t = df_laser.loc[df_laser['type'] == t]
         #     pixel_list = np.unique(df_t['pixel'])
         #     for p in tqdm(pixel_list):
         #         df_p = df_t.loc[df_t['pixel'] == p]
-        #         cal_val = df_p.loc[df_p['level'] == fw_cal, 'charge'].values
+        #         cal_entry = (df_p['level'] == fw_cal) & (df_p['cal'])
+        #         cal_val = df_p.loc[cal_entry, 'charge'].values
         #         self.fw_calibrator.set_calibration(fw_cal, cal_val)
         #         ill = self.fw_calibrator.get_illumination(df_p['level'])
-        #         b = (df_laser['type'] == t) & (df_laser['pixel'] == p)
-        #         df_laser.loc[b, 'illumination'] = ill
+        #         err = self.fw_calibrator.get_illumination_err(df_p['level'])
+        #         b = (df['type'] == t) & (df['pixel'] == p)
+        #         df.loc[b, 'illumination'] = ill
+        #         df.loc[b, 'illumination_err'] = err
         # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
-        # store['df_laser'] = df_laser
+        # store['df_ill'] = df
 
         store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
-        df_laser = store['df_laser']
+        df = store['df_ill']
 
-        df_lj = df_laser.loc[((df_laser['type'] == 'LS62') &
-                                 (df_laser['illumination'] < 20)) |
-                                ((df_laser['type'] == 'LS64') &
-                                 (df_laser['illumination'] >= 20))]
-        df_led = df_cal.loc[df_cal['type'] == 'LED']
+        df_lj = df.loc[((df['type'] == 'LS62') &
+                        (df['illumination'] < 20)) |
+                       ((df['type'] == 'LS64') &
+                        (df['illumination'] >= 20))]
+        df_ljc = df_lj.loc[df_lj['cal']]
+        df_lju = df_lj.loc[~df_lj['cal']]
+        df_led = df.loc[(df['type'] == 'LED') & (df['cal'])]
 
         # Create figures
         self.p_comparison.create(df.loc[df['type'] == 'LS62'])
@@ -620,17 +732,29 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.create("Illumination (p.e.)", "Charge (p.e.)", "Pixel Distribution")
         self.p_scatter_pix.set_x_log()
         self.p_scatter_pix.set_y_log()
+        output_np = join(self.p_scatter_pix.output_dir, "pix{}_dr.npz")
         for ip, p in enumerate(self.poi):
-            df_pix = df_lj.loc[df_lj['pixel'] == p]
+            df_pix = df_ljc.loc[df_ljc['pixel'] == p]
             x = df_pix['illumination']
             y = df_pix['charge']
+            x_err = df_pix['illumination_err']
             y_err = [df_pix['charge_err_bottom'], df_pix['charge_err_top']]
             label = "Pixel {}".format(p)
-            self.p_scatter_pix.add(x, y, y_err, label)
+            self.p_scatter_pix.add(x, y, x_err, y_err, label)
+            self.log.info("Saving numpy array: {}".format(output_np.format(p)))
+            np.savez(output_np.format(p), x=x, y=y, x_err=x_err, y_err=y_err)
+        p = 1825
+        df_pix = df_ljc.loc[df_ljc['pixel'] == p]
+        x = df_pix['illumination']
+        y = df_pix['recovered_charge']
+        x_err = df_pix['illumination_err']
+        y_err = [df_pix['rec_charge_err_bottom'], df_pix['rec_charge_err_top']]
+        label = "Pixel {}, Saturation-Recovered".format(p)
+        self.p_scatter_pix.add(x, y, x_err, y_err, label)
         self.p_scatter_pix.add_xy_line()
         self.p_scatter_pix.add_legend()
 
-        df_camera = df_lj.groupby(['type', 'level'])
+        df_camera = df_ljc.groupby(['type', 'level'])
         df_sum = df_camera.apply(np.sum)
         b = df_sum['tm'] == 31652  # fix to ensure statistics
         df_mean = df_camera.apply(np.mean)
@@ -643,15 +767,16 @@ class ADC2PEPlots(Tool):
         df_std = df_std.groupby('a').apply(np.mean)  # fix to ensure statistics
         x = df_mean['illumination']
         y = df_mean['charge']
+        x_err = df_mean['illumination_err']
         y_err = df_std['charge']
         self.p_scatter_camera.create("Illumination (p.e.)", "Charge (p.e.)", "Camera Distribution")
         self.p_scatter_camera.set_x_log()
         self.p_scatter_camera.set_y_log()
-        self.p_scatter_camera.add(x, y, y_err, '')
+        self.p_scatter_camera.add(x, y, x_err, y_err, '')
         self.p_scatter_camera.add_xy_line()
         self.p_scatter_camera.add_legend()
 
-        df_camera = df_lj.groupby(['type', 'level'])
+        df_camera = df_ljc.groupby(['type', 'level'])
         df_sum = df_camera.apply(np.sum)
         b = df_sum['tm'] == 31652  # fix to ensure statistics
         df_mean = df_camera.apply(np.mean)
@@ -660,62 +785,163 @@ class ADC2PEPlots(Tool):
         df_mean = df_mean.groupby('a').apply(np.mean)  # fix to ensure statistics
         x = df_mean['illumination']
         y = df_mean['tres_camera']
+        x_err = df_mean['illumination_err']
+        y_err = None#np.sqrt(df_mean['tres_camera_n'])
+        gt1 = x > 1
         self.p_time_res.create("Illumination (p.e.)", "Time Resolution (ns)", "Camera Timing Resolution")
         self.p_time_res.set_x_log()
         self.p_time_res.set_y_log()
-        self.p_time_res.add(x, y, None, "Peak")
+        self.p_time_res.add(x[gt1], y[gt1], x_err[gt1], None, "Peak", 'black')
         # y = df_mean['tgradres_camera']
-        # self.p_time_res.add(x, y, None, "Grad")
+        # self.p_time_res.add(x, y, y_err, "Grad")
+        # gt5 = x > 5
         # y = df_mean['tavgres_camera']
-        # self.p_time_res.add(x, y, None, "Avg")
+        # self.p_time_res.add(x[gt5], y[gt5], None, "Avg")
         # self.p_time_res.add_xy_line()
         # self.p_time_res.add_legend(1)
+        self.p_time_res.ax.get_yaxis().set_minor_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
 
         self.p_time_res_pix.create("Illumination (p.e.)", "Time Resolution (ns)", "Pixel Timing Resolution")
         self.p_time_res_pix.set_x_log()
         self.p_time_res_pix.set_y_log()
         for ip, p in enumerate(self.poi):
-            df_pix = df_lj.loc[df_lj['pixel'] == p]
+            df_pix = df_ljc.loc[df_ljc['pixel'] == p]
             x = df_pix['illumination']
             y = df_pix['tres_pix']
+            x_err = df_pix['illumination_err']
+            gt1 = x > 1
             label = "Pixel {}".format(p)
-            self.p_time_res_pix.add(x, y, None, label)
+            self.p_time_res_pix.add(x[gt1], y[gt1], x_err[gt1], None, label)
         # self.p_scatter_pix.add_xy_line()
         self.p_time_res_pix.add_legend(1)
 
-        levels = np.unique(df_lj['level'])
+        df_camera = df_ljc.groupby(['type', 'level'])
+        df_sum = df_camera.apply(np.sum)
+        b = df_sum['tm'] == 31652  # fix to ensure statistics
+        df_mean = df_camera.apply(np.mean)
+        df_mean['a'] = np.arange(df_mean.index.size)
+        df_mean.loc[~b, 'a'] = -1
+        df_mean = df_mean.groupby('a').apply(np.mean)  # fix to ensure statistics
+        x = df_mean['illumination']
+        y = df_mean['fwhm_mean_camera']
+        x_err = df_mean['illumination_err']
+        y_err = df_mean['fwhm_std_camera']
+        self.p_fwhm_camera.create("Illumination (p.e.)", "FWHM (ns)", "Camera FWHM")
+        self.p_fwhm_camera.set_x_log()
+        # self.p_fwhm_camera.set_y_log()
+        self.p_fwhm_camera.add(x, y, x_err, y_err, "Peak", 'black')
+
+        df_camera = df_ljc.groupby(['type', 'level'])
+        df_sum = df_camera.apply(np.sum)
+        b = df_sum['tm'] == 31652  # fix to ensure statistics
+        df_mean = df_camera.apply(np.mean)
+        df_mean['a'] = np.arange(df_mean.index.size)
+        df_mean.loc[~b, 'a'] = -1
+        df_mean = df_mean.groupby('a').apply(np.mean)  # fix to ensure statistics
+        x = df_mean['illumination']
+        y = df_mean['rise_time_mean_camera']
+        x_err = df_mean['illumination_err']
+        y_err = df_mean['rise_time_std_camera']
+        self.p_rt_camera.create("Illumination (p.e.)", "Rise Time (ns)", "Camera Rise Time")
+        self.p_rt_camera.set_x_log()
+        # self.p_fwhm_camera.set_y_log()
+        self.p_rt_camera.add(x, y, x_err, y_err, "Peak", 'black')
+
+        levels = np.unique(df_lju['level'])
         for p, f in self.p_wf_dict.items():
             title = "Pixel {}".format(p)
-            f.create(title)
-            df_pix = df_lj.loc[df_lj['pixel'] == p]
+            f.create(title, "Amplitude (V)")
+            df_pixu = df_lju.loc[df_lju['pixel'] == p]
+            df_pixc = df_ljc.loc[df_ljc['pixel'] == p]
             for il, l in enumerate(levels):
-                df_l = df_pix.loc[df_pix['level'] == l]
-                wf = df_l['wf'].values[0]
-                illumination = df_l['illumination'].values[0]
-                label = "{:.2f} p.e.".format(illumination)
+                df_lu = df_pixu.loc[df_pixu['level'] == l]
+                df_lc = df_pixc.loc[df_pixc['level'] == l]
+                wf = checm_dac_to_volts(df_lu['wf'].values[0])
+                illumination = df_lu['illumination'].values[0]
+                charge = df_lc['wf_charge'].values[0]
+                label = "{:.2f} p.e. ({:.2f} p.e.)".format(illumination, charge)
                 f.add(wf, label)
 
-        levels = np.unique(df_lj['level'])
+        levels = np.unique(df_lju['level'])
+        for p, f in self.p_wf_zoom_dict.items():
+            title = "Pixel {}".format(p)
+            f.create(title, "Amplitude (V)")
+            df_pixu = df_lju.loc[df_lju['pixel'] == p]
+            df_pixc = df_ljc.loc[df_ljc['pixel'] == p]
+            for il, l in enumerate(levels):
+                df_lu = df_pixu.loc[df_pixu['level'] == l]
+                df_lc = df_pixc.loc[df_pixc['level'] == l]
+                wf = checm_dac_to_volts(df_lu['wf'].values[0])
+                illumination = df_lu['illumination'].values[0]
+                charge = df_lc['wf_charge'].values[0]
+                label = "{:.2f} p.e. ({:.2f} p.e.)".format(illumination, charge)
+                f.add(wf, label)
+                # f.ax.set_ylim((-0.2, 0.2))
+                f.ax.set_ylim((-0.005, 0.005))
+
+        levels = np.unique(df_lju['level'])
         for p, f in self.p_avgwf_dict.items():
             title = "Pixel {}".format(p)
-            f.create(title)
-            df_pix = df_lj.loc[df_lj['pixel'] == p]
+            f.create(title, "Amplitude (V)")
+            df_pixu = df_lju.loc[df_lju['pixel'] == p]
+            df_pixc = df_ljc.loc[df_ljc['pixel'] == p]
             for il, l in enumerate(levels):
-                df_l = df_pix.loc[df_pix['level'] == l]
-                wf = df_l['avgwf'].values[0]
-                illumination = df_l['illumination'].values[0]
-                label = "{:.2f} p.e.".format(illumination)
+                df_lu = df_pixu.loc[df_pixu['level'] == l]
+                df_lc = df_pixc.loc[df_pixc['level'] == l]
+                wf = checm_dac_to_volts(df_lu['avgwf'].values[0])
+                illumination = df_lu['illumination'].values[0]
+                charge = df_lc['avgwf_charge'].values[0]
+                label = "{:.2f} p.e. ({:.2f} p.e.)".format(illumination, charge)
                 f.add(wf, label)
+
+        levels = np.unique(df_lju['level'])
+        for p, f in self.p_avgwf_zoom_dict.items():
+            title = "Pixel {}".format(p)
+            f.create(title, "Amplitude (V)")
+            df_pixu = df_lju.loc[df_lju['pixel'] == p]
+            df_pixc = df_ljc.loc[df_ljc['pixel'] == p]
+            for il, l in enumerate(levels):
+                df_lu = df_pixu.loc[df_pixu['level'] == l]
+                df_lc = df_pixc.loc[df_pixc['level'] == l]
+                wf = checm_dac_to_volts(df_lu['avgwf'].values[0])
+                illumination = df_lu['illumination'].values[0]
+                charge = df_lc['avgwf_charge'].values[0]
+                label = "{:.2f} p.e. ({:.2f} p.e.)".format(illumination, charge)
+                f.add(wf, label)
+                # f.ax.set_ylim((-0.2, 0.2))
+                f.ax.set_ylim((-0.005, 0.005))
 
         self.p_scatter_led.create("LED", "Charge (p.e.)", "LED Distribution")
         self.p_scatter_led.set_y_log()
+        output_np = join(self.p_scatter_pix.output_dir, "pix{}_dr_led.npz")
         for ip, p in enumerate(self.poi):
             df_pix = df_led.loc[df_led['pixel'] == p]
             x = df_pix['level']
             y = df_pix['charge']
             y_err = [df_pix['charge_err_bottom'], df_pix['charge_err_top']]
             label = "Pixel {}".format(p)
-            self.p_scatter_led.add(x, y, y_err, label)
+            self.p_scatter_led.add(x, y, None, y_err, label)
+            self.log.info("Saving numpy array: {}".format(output_np.format(p)))
+            np.savez(output_np.format(p), x=x, y=y, x_err=None, y_err=y_err)
+        self.p_scatter_led.add_legend()
+
+        self.p_scatter_led_width.create("Width (ns)", "Charge (p.e.)", "LED Saturation Recovery")
+        for ip, p in enumerate(self.poi):
+            df_pix = df_led.loc[df_led['pixel'] == p]
+            x = df_pix['width']
+            y = df_pix['charge']
+            x_err = df_pix['width_err']
+            y_err = [df_pix['charge_err_bottom'], df_pix['charge_err_top']]
+            label = "Pixel {}, Pulse Integration".format(p)
+            self.p_scatter_led_width.add(x, y, x_err, y_err, label)
+            x = df_pix['width']
+            y = df_pix['recovered_charge']
+            x_err = df_pix['width_err']
+            y_err = [df_pix['rec_charge_err_bottom'], df_pix['rec_charge_err_top']]
+            label = "Pixel {}, Saturation Recovery".format(p)
+            self.p_scatter_led_width.add(x, y, x_err, y_err, label)
+        self.p_scatter_led_width.set_y_log()
+        self.p_scatter_led_width.add_legend()
 
     def finish(self):
         # Save figures
@@ -725,11 +951,18 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.save()
         self.p_scatter_camera.save()
         self.p_scatter_led.save()
+        self.p_scatter_led_width.save()
         self.p_time_res.save()
         self.p_time_res_pix.save()
+        self.p_fwhm_camera.save()
+        self.p_rt_camera.save()
         for p, f in self.p_wf_dict.items():
             f.save()
+        for p, f in self.p_wf_zoom_dict.items():
+            f.save()
         for p, f in self.p_avgwf_dict.items():
+            f.save()
+        for p, f in self.p_avgwf_zoom_dict.items():
             f.save()
 
 

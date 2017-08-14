@@ -63,10 +63,10 @@ class Scatter(OfficialPlotter):
         self.add(x, y, y_err, label)
 
         # self.ax.set_xscale('log')
-        # self.ax.set_yscale('log')
+        self.ax.set_yscale('log')
         # self.ax.set_xticks(x)
-        # self.ax.get_xaxis().set_major_formatter(ScalarFormatter())
-        # self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
+        self.ax.get_xaxis().set_major_formatter(ScalarFormatter())
+        self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
         # self.ax.xaxis.set_tick_params(
         #     which='minor',  # both major and minor ticks are affected
         #     bottom='off',  # ticks along the bottom edge are off
@@ -98,99 +98,61 @@ class FWInvestigator(Tool):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.reader = None
-        self.dl0 = None
-        self.dl1 = None
-        self.fitter = None
-        self.dead = None
         self.fw_calibrator = None
 
-        directory = join(realpath(dirname(__file__)), "../targetpipe/io")
-        self.fw_txt_path = join(directory, "FW.txt")
-        self.fw_storage_path = join(directory, "FW.h5")
-        self.fw_storage_path_spe = join(directory, "FW_spe_LS62.h5")
-        self.spe_fw = 1210
+        directory = "/Users/Jason/Downloads/quick_analysis_results"
+        fw_np_path_y1 = join(directory, "quick_analysis_area_withoutpreamp.npy")
+        fw_np_path_y2 = join(directory, "quick_analysis_area_withpreamp-withfilterOD1.npy")
+        fw_np_path_y3 = join(directory, "quick_analysis_area_withpreamp.npy")
+        fw_np_path_yerr1 = join(directory, "quick_analysis_areaerr_withoutpreamp.npy")
+        fw_np_path_yerr2 = join(directory, "quick_analysis_areaerr_withpreamp-withfilterOD1.npy")
+        fw_np_path_yerr3 = join(directory, "quick_analysis_areaerr_withpreamp.npy")
+        fw_np_path_x1 = join(directory, "quick_analysis_fwpos_withoutpreamp.npy")
+        fw_np_path_x2 = join(directory, "quick_analysis_fwpos_withpreamp-withfilterOD1.npy")
+        fw_np_path_x3 = join(directory, "quick_analysis_fwpos_withpreamp.npy")
+
+        self.fw_np_y1 = np.load(fw_np_path_y1)
+        self.fw_np_y2 = np.load(fw_np_path_y2)
+        self.fw_np_y3 = np.load(fw_np_path_y3)
+        self.fw_np_yerr1 = np.load(fw_np_path_yerr1)
+        self.fw_np_yerr2 = np.load(fw_np_path_yerr2)
+        self.fw_np_yerr3 = np.load(fw_np_path_yerr3)
+        self.fw_np_x1 = np.load(fw_np_path_x1)
+        self.fw_np_x2 = np.load(fw_np_path_x2)
+        self.fw_np_x3 = np.load(fw_np_path_x3)
 
         self.p_attenuation = None
-        self.p_pe = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
 
-        filepath = '/Volumes/gct-jason/data/170314/spe/Run00073_r1_adc.tio'
-        self.reader = TargetioFileReader(input_path=filepath, **kwargs)
-
-        cleaner = CHECMWaveformCleanerAverage(**kwargs)
-        extractor = AverageWfPeakIntegrator(**kwargs)
-        self.dl0 = CameraDL0Reducer(**kwargs)
-        self.dl1 = CameraDL1Calibrator(extractor=extractor,
-                                       cleaner=cleaner,
-                                       **kwargs)
-        self.fitter = CHECMSPEFitter(**kwargs)
-        self.fitter.range = [-30, 160]
-        self.dead = Dead()
         self.fw_calibrator = FWCalibrator(**kwargs)
 
         script = "filter_wheel"
         self.p_attenuation = Scatter(**kwargs, script=script, figure_name="attenuation")
-        self.p_pe = Scatter(**kwargs, script=script, figure_name="pe")
-        # self.p_tmspe = TMSPEFitPlotter(**kwargs, script=script, figure_name="spe_fit_tm24")
-        # self.p_tmspe_pe = TMSPEFitPlotter(**kwargs, script=script, figure_name="spe_fit_tm24_pe")
-        # self.p_adc2pe = ADC2PEPlotter(**kwargs, script=script, figure_name="adc2pe", shape='wide')
-        # self.p_adc2pe_1100tm = ADC2PE1100VTMPlotter(**kwargs, script=script, figure_name="adc2pe_1100V_tms", shape='wide')
-        # self.p_adc2pe_1100tm_stats = ADC2PE1100VTMStatsPlotter(**kwargs, script=script, figure_name="adc2pe_1100V_tms_stats", shape='wide')
 
     def start(self):
-        n_events = self.reader.num_events
-        first_event = self.reader.get_event(0)
-        telid = list(first_event.r0.tels_with_data)[0]
-        n_pixels, n_samples = first_event.r1.tel[telid].pe_samples[0].shape
 
-        dl1 = np.zeros((n_events, n_pixels))
-        lambda_ = np.zeros(n_pixels)
+        con = np.concatenate
+        df = pd.DataFrame(dict(
+            position=con([self.fw_np_x1, self.fw_np_x2, self.fw_np_x3]),
+            transmission=con([self.fw_np_y1, self.fw_np_y2, self.fw_np_y3]),
+            error=con([self.fw_np_yerr1, self.fw_np_yerr2, self.fw_np_yerr3]),
+        ))
+        df = df.groupby('position').apply(np.mean)
 
-        source = self.reader.read()
-        desc = "Looping through file"
-        for event in tqdm(source, total=n_events, desc=desc):
-            index = event.count
-            self.dl0.reduce(event)
-            self.dl1.calibrate(event)
-            dl1[index] = event.dl1.tel[telid].image
-
-        desc = "Fitting pixels"
-        for pix in trange(n_pixels, desc=desc):
-            if not self.fitter.apply(dl1[:, pix]):
-                self.log.warning("Pixel {} couldn't be fit".format(pix))
-                continue
-            lambda_[pix] = self.fitter.coeff['lambda_']
-
-        lambda_ = self.dead.mask1d(lambda_)
-        avg_lamda = np.mean(lambda_)
-
-        self.fw_calibrator.load_from_txt(self.fw_txt_path)
-        self.fw_calibrator.save(self.fw_storage_path)
-        self.fw_calibrator.set_calibration(self.spe_fw, avg_lamda)
-        df = self.fw_calibrator.df
+        self.fw_calibrator.df = df
+        self.fw_calibrator.save(self.fw_calibrator.fw_path)
 
         x = df['position']
-        y = df['attenuation_mean']
-        y_err = df['attenuation_rms']
-        self.p_attenuation.create(x, y, y_err, '', "Postion", "Attenuation", "Filter Wheel Attenuation")
-
-        x = df['position']
-        y = df['pe']
-        y_err = df['pe_err']
-        self.p_pe.create(x, y, y_err, '', "Postion", "Illumination (p.e.)", "Filter Wheel Calibrated")
-        self.p_pe.ax.set_yscale('log')
-        self.p_pe.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
+        y = df['transmission']
+        y_err = df['error']
+        self.p_attenuation.create(x, y, y_err, '', "Postion", "Transmission", "Filter Wheel Attenuation")
 
     def finish(self):
         # Save figures
         self.p_attenuation.save()
-        self.p_pe.save()
-        self.fw_calibrator.save(self.fw_storage_path_spe)
-
 
 if __name__ == '__main__':
     exe = FWInvestigator()

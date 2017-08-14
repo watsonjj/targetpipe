@@ -47,7 +47,7 @@ class ImagePlotter(OfficialPlotter):
 
         self.cb = None
 
-        self.fig = plt.figure(figsize=(8, 8))
+        self.fig = plt.figure(figsize=(13, 8))
         self.ax = self.fig.add_subplot(1, 1, 1)
         self.fig.subplots_adjust(right=0.85)
 
@@ -57,7 +57,7 @@ class ImagePlotter(OfficialPlotter):
         camera = CameraDisplay(geom, ax=self.ax,
                                image=np.zeros(2048),
                                cmap='viridis')
-        camera.add_colorbar()
+        camera.add_colorbar(pad=-0.2)
         camera.colorbar.set_label("Amplitude (p.e.)", fontsize=20)
 
         with PdfPages(self.output_path) as pdf:
@@ -109,7 +109,7 @@ class PeakTimePlotter(OfficialPlotter):
 
         self.cb = None
 
-        self.fig = plt.figure(figsize=(8, 8))
+        self.fig = plt.figure(figsize=(13, 8))
         self.ax = self.fig.add_subplot(1, 1, 1)
         self.fig.subplots_adjust(right=0.85)
 
@@ -119,7 +119,7 @@ class PeakTimePlotter(OfficialPlotter):
         camera = CameraDisplay(geom, ax=self.ax,
                                image=np.ma.zeros(2048),
                                cmap='viridis')
-        camera.add_colorbar()
+        camera.add_colorbar(pad=-0.2)
         camera.colorbar.set_label("Peak Time (ns)", fontsize=20)
 
         with PdfPages(self.output_path) as pdf:
@@ -838,7 +838,7 @@ class HillasBuilder(Tool):
         geom_mc = rdf.loc[rdf['type'] == "MC", "geom"].iloc[0]
 
         self.p_allimage.create(df_data, geom_data)
-        # self.p_alltimeimage.create(df_data, geom_data)
+        self.p_alltimeimage.create(df_data, geom_data)
         # self.p_allmcimage.create(df_mc, geom_mc)
         # self.p_zwimage.create(df_data, geom_data)
         # self.p_zwmcimage.create(df_mc, geom_mc)
@@ -856,7 +856,7 @@ class HillasBuilder(Tool):
         # self.p_width.create(self.df)
 
         self.p_allimage.save()
-        # self.p_alltimeimage.save()
+        self.p_alltimeimage.save()
         # self.p_allmcimage.save()
         # self.p_zwimage.save()
         # self.p_zwmcimage.save()

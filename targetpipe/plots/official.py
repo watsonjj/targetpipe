@@ -39,9 +39,9 @@ class OfficialPlotter(Component):
         sns.set_style("white")
         sns.set_style("ticks")
         sns.set_context(self.type, rc={"font.famly": "Helvetica",
-                                       "font.size":14,
-                                       "axes.titlesize":14,
-                                       "axes.labelsize":14
+                                       "font.size":20,
+                                       "axes.titlesize":20,
+                                       "axes.labelsize":20
                                        })
 
         if self.shape == 'wide':
@@ -55,6 +55,8 @@ class OfficialPlotter(Component):
         # plt.tick_params(which='both', width=1)
         # plt.tick_params(which='minor', length=4)
         # plt.tick_params(axis='both', which='major', length=8)
+
+        self.ax.tick_params(labelsize=19)
 
         self.extension = 'pdf'
         base_dir = "/Volumes/gct-jason/plots/checm_paper"

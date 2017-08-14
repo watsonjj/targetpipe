@@ -34,26 +34,29 @@ class FWCalibrator(Component):
         store = pd.HDFStore(self.fw_path)
         self.df = store['df']
 
-    def load_from_txt(self, path):
-        columns = ['position', 'attenuation_mean', 'attenuation_rms']
-        self.df = pd.read_table(path, sep=' ', names=columns,
-                                usecols=[0, 1, 2], skiprows=1)
-        self.df = self.df.groupby('position').apply(np.mean)
-
     def set_calibration(self, fw, illumination):
-        att_log = np.log10(self.df['attenuation_mean'])
-        fw_att = 10**np.interp(fw, self.df['position'], att_log)
-        i0 = illumination/(1 - fw_att)
-        self.df = self.df.assign(pe=(1-self.df['attenuation_mean']) * i0)
-        self.df = self.df.assign(pe_err=self.df['attenuation_rms'] * i0)
+        t_log = np.log10(self.df['transmission'])
+        transmission = 10**np.interp(fw, self.df['position'], t_log)
+        i0 = illumination / transmission
+        self.df = self.df.assign(illumination=self.df['transmission'] * i0)
+        self.df = self.df.assign(illumination_err=self.df['error'] * i0)
 
     def get_illumination(self, fw):
         try:
-            pe_log = np.log10(self.df['pe'])
+            pe_log = np.log10(self.df['illumination'])
             illumination = 10 ** np.interp(fw, self.df['position'], pe_log)
             return illumination
         except KeyError:
-            self.log.error("This FW file has no pe column, "
+            self.log.error("This FW file has no illumination column, "
+                           "need to use set_calibration()")
+
+    def get_illumination_err(self, fw):
+        try:
+            err_log = np.log10(self.df['illumination_err'])
+            err = 10 ** np.interp(fw, self.df['position'], err_log)
+            return err
+        except KeyError:
+            self.log.error("This FW file has no illumination column, "
                            "need to use set_calibration()")
 
     def save(self, path):

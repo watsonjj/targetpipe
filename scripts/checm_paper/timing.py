@@ -1,3 +1,5 @@
+from scipy.signal import general_gaussian
+
 from targetpipe.io.camera import Config
 Config('checm')
 
@@ -9,6 +11,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 from traitlets import Dict, List
 from scipy.stats import norm
+from scipy import interpolate
 
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
@@ -143,8 +146,8 @@ class WaveformHist1DInt(OfficialPlotter):
 
         n = int(vals.max() - vals.min())
         c = self.ax._get_lines.get_next_color()
-        self.ax.hist(vals-0.5, n, normed=True, color=c, alpha=0.5, rwidth=0.5)
-        self.ax.plot(fit_x, fit, color=c, alpha=0.8, label=label)
+        self.ax.hist(vals-0.5, n, normed=True, color=c, alpha=0.5, rwidth=0.5, label=label)
+        # self.ax.plot(fit_x, fit, color=c, alpha=0.8, label=label)
 
     def create(self, vals, label, title=""):
 
@@ -192,8 +195,8 @@ class WaveformHist1D(OfficialPlotter):
 
         n = int((vals.max() - vals.min())*1.5+1)
         c = self.ax._get_lines.get_next_color()
-        self.ax.hist(vals, n, normed=True, color=c, alpha=0.5)#, rwidth=0.5)
-        self.ax.plot(fit_x, fit, color=c, alpha=0.8, label=label)
+        self.ax.hist(vals, n, normed=True, color=c, alpha=0.5, label=label)#, rwidth=0.5)
+        # self.ax.plot(fit_x, fit, color=c, alpha=0.8, label=label)
 
     def create(self, vals, label, title=""):
 
@@ -290,6 +293,7 @@ class TimingExtractor(Tool):
         self.p_laser_1dcomp_wavg = None
         self.p_laser_1deoicomp = None
         self.p_laser_1dcomp = None
+        self.p_laser_1d_final = None
         self.p_laser_imageeoitgrad = None
 
         self.p_laser_fwhm = None
@@ -366,6 +370,8 @@ class TimingExtractor(Tool):
         self.p_laser_1deoicomp = WaveformHist1DInt(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "laser_1D_comparison_allevents".format(self.eoi)
         self.p_laser_1dcomp = WaveformHist1D(**p_kwargs, shape='wide')
+        p_kwargs['figure_name'] = "laser_1D_finalmethod"
+        self.p_laser_1d_final = WaveformHist1D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "laser_image_tgrad_eid{}".format(self.eoi)
         self.p_laser_imageeoitgrad = ImagePlotter(**p_kwargs)
 
@@ -373,101 +379,116 @@ class TimingExtractor(Tool):
         self.p_laser_fwhm = WaveformHist1DInt(**p_kwargs, shape='wide')
 
     def start(self):
+        df_list = []
+
         dead = self.dead.get_pixel_mask()
-
-        ind = np.indices((self.n_pixels, self.n_samples))[1]
+        kernel = general_gaussian(3, p=1.0, sig=1)
+        x_base = np.arange(self.n_samples)
+        x_interp = np.linspace(0, self.n_samples - 1, 300)
+        ind = np.indices((self.n_pixels, x_interp.size))[1]
         r_ind = ind[:, ::-1]
+        ind_x = x_interp[ind]
+        r_ind_x = x_interp[r_ind]
 
-        # df_list = []
-        #
-        # readers = [self.reader_led, self.reader_laser]
-        # r1s = [self.r1_led, self.r1_laser]
-        # run_type = ['led', 'laser']
-        #
-        # for reader, r1_cal, rt in zip(readers, r1s, run_type):
-        #     run = reader.filename
-        #     n_events = reader.num_events
-        #     source = reader.read()
-        #     desc = "Processing Events for {} run".format(rt)
-        #     for event in tqdm(source, total=n_events, desc=desc):
-        #         ev = event.count
-        #         event_id = event.r0.event_id
-        #         time = event.trig.gps_time.value
-        #         tack = event.meta['tack']
-        #         fci = np.copy(event.r0.tel[0].first_cell_ids)
-        #         bp = event.r0.tel[0].blockphase
-        #
-        #         r1_cal.calibrate(event)
-        #         self.dl0.reduce(event)
-        #         self.dl1.calibrate(event)
-        #         r0 = event.r0.tel[0].adc_samples[0]
-        #         r1 = event.r1.tel[0].pe_samples[0]
-        #         dl1 = event.dl1.tel[0].image[0]
-        #         grad = np.gradient(r1)[1]
-        #
-        #         saturated = np.any(r0 < 10, 1)
-        #         low_pe = np.all(r1 < 10, 1)
-        #         mask = dead | saturated | low_pe
-        #
-        #         ind = np.indices(r1.shape)[1]
-        #
-        #         t_max = np.argmax(r1, 1)
-        #         t_start = t_max - 2
-        #         t_end = t_max + 2
-        #         t_window = (ind >= t_start[..., None]) & (ind < t_end[..., None])
-        #         t_windowed = np.ma.array(r1, mask=~t_window)
-        #         t_windowed_ind = np.ma.array(ind, mask=~t_window)
-        #         t_avg = np.ma.average(t_windowed_ind, weights=t_windowed, axis=1)
-        #
-        #         t_grad_max = np.argmax(grad, 1)
-        #         t_grad_start = t_grad_max - 2
-        #         t_grad_end = t_grad_max + 2
-        #         t_grad_window = (ind >= t_grad_start[..., None]) & (ind < t_grad_end[..., None])
-        #         t_grad_windowed = np.ma.array(grad, mask=~t_grad_window)
-        #         t_grad_windowed_ind = np.ma.array(ind, mask=~t_grad_window)
-        #         t_grad_avg = np.ma.average(t_grad_windowed_ind, weights=t_grad_windowed, axis=1)
-        #
-        #         max_ = np.max(r1, axis=1)
-        #         reversed_ = r1[:, ::-1]
-        #         peak_time_i = np.ones(r1.shape) * t_max[:, None]
-        #         mask_before = np.ma.masked_less(ind, peak_time_i).mask
-        #         mask_after = np.ma.masked_greater(r1, peak_time_i).mask
-        #         masked_bef = np.ma.masked_array(r1, mask_before)
-        #         masked_aft = np.ma.masked_array(reversed_, mask_after)
-        #         half_max = max_/2
-        #         d_l = np.diff(np.sign(half_max[:, None] - masked_aft))
-        #         d_r = np.diff(np.sign(half_max[:, None] - masked_bef))
-        #         t_l = r_ind[0, np.argmax(d_l, axis=1) + 1]
-        #         t_r = ind[0, np.argmax(d_r, axis=1) + 1]
-        #         fwhm = t_r - t_l
-        #
-        #         # if (t_grad > 60).any():
-        #         #     print(event_id)
-        #         #
-        #         if event_id == 23:
-        #             continue
-        #
-        #         d = dict(run=run,
-        #                  type=rt,
-        #                  index=ev,
-        #                  id=event_id,
-        #                  time=time,
-        #                  tack=tack,
-        #                  fci=fci,
-        #                  bp=bp,
-        #                  mask=mask,
-        #                  dl1=dl1,
-        #                  t=t_max,
-        #                  t_grad=t_grad_max,
-        #                  t_avg=t_avg,
-        #                  t_grad_avg=t_grad_avg,
-        #                  fwhm=fwhm
-        #                  )
-        #         df_list.append(d)
-        #
-        # self.df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
-        # store['df'] = self.df
+        readers = [self.reader_led, self.reader_laser]
+        r1s = [self.r1_led, self.r1_laser]
+        run_type = ['led', 'laser']
+
+        for reader, r1_cal, rt in zip(readers, r1s, run_type):
+            run = reader.filename
+            n_events = reader.num_events
+            source = reader.read()
+            desc = "Processing Events for {} run".format(rt)
+            for event in tqdm(source, total=n_events, desc=desc):
+                ev = event.count
+                event_id = event.r0.event_id
+                time = event.trig.gps_time.value
+                tack = event.meta['tack']
+                fci = np.copy(event.r0.tel[0].first_cell_ids)
+                bp = event.r0.tel[0].blockphase
+
+                r1_cal.calibrate(event)
+                self.dl0.reduce(event)
+                self.dl1.calibrate(event)
+                r0 = event.r0.tel[0].adc_samples[0]
+                r1 = event.r1.tel[0].pe_samples[0]
+                dl1 = event.dl1.tel[0].image[0]
+
+                smooth_flat = np.convolve(r1.ravel(), kernel, "same")
+                smoothed = np.reshape(smooth_flat, r1.shape)
+                samples_std = np.std(r1, axis=1)
+                smooth_baseline_std = np.std(smoothed, axis=1)
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    smoothed *= (samples_std / smooth_baseline_std)[:, None]
+                    smoothed[~np.isfinite(smoothed)] = 0
+                r1 = smoothed
+
+                f = interpolate.interp1d(x_base, r1, kind=3, axis=1)
+                r1 = f(x_interp)
+
+                grad = np.gradient(r1)[1]
+
+                saturated = np.any(r0 < 10, 1)
+                low_pe = np.all(r1 < 10, 1)
+                mask = dead | saturated | low_pe
+
+                t_max = x_interp[np.argmax(r1, 1)]
+                t_start = t_max - 2
+                t_end = t_max + 2
+                t_window = (ind_x >= t_start[..., None]) & (ind_x < t_end[..., None])
+                t_windowed = np.ma.array(r1, mask=~t_window)
+                t_windowed_ind = np.ma.array(ind_x, mask=~t_window)
+                t_avg = np.ma.average(t_windowed_ind, weights=t_windowed, axis=1)
+
+                t_grad_max = x_interp[np.argmax(grad, 1)]
+                t_grad_start = t_grad_max - 2
+                t_grad_end = t_grad_max + 2
+                t_grad_window = (ind_x >= t_grad_start[..., None]) & (ind_x < t_grad_end[..., None])
+                t_grad_windowed = np.ma.array(grad, mask=~t_grad_window)
+                t_grad_windowed_ind = np.ma.array(ind_x, mask=~t_grad_window)
+                t_grad_avg = np.ma.average(t_grad_windowed_ind, weights=t_grad_windowed, axis=1)
+
+                max_ = np.max(r1, axis=1)
+                reversed_ = r1[:, ::-1]
+                peak_time_i = np.ones(r1.shape) * t_max[:, None]
+                mask_before = np.ma.masked_less(ind_x, peak_time_i).mask
+                mask_after = np.ma.masked_greater(r_ind_x, peak_time_i).mask
+                masked_bef = np.ma.masked_array(r1, mask_before)
+                masked_aft = np.ma.masked_array(reversed_, mask_after)
+                half_max = max_/2
+                d_l = np.diff(np.sign(half_max[:, None] - masked_aft))
+                d_r = np.diff(np.sign(half_max[:, None] - masked_bef))
+                t_l = x_interp[r_ind[0, np.argmax(d_l, axis=1) + 1]]
+                t_r = x_interp[ind[0, np.argmax(d_r, axis=1) + 1]]
+                fwhm = t_r - t_l
+
+                # if (t_grad > 60).any():
+                #     print(event_id)
+                #
+                if event_id == 23:
+                    continue
+
+                d = dict(run=run,
+                         type=rt,
+                         index=ev,
+                         id=event_id,
+                         time=time,
+                         tack=tack,
+                         fci=fci,
+                         bp=bp,
+                         mask=mask,
+                         dl1=dl1,
+                         t=t_max,
+                         t_grad=t_grad_max,
+                         t_avg=t_avg,
+                         t_grad_avg=t_grad_avg,
+                         fwhm=fwhm
+                         )
+                df_list.append(d)
+
+        self.df = pd.DataFrame(df_list)
+        store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
+        store['df'] = self.df
 
         store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
         self.df = store['df']
@@ -604,6 +625,14 @@ class TimingExtractor(Tool):
         fwhm = fwhm[fwhm > 0]
         self.p_laser_fwhm.create(fwhm, "FWHM", "FWHM Distribution")
 
+        # 1D histograms
+        index = eid[eid == self.eoi].index[0]
+        eoi_t = t[index].compressed()
+        eoi_tgrad = t_grad[index].compressed()
+        t_shifted = (t - t.mean(1)[:, None]).compressed()
+        t_grad_shifted = (t_grad - t_grad.mean(1)[:, None]).compressed()
+        self.p_laser_1d_final.create(t_shifted, "Peak Time", "Smoothed Local Peak Time (all events)")
+
         # self.p_led_eidvsfci.save()
         # self.p_led_timevstack.save()
         # self.p_led_bpvstack.save()
@@ -622,6 +651,7 @@ class TimingExtractor(Tool):
         self.p_laser_1dcomp_wavg.save()
         self.p_laser_1deoicomp.save()
         self.p_laser_1dcomp.save()
+        self.p_laser_1d_final.save()
         self.p_laser_imageeoitgrad.save()
 
         self.p_laser_fwhm.save()

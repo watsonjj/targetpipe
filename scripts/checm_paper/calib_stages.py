@@ -3,6 +3,7 @@ Config('checm')
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.ticker import MultipleLocator
 from traitlets import Dict, List
 from ctapipe.core import Tool
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
@@ -16,6 +17,7 @@ from ctapipe.visualization import CameraDisplay
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.plots.official import OfficialPlotter
+from targetpipe.utils.dactov import checm_dac_to_volts
 
 
 class ImagePlotter(OfficialPlotter):
@@ -37,7 +39,7 @@ class ImagePlotter(OfficialPlotter):
         """
         super().__init__(config=config, tool=tool, **kwargs)
 
-        self.fig = plt.figure(figsize=(8, 8))
+        self.fig = plt.figure(figsize=(13, 8))
         self.ax = self.fig.add_subplot(1, 1, 1)
         self.fig.subplots_adjust(right=0.85)
 
@@ -46,7 +48,7 @@ class ImagePlotter(OfficialPlotter):
         camera = CameraDisplay(geom, ax=self.ax,
                                image=image,
                                cmap='viridis')
-        camera.add_colorbar()
+        camera.add_colorbar(pad=-0.2)
         camera.colorbar.set_label("Amplitude ({})".format(units), fontsize=20)
         camera.image = image
 
@@ -90,6 +92,7 @@ class WaveformPlotter(OfficialPlotter):
         self.ax.set_title(title)
         self.ax.set_xlabel("Time (ns)", fontsize=20)
         self.ax.set_ylabel("Amplitude ({})".format(units), fontsize=20)
+        self.ax.xaxis.set_major_locator(MultipleLocator(16))
 
 
 class CalibStages(Tool):
@@ -110,7 +113,7 @@ class CalibStages(Tool):
 
         self.p_raw = None
         self.p_calibpedestal = None
-        self.p_calibadc = None
+        self.p_calibmv = None
         self.p_calibpe = None
         self.p_charge = None
         self.p_cleaned = None
@@ -119,7 +122,7 @@ class CalibStages(Tool):
 
         self.p_raw_wf = None
         self.p_calibpedestal_wf = None
-        self.p_calibadc_wf = None
+        self.p_calibmv_wf = None
         self.p_calibpe_wf = None
         self.p_cleaned_wf = None
 
@@ -157,7 +160,7 @@ class CalibStages(Tool):
         p_kwargs['figure_name'] = "1_r1_calib_pedestal"
         self.p_calibpedestal = ImagePlotter(**p_kwargs)
         p_kwargs['figure_name'] = "2_r1_calib_adc"
-        self.p_calibadc = ImagePlotter(**p_kwargs)
+        self.p_calibmv = ImagePlotter(**p_kwargs)
         p_kwargs['figure_name'] = "3_r1_calib_pe"
         self.p_calibpe = ImagePlotter(**p_kwargs)
         p_kwargs['figure_name'] = "4_dl1_charge"
@@ -174,7 +177,7 @@ class CalibStages(Tool):
         p_kwargs['figure_name'] = "1_r1_calib_pedestal_wf"
         self.p_calibpedestal_wf = WaveformPlotter(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "2_r1_calib_adc_wf"
-        self.p_calibadc_wf = WaveformPlotter(**p_kwargs, shape='wide')
+        self.p_calibmv_wf = WaveformPlotter(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "3_r1_calib_pe_wf"
         self.p_calibpe_wf = WaveformPlotter(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "4_cleaned_wf"
@@ -211,11 +214,11 @@ class CalibStages(Tool):
 
         t0_r0 = r0[0, :, t0]
         t0_r1 = r1[0, :, t0]
-        t0_r1_adc = r1_adc[0, :, t0]
+        t0_r1_mv = checm_dac_to_volts(r1_adc[0, :, t0])
         t0_r1_pedestal = r1_pedestal[0, :, t0]
         pix_r0 = r0[0, pix, :]
         pix_r1 = r1[0, pix, :]
-        pix_r1_adc = r1_adc[0, pix, :]
+        pix_r1_mv = checm_dac_to_volts(r1_adc[0, pix, :])
         pix_r1_pedestal = r1_pedestal[0, pix, :]
         pix_cleaned = cleaned[pix]
 
@@ -226,10 +229,10 @@ class CalibStages(Tool):
 
         t = "Raw, T={}ns".format(t0)
         self.p_raw.create(t, "ADC", t0_r0, geom, tc, tc)
-        t = "R1 Calibrated Pedestal, T={}ns".format(t0)
+        t = "R1 Pedestal Subtracted, T={}ns".format(t0)
         self.p_calibpedestal.create(t, "ADC", t0_r1_pedestal, geom, tc, tc)
-        t = "R1 Calibrated ADC, T={}ns".format(t0)
-        self.p_calibadc.create(t, "ADC", t0_r1_adc, geom, tc, tc)
+        t = "R1 Transfer Function Applied, T={}ns".format(t0)
+        self.p_calibmv.create(t, "V", t0_r1_mv, geom, tc, tc)
         t = "R1 Calibrated p.e., T={}ns".format(t0)
         self.p_calibpe.create(t, "p.e.", t0_r1, geom, tc, tc)
         t = "DL1 Extracted Charge"
@@ -245,10 +248,10 @@ class CalibStages(Tool):
 
         t = "Raw, pix={}".format(pix)
         self.p_raw_wf.create(pix_r0, t, 'ADC')
-        t = "R1 Calibrated Pedestal, pix={}".format(pix)
+        t = "R1 Pedestal Subtracted, pix={}".format(pix)
         self.p_calibpedestal_wf.create(pix_r1_pedestal, t, 'ADC')
-        t = "R1 Calibrated ADC, pix={}".format(pix)
-        self.p_calibadc_wf.create(pix_r1_adc, t, 'ADC')
+        t = "R1 Transfer Function Applied, pix={}".format(pix)
+        self.p_calibmv_wf.create(pix_r1_mv, t, 'V')
         t = "R1 Calibrated p.e., pix={}".format(pix)
         self.p_calibpe_wf.create(pix_r1, t, 'p.e.')
         t = "Cleaned Wf, pix={}".format(pix)
@@ -257,7 +260,7 @@ class CalibStages(Tool):
     def finish(self):
         self.p_raw.save()
         self.p_calibpedestal.save()
-        self.p_calibadc.save()
+        self.p_calibmv.save()
         self.p_calibpe.save()
         self.p_charge.save()
         self.p_cleaned.save()
@@ -266,7 +269,7 @@ class CalibStages(Tool):
 
         self.p_raw_wf.save()
         self.p_calibpedestal_wf.save()
-        self.p_calibadc_wf.save()
+        self.p_calibmv_wf.save()
         self.p_calibpe_wf.save()
         self.p_cleaned_wf.save()
 
