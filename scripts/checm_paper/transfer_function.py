@@ -47,7 +47,7 @@ class TFPlotter(OfficialPlotter):
         self.ax.fill_between(x, tf_min, tf_max, color='black', label='Range')
         # self.ax.plot(x, tf_avg, color='grey', label='Average', lw=2)
         self.ax.plot(x, tf_single, color='grey', label='Single', lw=2)
-        self.ax.set_title(title)
+        # self.ax.set_title(title)
         self.ax.set_xlabel("ADC - Pedestal")
         self.ax.set_ylabel("DAC - Baseline (V)")
         self.ax.legend(loc=2)
@@ -79,7 +79,6 @@ class BeforeAfterHist(OfficialPlotter):
         self.ax_add.xaxis.set_label_position('bottom')
         self.ax_add.xaxis.set_ticks_position('bottom')
         self.ax_add.xaxis.label.set_color('g')
-        self.ax_add.tick_params(labelsize=19)
         self.ax_add.xaxis.set_minor_locator(AutoMinorLocator(5))
 
         tkw = dict(size=4, width=1.5)
@@ -113,7 +112,7 @@ class BeforeAfterHist(OfficialPlotter):
 
     def create(self, title=""):
         self.ax.set_ylabel("Probability Density")
-        self.ax.set_title(title)
+        # self.ax.set_title(title)
 
         # self.ax.xaxis.set_minor_locator(MultipleLocator(0.5))
         # self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
@@ -144,7 +143,6 @@ class Scatter(OfficialPlotter):
         self.ax.yaxis.label.set_color('b')
         self.ax_add = self.ax.twinx()
         self.ax_add.yaxis.label.set_color('g')
-        self.ax_add.tick_params(labelsize=19)
         self.ax_add.yaxis.set_minor_locator(AutoMinorLocator(5))
 
         tkw = dict(size=4, width=1.5)
@@ -173,7 +171,7 @@ class Scatter(OfficialPlotter):
     def create(self, x_label="", y_label="", title=""):
         self.ax.set_xlabel(x_label)
         # self.ax.set_ylabel(y_label)
-        self.fig.suptitle(title)
+        # self.fig.suptitle(title)
 
 
 class TFInvestigator(Tool):

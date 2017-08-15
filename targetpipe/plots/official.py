@@ -39,24 +39,26 @@ class OfficialPlotter(Component):
         sns.set_style("white")
         sns.set_style("ticks")
         sns.set_context(self.type, rc={"font.famly": "Helvetica",
-                                       "font.size":20,
-                                       "axes.titlesize":20,
-                                       "axes.labelsize":20
+                                       "font.size":10,
+                                       "axes.titlesize":10,
+                                       "axes.labelsize":10,
+                                       "legend.fontsize": 10,
+                                       "text.fontsize": 10
                                        })
 
         if self.shape == 'wide':
-            self.fig = plt.figure(figsize=(7, 5))
+            self.fig = plt.figure(figsize=(8, 4))
         else:
             self.fig = plt.figure(figsize=(4, 4))
         self.ax = self.fig.add_subplot(1, 1, 1)
 
-        self.ax.xaxis.set_minor_locator(AutoMinorLocator(5))
-        self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
-        # plt.tick_params(which='both', width=1)
-        # plt.tick_params(which='minor', length=4)
-        # plt.tick_params(axis='both', which='major', length=8)
+        self.ax.xaxis.set_minor_locator(AutoMinorLocator())
+        self.ax.yaxis.set_minor_locator(AutoMinorLocator())
+        plt.tick_params(which='both', width=1)
+        plt.tick_params(which='minor', length=4)
+        plt.tick_params(which='major', length=7)
 
-        self.ax.tick_params(labelsize=19)
+        # self.ax.tick_params(labelsize=19)
 
         self.extension = 'pdf'
         base_dir = "/Volumes/gct-jason/plots/checm_paper"

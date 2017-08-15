@@ -90,8 +90,8 @@ class WaveformPlotter(OfficialPlotter):
     def create(self, waveform, title, units):
         self.ax.plot(waveform, color='black')
         self.ax.set_title(title)
-        self.ax.set_xlabel("Time (ns)", fontsize=20)
-        self.ax.set_ylabel("Amplitude ({})".format(units), fontsize=20)
+        self.ax.set_xlabel("Time (ns)")
+        self.ax.set_ylabel("Amplitude ({})".format(units))
         self.ax.xaxis.set_major_locator(MultipleLocator(16))
 
 

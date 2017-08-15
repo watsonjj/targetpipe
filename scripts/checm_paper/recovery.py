@@ -35,137 +35,6 @@ from targetpipe.utils.dactov import checm_dac_to_volts
 from IPython import embed
 
 
-class ViolinPlotter(OfficialPlotter):
-    name = 'ADC2PEPlotter'
-
-    def __init__(self, config, tool, **kwargs):
-        """
-        Parameters
-        ----------
-        config : traitlets.loader.Config
-            Configuration specified by config file or cmdline arguments.
-            Used to set traitlet values.
-            Set to None if no configuration to pass.
-        tool : ctapipe.core.Tool
-            Tool executable that is calling this component.
-            Passes the correct logger to the component.
-            Set to None if no Tool to pass.
-        kwargs
-        """
-        super().__init__(config=config, tool=tool, **kwargs)
-
-    def create(self, df):
-        sns.violinplot(ax=self.ax, data=df, x='level', y='charge', hue='cal_t',
-                       split=True, scale='count', inner='quartile',
-                       legend=False)
-        self.ax.set_title("Distribution Before and After ADC2PE Correction")
-        self.ax.set_xlabel('FW')
-        self.ax.set_ylabel('Charge (p.e.)')
-        self.ax.legend(loc="upper right")
-
-        major_locator = MultipleLocator(50)
-        major_formatter = FormatStrFormatter('%d')
-        minor_locator = MultipleLocator(10)
-        self.ax.yaxis.set_major_locator(major_locator)
-        self.ax.yaxis.set_major_formatter(major_formatter)
-        self.ax.yaxis.set_minor_locator(minor_locator)
-
-
-class Dist1D(OfficialPlotter):
-    name = 'Dist1D'
-
-    def __init__(self, config, tool, **kwargs):
-        """
-        Parameters
-        ----------
-        config : traitlets.loader.Config
-            Configuration specified by config file or cmdline arguments.
-            Used to set traitlet values.
-            Set to None if no configuration to pass.
-        tool : ctapipe.core.Tool
-            Tool executable that is calling this component.
-            Passes the correct logger to the component.
-            Set to None if no Tool to pass.
-        kwargs
-        """
-        super().__init__(config=config, tool=tool, **kwargs)
-
-    def create(self, df):
-        charge = df.loc[df['key'] == '3050', 'charge']
-        charge_pe = df.loc[df['key'] == '3050pe', 'charge']
-        std = charge.std()
-        std_pe = charge_pe.std()
-        median = np.median(charge)
-        median_pe = np.median(charge_pe)
-        q75, q25 = np.percentile(charge, [75, 25])
-        q75_pe, q25_pe = np.percentile(charge_pe, [75, 25])
-        sns.kdeplot(charge, ax=self.ax, color="blue", shade=True, label='Uncal (stddev = {:.2f})'.format(std))
-        sns.kdeplot(charge_pe, ax=self.ax, color="green", shade=True, label='Cal, ADC2PE Calibrated (stddev = {:.2f})'.format(std_pe))
-
-        x, y = self.ax.get_lines()[0].get_data()
-        y_median_1000 = y[np.abs(x-median).argmin()]
-        y_q25_1000 = y[np.abs(x-q25).argmin()]
-        y_q75_1000 = y[np.abs(x-q75).argmin()]
-        x, y = self.ax.get_lines()[1].get_data()
-        y_median_1000pe = y[np.abs(x-median_pe).argmin()]
-        y_q25_1000pe = y[np.abs(x-q25_pe).argmin()]
-        y_q75_1000pe = y[np.abs(x-q75_pe).argmin()]
-
-        self.ax.vlines(median, 0, y_median_1000, color="blue", linestyle='--')
-        self.ax.vlines(q25, 0, y_q25_1000, color="blue", linestyle=':')
-        self.ax.vlines(q75, 0, y_q75_1000, color="blue", linestyle=':')
-        self.ax.vlines(median_pe, 0, y_median_1000pe, color="green", linestyle='--')
-        self.ax.vlines(q25_pe, 0, y_q25_1000pe, color="green", linestyle=':')
-        self.ax.vlines(q75_pe, 0, y_q75_1000pe, color="green", linestyle=':')
-
-        self.ax.set_title("Distribution of Charge Across the Camera")
-        self.ax.set_xlabel('Charge (p.e.)')
-        self.ax.set_ylabel('Density')
-        self.ax.legend(loc="upper right", prop={'size': 9})
-
-        majorLocator = MultipleLocator(50)
-        majorFormatter = FormatStrFormatter('%d')
-        minorLocator = MultipleLocator(10)
-        self.ax.xaxis.set_major_locator(majorLocator)
-        self.ax.xaxis.set_major_formatter(majorFormatter)
-        self.ax.xaxis.set_minor_locator(minorLocator)
-
-
-class ImagePlotter(OfficialPlotter):
-    name = 'ImagePlotter'
-
-    def __init__(self, config, tool, **kwargs):
-        """
-        Parameters
-        ----------
-        config : traitlets.loader.Config
-            Configuration specified by config file or cmdline arguments.
-            Used to set traitlet values.
-            Set to None if no configuration to pass.
-        tool : ctapipe.core.Tool
-            Tool executable that is calling this component.
-            Passes the correct logger to the component.
-            Set to None if no Tool to pass.
-        kwargs
-        """
-        super().__init__(config=config, tool=tool, **kwargs)
-
-        self.fig = plt.figure(figsize=(8, 8))
-        self.ax = self.fig.add_subplot(1, 1, 1)
-
-    def create(self, image, label, title):
-        camera = CameraDisplay(get_geometry(), ax=self.ax,
-                               image=image,
-                               cmap='viridis')
-        camera.add_colorbar()
-        camera.colorbar.set_label(label, fontsize=20)
-        camera.image = image
-        camera.colorbar.ax.tick_params(labelsize=30)
-
-        self.ax.set_title(title)
-        self.ax.axis('off')
-
-
 class Scatter(OfficialPlotter):
     name = 'Scatter'
 
@@ -207,7 +76,7 @@ class Scatter(OfficialPlotter):
     def create(self, x_label="", y_label="", title=""):
         self.ax.set_xlabel(x_label)
         self.ax.set_ylabel(y_label)
-        self.fig.suptitle(title)
+        # self.fig.suptitle(title)
 
     def add_xy_line(self):
         lims = [
@@ -231,22 +100,6 @@ class Scatter(OfficialPlotter):
 
     def add_legend(self, loc=2):
         self.ax.legend(loc=loc)
-
-
-class WaveformPlotter(OfficialPlotter):
-    name = 'WaveformPlotter'
-
-    def add(self, waveform, label):
-        self.ax.plot(waveform, label=label)
-
-    def create(self, title, y_label):
-        self.ax.set_title(title)
-        self.ax.set_xlabel("Time (ns)", fontsize=20)
-        self.ax.set_ylabel(y_label, fontsize=20)
-
-    def save(self, output_path=None):
-        self.ax.legend(loc=2)
-        super().save(output_path)
 
 
 class ADC2PEPlots(Tool):
@@ -475,9 +328,9 @@ class ADC2PEPlots(Tool):
         df = store['df_ill']
 
         df_lj = df.loc[((df['type'] == 'LS62') &
-                        (df['illumination'] < 20)) |
+                        (df['level'] <= 2850)) |
                        ((df['type'] == 'LS64') &
-                        (df['illumination'] >= 20))]
+                        (df['level'] >= 2450))]
 
         gradient = np.zeros(self.n_pixels)
         intercept = np.zeros(self.n_pixels)

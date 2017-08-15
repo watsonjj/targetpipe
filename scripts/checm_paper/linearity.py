@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter, \
     AutoMinorLocator, ScalarFormatter, FuncFormatter
 import seaborn as sns
-from scipy.stats import norm
+from scipy.stats import norm, binned_statistic as bs
 from scipy import interpolate
 
 from os.path import exists, join
@@ -58,7 +58,7 @@ class ViolinPlotter(OfficialPlotter):
         sns.violinplot(ax=self.ax, data=df, x='level', y='charge', hue='cal_t',
                        split=True, scale='count', inner='quartile',
                        legend=False)
-        self.ax.set_title("Distribution Before and After ADC2PE Correction")
+        # self.ax.set_title("Distribution Before and After ADC2PE Correction")
         self.ax.set_xlabel('FW')
         self.ax.set_ylabel('Charge (p.e.)')
         self.ax.legend(loc="upper right")
@@ -118,7 +118,7 @@ class Dist1D(OfficialPlotter):
         self.ax.vlines(q25_pe, 0, y_q25_1000pe, color="green", linestyle=':')
         self.ax.vlines(q75_pe, 0, y_q75_1000pe, color="green", linestyle=':')
 
-        self.ax.set_title("Distribution of Charge Across the Camera")
+        # self.ax.set_title("Distribution of Charge Across the Camera")
         self.ax.set_xlabel('Charge (p.e.)')
         self.ax.set_ylabel('Density')
         self.ax.legend(loc="upper right", prop={'size': 9})
@@ -162,7 +162,7 @@ class ImagePlotter(OfficialPlotter):
         camera.image = image
         camera.colorbar.ax.tick_params(labelsize=30)
 
-        self.ax.set_title(title)
+        # self.ax.set_title(title)
         self.ax.axis('off')
 
 
@@ -202,7 +202,7 @@ class Scatter(OfficialPlotter):
     def create(self, x_label="", y_label="", title=""):
         self.ax.set_xlabel(x_label)
         self.ax.set_ylabel(y_label)
-        self.fig.suptitle(title)
+        # self.fig.suptitle(title)
 
     def add_xy_line(self):
         lims = [
@@ -225,7 +225,7 @@ class Scatter(OfficialPlotter):
         self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
 
     def add_legend(self, loc=2):
-        self.ax.legend(loc=loc)
+        self.ax.legend(loc=loc, prop={'size': 9})
 
 
 class WaveformPlotter(OfficialPlotter):
@@ -235,13 +235,103 @@ class WaveformPlotter(OfficialPlotter):
         self.ax.plot(waveform, label=label)
 
     def create(self, title, y_label):
-        self.ax.set_title(title)
-        self.ax.set_xlabel("Time (ns)", fontsize=20)
-        self.ax.set_ylabel(y_label, fontsize=20)
+        # self.ax.set_title(title)
+        self.ax.set_xlabel("Time (ns)")
+        self.ax.set_ylabel(y_label)
 
     def save(self, output_path=None):
         self.ax.legend(loc=2)
         super().save(output_path)
+
+
+class Profile(OfficialPlotter):
+    name = 'Profile'
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+        self.ddof = 0
+        self.bin_edges = None
+        self.n = None
+        self.s = None
+        self.s2 = None
+
+    @staticmethod
+    def sum_squared(array):
+        return np.sum(array ** 2)
+
+    @property
+    def mean(self):
+        n = np.ma.masked_where(self.n == 0, self.n)
+        return self.s / n
+
+    @property
+    def variance(self):
+        n = np.ma.masked_where(self.n == 0, self.n)
+        return (n * self.s2 - self.s ** 2) / \
+               (n * (n - self.ddof))
+
+    @property
+    def stddev(self):
+        return np.sqrt(self.variance)
+
+    def create(self, x_range, n_xbins, log=False):
+        if not log:
+            empty, self.bin_edges = np.histogram(None, range=x_range,
+                                                 bins=n_xbins)
+        else:
+            if (x_range[0] <= 0) or (x_range[1] <= 0):
+                raise ValueError("X range can only be greater than zero"
+                                 " for log bins")
+            x_range_log = np.log10(x_range)
+            empty, self.bin_edges = np.histogram(np.nan, range=x_range_log,
+                                                 bins=n_xbins)
+            self.bin_edges = 10 ** self.bin_edges
+        self.n = np.zeros(empty.shape)
+        self.s = np.zeros(empty.shape)
+        self.s2 = np.zeros(empty.shape)
+
+    def add(self, x, y):
+        # TODO: Use Welford's Method to avoid issues when mean>>stddev
+        x = x.ravel()
+        y = y.ravel()
+        count, _, _ = bs(x, y, statistic='count', bins=self.bin_edges)
+        s, _, _ = bs(x, y, statistic='sum', bins=self.bin_edges)
+        s2, _, _ = bs(x, y, statistic=self.sum_squared, bins=self.bin_edges)
+        s2[np.isnan(s2)] = 0
+        self.n += count
+        self.s += s
+        self.s2 += s2
+
+    def save_numpy(self, path):
+        self.log.info("Saving Profile numpy file: {}".format(path))
+        np.savez(path, n=self.n, s=self.s, s2=self.s2)
+
+    def load_numpy(self, path):
+        self.log.info("Loading Profile numpy file: {}".format(path))
+        file = np.load(path)
+        self.n = file['n']
+        self.s = file['s']
+        self.s2 = file['s2']
+
+    def plot(self, x_label, y_label):
+        x = (self.bin_edges[1:] + self.bin_edges[:-1]) / 2
+        y = self.mean
+        y_err = self.stddev
+        (_, caps, _) = self.ax.errorbar(x, y, xerr=None, yerr=y_err, fmt='o',
+                                        mew=0.5, color='black',
+                                        markersize=3, capsize=3)
+        for cap in caps:
+            cap.set_markeredgewidth(1)
+        self.ax.set_xlabel(x_label)
+        self.ax.set_ylabel(y_label)
+
+    def set_x_log(self):
+        self.ax.set_xscale('log')
+        self.ax.get_xaxis().set_major_formatter(FuncFormatter(lambda x, _: '{:g}'.format(x)))
+
+    def set_y_log(self):
+        self.ax.set_yscale('log')
+        self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
 
 
 class ADC2PEPlots(Tool):
@@ -276,12 +366,14 @@ class ADC2PEPlots(Tool):
         self.p_image_saturated = None
         self.p_scatter_pix = None
         self.p_scatter_camera = None
-        self.p_scatter_led = None
-        self.p_scatter_led_width = None
         self.p_time_res = None
         self.p_time_res_pix = None
         self.p_fwhm_camera = None
         self.p_rt_camera = None
+        self.p_fwhm_profile = None
+        self.p_rt_profile = None
+        self.p_fwhm_pix = None
+        self.p_rt_pix = None
         self.p_wf_dict = {}
         self.p_wf_zoom_dict = {}
         self.p_avgwf_dict = {}
@@ -344,91 +436,6 @@ class ADC2PEPlots(Tool):
         dfl.append(dict(path=base_path_pe.format(3994), type="LS62", cal=True, level=2850))
         dfl.append(dict(path=base_path_pe.format(3995), type="LS62", cal=True, level=3050))
 
-        base_path = "/Volumes/gct-jason/data/170322/led/Run{:05}_r1_adc.tio"
-        base_path_pe = "/Volumes/gct-jason/data/170322/led/Run{:05}_r1_pe.tio"
-
-        dfl.append(dict(path=base_path.format(4333), type="LED", cal=False, level=0))
-        dfl.append(dict(path=base_path.format(4334), type="LED", cal=False, level=1))
-        dfl.append(dict(path=base_path.format(4335), type="LED", cal=False, level=2))
-        dfl.append(dict(path=base_path.format(4336), type="LED", cal=False, level=3))
-        dfl.append(dict(path=base_path.format(4337), type="LED", cal=False, level=4))
-        dfl.append(dict(path=base_path.format(4338), type="LED", cal=False, level=5))
-        dfl.append(dict(path=base_path.format(4339), type="LED", cal=False, level=6))
-        dfl.append(dict(path=base_path.format(4340), type="LED", cal=False, level=7))
-        dfl.append(dict(path=base_path.format(4341), type="LED", cal=False, level=8))
-        dfl.append(dict(path=base_path.format(4342), type="LED", cal=False, level=9))
-        dfl.append(dict(path=base_path.format(4343), type="LED", cal=False, level=10))
-        dfl.append(dict(path=base_path.format(4344), type="LED", cal=False, level=11))
-        dfl.append(dict(path=base_path.format(4345), type="LED", cal=False, level=12))
-        dfl.append(dict(path=base_path.format(4346), type="LED", cal=False, level=13))
-        dfl.append(dict(path=base_path.format(4347), type="LED", cal=False, level=14))
-        dfl.append(dict(path=base_path.format(4348), type="LED", cal=False, level=15))
-        dfl.append(dict(path=base_path.format(4349), type="LED", cal=False, level=16))
-        dfl.append(dict(path=base_path.format(4350), type="LED", cal=False, level=17))
-        dfl.append(dict(path=base_path.format(4351), type="LED", cal=False, level=18))
-        dfl.append(dict(path=base_path.format(4352), type="LED", cal=False, level=19))
-        dfl.append(dict(path=base_path.format(4353), type="LED", cal=False, level=20))
-        dfl.append(dict(path=base_path.format(4354), type="LED", cal=False, level=21))
-        dfl.append(dict(path=base_path.format(4355), type="LED", cal=False, level=22))
-        dfl.append(dict(path=base_path.format(4356), type="LED", cal=False, level=23))
-        dfl.append(dict(path=base_path.format(4357), type="LED", cal=False, level=24))
-        dfl.append(dict(path=base_path.format(4358), type="LED", cal=False, level=25))
-        dfl.append(dict(path=base_path.format(4359), type="LED", cal=False, level=26))
-        dfl.append(dict(path=base_path.format(4360), type="LED", cal=False, level=27))
-        dfl.append(dict(path=base_path.format(4361), type="LED", cal=False, level=28))
-        dfl.append(dict(path=base_path.format(4362), type="LED", cal=False, level=29))
-        dfl.append(dict(path=base_path.format(4363), type="LED", cal=False, level=30))
-        dfl.append(dict(path=base_path.format(4364), type="LED", cal=False, level=31))
-        dfl.append(dict(path=base_path.format(4365), type="LED", cal=False, level=32))
-        dfl.append(dict(path=base_path.format(4366), type="LED", cal=False, level=33))
-        dfl.append(dict(path=base_path.format(4367), type="LED", cal=False, level=34))
-        dfl.append(dict(path=base_path.format(4368), type="LED", cal=False, level=35))
-        dfl.append(dict(path=base_path.format(4369), type="LED", cal=False, level=36))
-        dfl.append(dict(path=base_path.format(4370), type="LED", cal=False, level=37))
-        dfl.append(dict(path=base_path.format(4371), type="LED", cal=False, level=38))
-        dfl.append(dict(path=base_path.format(4372), type="LED", cal=False, level=39))
-
-        dfl.append(dict(path=base_path_pe.format(4333), type="LED", cal=True, level=0))
-        dfl.append(dict(path=base_path_pe.format(4334), type="LED", cal=True, level=1))
-        dfl.append(dict(path=base_path_pe.format(4335), type="LED", cal=True, level=2))
-        dfl.append(dict(path=base_path_pe.format(4336), type="LED", cal=True, level=3))
-        dfl.append(dict(path=base_path_pe.format(4337), type="LED", cal=True, level=4))
-        dfl.append(dict(path=base_path_pe.format(4338), type="LED", cal=True, level=5))
-        dfl.append(dict(path=base_path_pe.format(4339), type="LED", cal=True, level=6))
-        dfl.append(dict(path=base_path_pe.format(4340), type="LED", cal=True, level=7))
-        dfl.append(dict(path=base_path_pe.format(4341), type="LED", cal=True, level=8))
-        dfl.append(dict(path=base_path_pe.format(4342), type="LED", cal=True, level=9))
-        dfl.append(dict(path=base_path_pe.format(4343), type="LED", cal=True, level=10))
-        dfl.append(dict(path=base_path_pe.format(4344), type="LED", cal=True, level=11))
-        dfl.append(dict(path=base_path_pe.format(4345), type="LED", cal=True, level=12))
-        dfl.append(dict(path=base_path_pe.format(4346), type="LED", cal=True, level=13))
-        dfl.append(dict(path=base_path_pe.format(4347), type="LED", cal=True, level=14))
-        dfl.append(dict(path=base_path_pe.format(4348), type="LED", cal=True, level=15))
-        dfl.append(dict(path=base_path_pe.format(4349), type="LED", cal=True, level=16))
-        dfl.append(dict(path=base_path_pe.format(4350), type="LED", cal=True, level=17))
-        dfl.append(dict(path=base_path_pe.format(4351), type="LED", cal=True, level=18))
-        dfl.append(dict(path=base_path_pe.format(4352), type="LED", cal=True, level=19))
-        dfl.append(dict(path=base_path_pe.format(4353), type="LED", cal=True, level=20))
-        dfl.append(dict(path=base_path_pe.format(4354), type="LED", cal=True, level=21))
-        dfl.append(dict(path=base_path_pe.format(4355), type="LED", cal=True, level=22))
-        dfl.append(dict(path=base_path_pe.format(4356), type="LED", cal=True, level=23))
-        dfl.append(dict(path=base_path_pe.format(4357), type="LED", cal=True, level=24))
-        dfl.append(dict(path=base_path_pe.format(4358), type="LED", cal=True, level=25))
-        dfl.append(dict(path=base_path_pe.format(4359), type="LED", cal=True, level=26))
-        dfl.append(dict(path=base_path_pe.format(4360), type="LED", cal=True, level=27))
-        dfl.append(dict(path=base_path_pe.format(4361), type="LED", cal=True, level=28))
-        dfl.append(dict(path=base_path_pe.format(4362), type="LED", cal=True, level=29))
-        dfl.append(dict(path=base_path_pe.format(4363), type="LED", cal=True, level=30))
-        dfl.append(dict(path=base_path_pe.format(4364), type="LED", cal=True, level=31))
-        dfl.append(dict(path=base_path_pe.format(4365), type="LED", cal=True, level=32))
-        dfl.append(dict(path=base_path_pe.format(4366), type="LED", cal=True, level=33))
-        dfl.append(dict(path=base_path_pe.format(4367), type="LED", cal=True, level=34))
-        dfl.append(dict(path=base_path_pe.format(4368), type="LED", cal=True, level=35))
-        dfl.append(dict(path=base_path_pe.format(4369), type="LED", cal=True, level=36))
-        dfl.append(dict(path=base_path_pe.format(4370), type="LED", cal=True, level=37))
-        dfl.append(dict(path=base_path_pe.format(4371), type="LED", cal=True, level=38))
-        dfl.append(dict(path=base_path_pe.format(4372), type="LED", cal=True, level=39))
-
         for d in dfl:
             d['reader'] = TargetioFileReader(input_path=d['path'], **kwargs)
         self.df_file = pd.DataFrame(dfl)
@@ -452,17 +459,22 @@ class ADC2PEPlots(Tool):
         self.p_image_saturated = ImagePlotter(**kwargs, script=script, figure_name="image_saturated")
         self.p_scatter_pix = Scatter(**kwargs, script=script, figure_name="scatter_pix")
         self.p_scatter_camera = Scatter(**kwargs, script=script, figure_name="scatter_camera")
-        self.p_scatter_led = Scatter(**kwargs, script=script, figure_name="scatter_led", shape='wide')
-        self.p_scatter_led_width = Scatter(**kwargs, script=script, figure_name="scatter_led_width", shape='wide')
         self.p_time_res = Scatter(**kwargs, script=script, figure_name="time_resolution")
         self.p_time_res_pix = Scatter(**kwargs, script=script, figure_name="time_resolution_pix")
         self.p_fwhm_camera = Scatter(**kwargs, script=script, figure_name="fwhm_camera")
         self.p_rt_camera = Scatter(**kwargs, script=script, figure_name="rise_time_camera")
+        self.p_fwhm_profile = Profile(**kwargs, script=script, figure_name="fwhm_profile")
+        self.p_rt_profile = Profile(**kwargs, script=script, figure_name="rt_profile")
+        self.p_fwhm_pix = Scatter(**kwargs, script=script, figure_name="fwhm_pix")
+        self.p_rt_pix = Scatter(**kwargs, script=script, figure_name="rise_time_pix")
         for p in self.poi:
             self.p_wf_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="wfs_pix{}".format(p), shape='wide')
             self.p_wf_zoom_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="wfs_zoom_pix{}".format(p), shape='wide')
             self.p_avgwf_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="avgwfs_pix{}".format(p), shape='wide')
             self.p_avgwf_zoom_dict[p] = WaveformPlotter(**kwargs, script=script, figure_name="avgwfs_zoom_pix{}".format(p), shape='wide')
+
+        self.p_fwhm_profile.create([0.1, 1000], 20, True)
+        self.p_rt_profile.create([0.1, 1000], 20, True)
 
     def start(self):
         # df_list = []
@@ -587,6 +599,12 @@ class ADC2PEPlots(Tool):
         #     self.dl1.calibrate(self.dummy_event)
         #     avgwfs_charge = self.dummy_event.dl1.tel[0].image[0]
         #
+        #     charge_masked = self.dead.mask2d(dl1).compressed()
+        #     charge_camera = np.mean(charge_masked)
+        #     q75, q25 = np.percentile(charge_masked, [75, 25])
+        #     charge_err_top_camera = q75 - charge_camera
+        #     charge_err_bottom_camera = charge_camera - q25
+        #
         #     t0_shifted = t0 - t0.mean(1)[:, None]
         #     t0_shifted = np.ma.masked_array(t0_shifted, mask=t0_mask)
         #     t0_grad_shifted = t0_grad - t0_grad.mean(1)[:, None]
@@ -606,7 +624,16 @@ class ADC2PEPlots(Tool):
         #     width = np.ma.masked_array(width, mask=low_max)
         #
         #     ch = gradient[None, :] * width + intercept[None, :]
-        #     recovered_charge = 10 ** (ch ** 2)
+        #     with np.errstate(over='ignore'):
+        #         recovered_charge = 10 ** (ch ** 2)
+        #
+        #     if ((type_ == 'LS62') & (level <= 2850)) | \
+        #         ((type_ == 'LS64') & (level >= 2450)):
+        #         profile_charge = np.ma.masked_array(dl1, mask=t0_mask).compressed()
+        #         profile_fwhm = fwhm.compressed()
+        #         profile_rt = rise_time.compressed()
+        #         self.p_fwhm_profile.add(profile_charge, profile_fwhm)
+        #         self.p_rt_profile.add(profile_charge, profile_rt)
         #
         #     desc3 = "Aggregate charge per pixel"
         #     for pix in trange(self.n_pixels, desc=desc3):
@@ -621,6 +648,8 @@ class ADC2PEPlots(Tool):
         #         pixel_width = width[:, pix]
         #         pixel_low_max = low_max[:, pix].all()
         #         pixel_rec_ch = recovered_charge[:, pix]
+        #         pixel_fwhm = fwhm[:, pix]
+        #         pixel_rt = rise_time[:, pix]
         #         if pix in self.dead.dead_pixels:
         #             continue
         #
@@ -638,12 +667,19 @@ class ADC2PEPlots(Tool):
         #         q75, q25 = np.percentile(pixel_rec_ch, [75, 25])
         #         rec_charge_err_top = q75 - rec_charge
         #         rec_charge_err_bottom = rec_charge - q25
+        #         fwhm_mean = np.ma.mean(pixel_fwhm)
+        #         fwhm_std = np.ma.std(pixel_fwhm)
+        #         rt_mean = np.ma.mean(pixel_rt)
+        #         rt_std = np.ma.std(pixel_rt)
         #         df_list.append(dict(type=type_, level=level,
         #                             cal=cal, cal_t=cal_t,
         #                             pixel=pix, tm=pix//64,
         #                             charge=charge,
         #                             charge_err_top=charge_err_top,
         #                             charge_err_bottom=charge_err_bottom,
+        #                             charge_camera=charge_camera,
+        #                             charge_err_top_camera=charge_err_top_camera,
+        #                             charge_err_bottom_camera=charge_err_bottom_camera,
         #                             tres_camera=tres_camera,
         #                             tgradres_camera=tgradres_camera,
         #                             tavgres_camera=tavgres_camera,
@@ -652,6 +688,11 @@ class ADC2PEPlots(Tool):
         #                             tgradres_pix=tgradres_pix,
         #                             tavgres_pix=tavgres_pix,
         #                             tres_pix_n=tres_pix_n,
+        #                             t0_masked=t0_mask[:, pix].all(),
+        #                             fwhm=fwhm_mean,
+        #                             fwhm_err=fwhm_std,
+        #                             rise_time=rt_mean,
+        #                             rise_time_err=rt_std,
         #                             fwhm_mean_camera=fwhm_mean_camera,
         #                             fwhm_std_camera=fwhm_std_camera,
         #                             rise_time_mean_camera=rise_time_mean_camera,
@@ -670,6 +711,9 @@ class ADC2PEPlots(Tool):
         # df = pd.DataFrame(df_list)
         # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
         # store['df'] = df
+        #
+        # self.p_fwhm_profile.save_numpy('/Users/Jason/Downloads/profile_fwhm.npz')
+        # self.p_rt_profile.save_numpy('/Users/Jason/Downloads/profile_rt.npz')
         #
         # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
         # df = store['df']
@@ -711,13 +755,19 @@ class ADC2PEPlots(Tool):
         store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
         df = store['df_ill']
 
+        self.p_fwhm_profile.load_numpy('/Users/Jason/Downloads/profile_fwhm.npz')
+        self.p_rt_profile.load_numpy('/Users/Jason/Downloads/profile_rt.npz')
+
+        # df_lj = df.loc[((df['type'] == 'LS62') &
+        #                 (df['illumination'] < 20)) |
+        #                ((df['type'] == 'LS64') &
+        #                 (df['illumination'] >= 20))]
         df_lj = df.loc[((df['type'] == 'LS62') &
-                        (df['illumination'] < 20)) |
+                        (df['level'] <= 2850)) |
                        ((df['type'] == 'LS64') &
-                        (df['illumination'] >= 20))]
+                        (df['level'] >= 2450))]
         df_ljc = df_lj.loc[df_lj['cal']]
         df_lju = df_lj.loc[~df_lj['cal']]
-        df_led = df.loc[(df['type'] == 'LED') & (df['cal'])]
 
         # Create figures
         self.p_comparison.create(df.loc[df['type'] == 'LS62'])
@@ -911,37 +961,36 @@ class ADC2PEPlots(Tool):
                 # f.ax.set_ylim((-0.2, 0.2))
                 f.ax.set_ylim((-0.005, 0.005))
 
-        self.p_scatter_led.create("LED", "Charge (p.e.)", "LED Distribution")
-        self.p_scatter_led.set_y_log()
-        output_np = join(self.p_scatter_pix.output_dir, "pix{}_dr_led.npz")
-        for ip, p in enumerate(self.poi):
-            df_pix = df_led.loc[df_led['pixel'] == p]
-            x = df_pix['level']
-            y = df_pix['charge']
-            y_err = [df_pix['charge_err_bottom'], df_pix['charge_err_top']]
-            label = "Pixel {}".format(p)
-            self.p_scatter_led.add(x, y, None, y_err, label)
-            self.log.info("Saving numpy array: {}".format(output_np.format(p)))
-            np.savez(output_np.format(p), x=x, y=y, x_err=None, y_err=y_err)
-        self.p_scatter_led.add_legend()
+        self.p_fwhm_profile.plot("Pulse Area (p.e.)", "FWHM (ns)")
+        self.p_fwhm_profile.set_x_log()
+        self.p_rt_profile.plot("Pulse Area (p.e.)", "Rise Time (ns)")
+        self.p_rt_profile.set_x_log()
 
-        self.p_scatter_led_width.create("Width (ns)", "Charge (p.e.)", "LED Saturation Recovery")
+        self.p_fwhm_pix.create("Illumination (p.e.)", "FWHM (ns)", "Pixel FWHM")
+        df_um = df_ljc.loc[~df['t0_masked']]
         for ip, p in enumerate(self.poi):
-            df_pix = df_led.loc[df_led['pixel'] == p]
-            x = df_pix['width']
-            y = df_pix['charge']
-            x_err = df_pix['width_err']
-            y_err = [df_pix['charge_err_bottom'], df_pix['charge_err_top']]
-            label = "Pixel {}, Pulse Integration".format(p)
-            self.p_scatter_led_width.add(x, y, x_err, y_err, label)
-            x = df_pix['width']
-            y = df_pix['recovered_charge']
-            x_err = df_pix['width_err']
-            y_err = [df_pix['rec_charge_err_bottom'], df_pix['rec_charge_err_top']]
-            label = "Pixel {}, Saturation Recovery".format(p)
-            self.p_scatter_led_width.add(x, y, x_err, y_err, label)
-        self.p_scatter_led_width.set_y_log()
-        self.p_scatter_led_width.add_legend()
+            df_pix = df_um.loc[df_um['pixel'] == p]
+            x = df_pix['illumination'].values.astype(np.float)
+            y = df_pix['fwhm'].values.astype(np.float)
+            x_err = df_pix['illumination_err'].values.astype(np.float)
+            y_err = df_pix['fwhm_err'].values.astype(np.float)
+            label = "Pixel {}".format(p)
+            self.p_fwhm_pix.add(x, y, x_err, y_err, label)
+        self.p_fwhm_pix.set_x_log()
+        self.p_fwhm_pix.add_legend()
+
+        self.p_rt_pix.create("Illumination (p.e.)", "Rise Time (ns)", "Pixel Rise Time")
+        df_um = df_ljc.loc[~df['t0_masked']]
+        for ip, p in enumerate(self.poi):
+            df_pix = df_um.loc[df_um['pixel'] == p]
+            x = df_pix['illumination'].values.astype(np.float)
+            y = df_pix['fwhm'].values.astype(np.float)
+            x_err = df_pix['illumination_err'].values.astype(np.float)
+            y_err = df_pix['fwhm_err'].values.astype(np.float)
+            label = "Pixel {}".format(p)
+            self.p_rt_pix.add(x, y, x_err, y_err, label)
+        self.p_rt_pix.set_x_log()
+        self.p_rt_pix.add_legend()
 
     def finish(self):
         # Save figures
@@ -950,8 +999,6 @@ class ADC2PEPlots(Tool):
         self.p_image_saturated.save()
         self.p_scatter_pix.save()
         self.p_scatter_camera.save()
-        self.p_scatter_led.save()
-        self.p_scatter_led_width.save()
         self.p_time_res.save()
         self.p_time_res_pix.save()
         self.p_fwhm_camera.save()
@@ -964,7 +1011,10 @@ class ADC2PEPlots(Tool):
             f.save()
         for p, f in self.p_avgwf_zoom_dict.items():
             f.save()
-
+        self.p_fwhm_profile.save()
+        self.p_rt_profile.save()
+        self.p_fwhm_pix.save()
+        self.p_rt_pix.save()
 
 if __name__ == '__main__':
     exe = ADC2PEPlots()
