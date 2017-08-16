@@ -274,6 +274,11 @@ class Profile(OfficialPlotter):
     def stddev(self):
         return np.sqrt(self.variance)
 
+    @property
+    def stderr(self):
+        n = np.ma.masked_where(self.n == 0, self.n)
+        return self.stddev/np.sqrt(n)
+
     def create(self, x_range, n_xbins, log=False):
         if not log:
             empty, self.bin_edges = np.histogram(None, range=x_range,
@@ -316,7 +321,7 @@ class Profile(OfficialPlotter):
     def plot(self, x_label, y_label):
         x = (self.bin_edges[1:] + self.bin_edges[:-1]) / 2
         y = self.mean
-        y_err = self.stddev
+        y_err = self.stderr
         (_, caps, _) = self.ax.errorbar(x, y, xerr=None, yerr=y_err, fmt='o',
                                         mew=0.5, color='black',
                                         markersize=3, capsize=3)
