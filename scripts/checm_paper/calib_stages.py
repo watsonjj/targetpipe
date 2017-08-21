@@ -18,6 +18,68 @@ from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.plots.official import OfficialPlotter
 from targetpipe.utils.dactov import checm_dac_to_volts
+from astropy import units as u
+
+
+class CustomCameraDisplay(CameraDisplay):
+
+    def __init__(
+            self,
+            geometry,
+            image=None,
+            ax=None,
+            title=None,
+            norm="lin",
+            cmap=None,
+            allow_pick=False,
+            autoupdate=True,
+            autoscale=True,
+            antialiased=True,
+            ):
+        self.ellipse = None
+        self.ellipse_t = None
+        super().__init__(geometry, image, ax, title, norm, cmap, allow_pick,
+                         autoupdate, autoscale, antialiased)
+
+    def overlay_moments_update(self, momparams, **kwargs):
+        """helper to overlay ellipse from a `reco.MomentParameters` structure
+        Updates existing ellipse if it already exists
+
+        Parameters
+        ----------
+        momparams: `reco.MomentParameters`
+            structuring containing Hillas-style parameterization
+        kwargs: key=value
+            any style keywords to pass to matplotlib (e.g. color='red'
+            or linewidth=6)
+        """
+
+        # strip off any units
+        cen_x = u.Quantity(momparams.cen_x).value
+        cen_y = u.Quantity(momparams.cen_y).value
+        length = u.Quantity(momparams.length).value
+        width = u.Quantity(momparams.width).value
+        text = "({:.02f},{:.02f})\n [w={:.03f},l={:.03f}]"\
+            .format(momparams.cen_x, momparams.cen_y,
+                    momparams.width, momparams.length)
+
+        if not self.ellipse:
+            self.ellipse = self.add_ellipse(centroid=(cen_x, cen_y),
+                                            length=length*2,
+                                            width=width*2,
+                                            angle=momparams.psi.rad,
+                                            **kwargs)
+            # self.ellipse_t = self.axes.text(cen_x, cen_y, text,
+            #                                 color=self.ellipse.get_edgecolor())
+        else:
+            self.ellipse.center = cen_x, cen_y
+            self.ellipse.height = width*2
+            self.ellipse.width = length*2
+            self.ellipse.angle = momparams.psi.deg
+            self.ellipse.update(kwargs)
+            # self.ellipse_t.set_position((cen_x, cen_y))
+            # self.ellipse_t.set_text(text)
+            # self.ellipse_t.set_color(self.ellipse.get_edgecolor())
 
 
 class ImagePlotter(OfficialPlotter):
@@ -45,9 +107,9 @@ class ImagePlotter(OfficialPlotter):
 
     def create(self, title, units, image, geom, tc,
                hl, hlc='white', hla=0.75, hillas=None):
-        camera = CameraDisplay(geom, ax=self.ax,
-                               image=image,
-                               cmap='viridis')
+        camera = CustomCameraDisplay(geom, ax=self.ax,
+                                     image=image,
+                                     cmap='viridis')
         camera.add_colorbar(pad=-0.2)
         camera.colorbar.set_label("Amplitude ({})".format(units), fontsize=20)
         camera.image = image
