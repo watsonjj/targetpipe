@@ -14,7 +14,7 @@ import seaborn as sns
 from scipy.stats import norm, binned_statistic as bs
 from scipy import interpolate
 
-from os.path import exists, join
+from os.path import exists, join, dirname, realpath
 from os import makedirs
 
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
@@ -788,6 +788,12 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.set_x_log()
         self.p_scatter_pix.set_y_log()
         output_np = join(self.p_scatter_pix.output_dir, "pix{}_dr.npz")
+        mapm_path = join(dirname(realpath(__file__)), "DynRange_MeasRW.txt")
+        mapm_data = np.loadtxt(mapm_path, delimiter=',')
+        mapm_x = mapm_data[:, 1]
+        mapm_y = mapm_data[:, 2]
+        label = "MAPM Data"
+        self.p_scatter_pix.add(mapm_x, mapm_y, None, None, label, 'black')
         for ip, p in enumerate(self.poi):
             df_pix = df_ljc.loc[df_ljc['pixel'] == p]
             x = df_pix['illumination']
@@ -935,7 +941,9 @@ class ADC2PEPlots(Tool):
                 f.ax.set_ylim((-0.005, 0.005))
 
         levels = np.unique(df_lju['level'])
+        output_np = join(self.p_scatter_pix.output_dir, "pix{}_avgwf.npz")
         for p, f in self.p_avgwf_dict.items():
+            wf_dict = {}
             title = "Pixel {}".format(p)
             f.create(title, "Amplitude (V)")
             df_pixu = df_lju.loc[df_lju['pixel'] == p]
@@ -948,9 +956,14 @@ class ADC2PEPlots(Tool):
                 charge = df_lc['avgwf_charge'].values[0]
                 label = "{:.2f} p.e. ({:.2f} p.e.)".format(illumination, charge)
                 f.add(wf, label)
+                wf_dict[label] = wf
+            self.log.info("Saving numpy array: {}".format(output_np.format(p)))
+            np.savez(output_np.format(p), **wf_dict)
 
         levels = np.unique(df_lju['level'])
+        output_np = join(self.p_scatter_pix.output_dir, "pix{}_avgwf_zoom.npz")
         for p, f in self.p_avgwf_zoom_dict.items():
+            wf_dict = {}
             title = "Pixel {}".format(p)
             f.create(title, "Amplitude (V)")
             df_pixu = df_lju.loc[df_lju['pixel'] == p]
@@ -965,6 +978,9 @@ class ADC2PEPlots(Tool):
                 f.add(wf, label)
                 # f.ax.set_ylim((-0.2, 0.2))
                 f.ax.set_ylim((-0.005, 0.005))
+                wf_dict[label] = wf
+            self.log.info("Saving numpy array: {}".format(output_np.format(p)))
+            np.savez(output_np.format(p), **wf_dict)
 
         self.p_fwhm_profile.plot("Pulse Area (p.e.)", "FWHM (ns)")
         self.p_fwhm_profile.set_x_log()

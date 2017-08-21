@@ -77,7 +77,7 @@ class SpreadComparer(Tool):
             # adc2pe = '/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_{}.tcal'.format(key)
             # self.r1_dict[key] = TargetioR1Calibrator(pedestal_path=p,
             #                                          tf_path=tf,
-            #                                          adc2pe_path='',
+            #                                          pe_path='',
             #                                          **kwargs)
             self.reader_dict[key] = TargetioFileReader(input_path=val,
                                                        **kwargs)

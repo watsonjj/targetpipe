@@ -94,7 +94,7 @@ class EventAnimationCreator(Tool):
                         max_events='EventFileReaderFactory.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
-                        pe='CameraR1CalibratorFactory.adc2pe_path',
+                        pe='CameraR1CalibratorFactory.pe_path',
                         desc='Animator.description',
                         ))
     classes = List([EventFileReaderFactory,

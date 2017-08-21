@@ -20,7 +20,7 @@ class R0R1Comparer(Tool):
                         max_events='TargetioFileReader.max_events',
                         ped='TargetioR1Calibrator.pedestal_path',
                         tf='TargetioR1Calibrator.tf_path',
-                        pe='TargetioR1Calibrator.adc2pe_path',
+                        pe='TargetioR1Calibrator.pe_path',
                         ))
     classes = List([TargetioFileReader,
                     TargetioR1Calibrator,

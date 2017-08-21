@@ -35,7 +35,7 @@ class ChargeVsRunExtractor(Tool):
                         max_events='TargetioFileLooper.max_events',
                         ped='CameraR1CalibratorFactory.pedestal_path',
                         tf='CameraR1CalibratorFactory.tf_path',
-                        pe='CameraR1CalibratorFactory.adc2pe_path',
+                        pe='CameraR1CalibratorFactory.pe_path',
                         O='ChargeVsRunExtractor.output_path',
                         ))
     flags = Dict(dict(mean=({'ChargeVsRunExtractor': {'calc_mean': True}},

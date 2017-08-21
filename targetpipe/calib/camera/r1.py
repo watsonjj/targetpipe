@@ -14,11 +14,11 @@ class TargetioR1Calibrator(CameraR1Calibrator):
     tf_path = Unicode('', allow_none=True,
                       help='Path to the TargetCalib Transfer Function '
                            'file').tag(config=True)
-    adc2pe_path = Unicode('', allow_none=True,
-                          help='Path to the TargetCalib adc2pe '
-                               'file').tag(config=True)
+    pe_path = Unicode('', allow_none=True,
+                      help='Path to the TargetCalib pe conversion '
+                           'file').tag(config=True)
     ff_path = Unicode('', allow_none=True,
-                          help='Path to the TargetCalib flat field '
+                          help='Path to a TargetCalib flat field '
                                'file').tag(config=True)
 
     def __init__(self, config, tool, **kwargs):
@@ -55,7 +55,7 @@ class TargetioR1Calibrator(CameraR1Calibrator):
         if self.pedestal_path:
             self.calibrator = target_calib.Calibrator(self.pedestal_path,
                                                       self.tf_path,
-                                                      [self.adc2pe_path,
+                                                      [self.pe_path,
                                                        self.ff_path])
             self.calibrate = self.real_calibrate
         else:
