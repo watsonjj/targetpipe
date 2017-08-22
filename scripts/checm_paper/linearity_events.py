@@ -466,7 +466,8 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.add(x, y, x_err, y_err, label)
         self.p_scatter_pix.add_xy_line()
         self.p_scatter_pix.add_legend()
-        self.p_scatter_pix.ax.set_xlim(left=0.5)
+        self.p_scatter_pix.ax.set_xlim(left=0.5, right=3000)
+        self.p_scatter_pix.ax.set_ylim(bottom=0.5, top=3000)
 
         self.p_fwhm_pix.create("Peak Height (p.e.)", "FWHM (ns)", "")
         self.p_fwhm_pix.set_x_log()
