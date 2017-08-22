@@ -62,7 +62,7 @@ class Scatter(OfficialPlotter):
 
         self.ax.set_xlabel(x_label)
         self.ax.set_ylabel(y_label)
-        self.fig.suptitle(title)
+        # self.fig.suptitle(title)
         self.ax.xaxis.set_minor_locator(AutoMinorLocator(5))
         self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
 
@@ -155,7 +155,7 @@ class WaveformHist1DInt(OfficialPlotter):
 
         self.ax.set_xlabel("Time (ns)")
         self.ax.set_ylabel("Probability Density")
-        self.ax.set_title(title)
+        # self.ax.set_title(title)
 
         self.ax.xaxis.set_minor_locator(MultipleLocator(1))
         self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
@@ -187,30 +187,31 @@ class WaveformHist1D(OfficialPlotter):
         # self.fig = plt.figure(figsize=(14, 10))
         # self.ax = self.fig.add_subplot(1, 1, 1)
 
-    def add(self, vals, label):
+    def add(self, vals, label, n=None):
         mean, std = norm.fit(vals)
         fit_x = np.linspace(vals.min()-1, vals.max()+1, 1000)
         fit = norm.pdf(fit_x, mean, std)
-        label = "{} (Mean = {:.3}, Stddev = {:.3})".format(label, mean, std)
+        #label = "{} (Mean = {:.3}, Stddev = {:.3})".format(label, mean, std)
 
-        n = int((vals.max() - vals.min())*1.5+1)
+        if not n:
+            n = int((vals.max() - vals.min())*1.5+1)
         c = self.ax._get_lines.get_next_color()
         self.ax.hist(vals, n, normed=True, color=c, alpha=0.5, label=label)#, rwidth=0.5)
         # self.ax.plot(fit_x, fit, color=c, alpha=0.8, label=label)
 
-    def create(self, vals, label, title=""):
+    def create(self, vals, label, title="", n=None):
 
-        self.add(vals, label)
+        self.add(vals, label, n)
 
         self.ax.set_xlabel("Time (ns)")
         self.ax.set_ylabel("Probability Density")
-        self.ax.set_title(title)
+        # self.ax.set_title(title)
 
         # self.ax.xaxis.set_minor_locator(MultipleLocator(0.5))
         # self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     def save(self, output_path=None):
-        self.ax.legend(loc=2)
+        self.ax.legend(loc=2, prop={'size': 9})
         super().save(output_path)
 
 
@@ -245,7 +246,7 @@ class ImagePlotter(OfficialPlotter):
         camera.image = image
         camera.colorbar.ax.tick_params(labelsize=30)
 
-        self.ax.set_title(title)
+        # self.ax.set_title(title)
         self.ax.axis('off')
 
 
@@ -294,6 +295,7 @@ class TimingExtractor(Tool):
         self.p_laser_1deoicomp = None
         self.p_laser_1dcomp = None
         self.p_laser_1d_final = None
+        self.p_laser_1d_final_pix = None
         self.p_laser_imageeoitgrad = None
 
         self.p_laser_fwhm = None
@@ -371,7 +373,9 @@ class TimingExtractor(Tool):
         p_kwargs['figure_name'] = "laser_1D_comparison_allevents".format(self.eoi)
         self.p_laser_1dcomp = WaveformHist1D(**p_kwargs, shape='wide')
         p_kwargs['figure_name'] = "laser_1D_finalmethod"
-        self.p_laser_1d_final = WaveformHist1D(**p_kwargs, shape='wide')
+        self.p_laser_1d_final = WaveformHist1D(**p_kwargs, shape='square')
+        p_kwargs['figure_name'] = "laser_1D_finalmethod_pix"
+        self.p_laser_1d_final_pix = WaveformHist1D(**p_kwargs, shape='square')
         p_kwargs['figure_name'] = "laser_image_tgrad_eid{}".format(self.eoi)
         self.p_laser_imageeoitgrad = ImagePlotter(**p_kwargs)
 
@@ -626,12 +630,15 @@ class TimingExtractor(Tool):
         self.p_laser_fwhm.create(fwhm, "FWHM", "FWHM Distribution")
 
         # 1D histograms
-        index = eid[eid == self.eoi].index[0]
-        eoi_t = t[index].compressed()
-        eoi_tgrad = t_grad[index].compressed()
         t_shifted = (t - t.mean(1)[:, None]).compressed()
-        t_grad_shifted = (t_grad - t_grad.mean(1)[:, None]).compressed()
         self.p_laser_1d_final.create(t_shifted, "Peak Time", "Smoothed Local Peak Time (all events)")
+
+        # 1D histograms pixel
+        t_shifted = (t - t.mean(1)[:, None])
+        t_shifted_pix = t_shifted[:, 1825].compressed()
+        self.p_laser_1d_final_pix.create(t_shifted_pix, "Pixel 1825", "Smoothed Local Peak Time (all events)", 10)
+        t_shifted_pix = t_shifted[:, 1203].compressed()
+        self.p_laser_1d_final_pix.add(t_shifted_pix, "Pixel 1203", 10)
 
         # self.p_led_eidvsfci.save()
         # self.p_led_timevstack.save()
@@ -652,6 +659,7 @@ class TimingExtractor(Tool):
         self.p_laser_1deoicomp.save()
         self.p_laser_1dcomp.save()
         self.p_laser_1d_final.save()
+        self.p_laser_1d_final_pix.save()
         self.p_laser_imageeoitgrad.save()
 
         self.p_laser_fwhm.save()

@@ -57,7 +57,7 @@ class PixelSPEFitPlotter(OfficialPlotter):
         self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.5)
         self.ax.semilogy(fitx, fit_n, color='black')
         self.ax.set_ylim(ymin=3e-2)
-        self.ax.set_title("SPE Spectrum, Pixel 1559")
+        # self.ax.set_title("SPE Spectrum, Pixel 1559")
         self.ax.set_xlabel("Pulse Area (V*ns)")
         self.ax.set_ylabel("Probability Density")
 
@@ -103,7 +103,7 @@ class TMSPEFitPlotter(OfficialPlotter):
 
         self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.2)
         # self.ax.set_ylim(ymin=1e-4)
-        self.ax.set_title("SPE Spectrum, TM 24")
+        # self.ax.set_title("SPE Spectrum, TM 24")
         self.ax.set_xlabel("Pulse Area ({})".format(x_unit))
         self.ax.set_ylabel("Probability Density")
 
@@ -139,7 +139,7 @@ class ADC2PEPlotter(OfficialPlotter):
         sns.violinplot(ax=self.ax, data=df, x='hv', y='spe_mv', hue='gm_t',
                        split=True, scale='count', inner='quartile',
                        legend=False)
-        self.ax.set_title("SPE Values for different HV Settings")
+        # self.ax.set_title("SPE Values for different HV Settings")
         self.ax.set_xlabel('HV')
         self.ax.set_ylabel('SPE Value (V*ns)')
         self.ax.legend(loc="upper left")
@@ -180,8 +180,8 @@ class ADC2PE1100VTMPlotter(OfficialPlotter):
                                   np.std(vals)))
         vals = df_1100['spe_mv']
         sns.kdeplot(vals, ax=self.ax, color="blue", legend=False, lw=3)
-        self.ax.set_title("Distribution of SPE Values Across "
-                          "the Camera with HV=1100V")
+        # self.ax.set_title("Distribution of SPE Values Across "
+        #                   "the Camera with HV=1100V")
         self.ax.set_xlabel('SPE Value (V*ns)')
         self.ax.set_ylabel('Density')
 
@@ -224,8 +224,8 @@ class ADC2PE1100VTMStatsPlotter(OfficialPlotter):
         stds = df_1100.groupby('tm')['spe_mv'].std()
         fracspreads = stds/means
         sns.distplot(fracspreads, ax=self.ax, color="black", rug=True)
-        self.ax.set_title("Fractional spread of SPE Value (V*ns) "
-                          "between TMs at 1100V")
+        # self.ax.set_title("Fractional spread of SPE Value (V*ns) "
+        #                   "between TMs at 1100V")
         self.ax.set_xlabel('Fractional spread')
         self.ax.set_ylabel('Density')
 
@@ -301,7 +301,7 @@ class ADC2PEPlots(Tool):
         self.p_pixelspe = PixelSPEFitPlotter(**kwargs, script=script, figure_name="spe_fit_pixel1559")
         self.p_tmspe = TMSPEFitPlotter(**kwargs, script=script, figure_name="spe_fit_tm24")
         self.p_tmspe_pe = TMSPEFitPlotter(**kwargs, script=script, figure_name="spe_fit_tm24_pe")
-        self.p_adc2pe = ADC2PEPlotter(**kwargs, script=script, figure_name="adc2pe", shape='wide')
+        self.p_adc2pe = ADC2PEPlotter(**kwargs, script=script, figure_name="adc2pe", shape='square')
         self.p_adc2pe_1100tm = ADC2PE1100VTMPlotter(**kwargs, script=script, figure_name="adc2pe_1100V_tms", shape='wide')
         self.p_adc2pe_1100tm_stats = ADC2PE1100VTMStatsPlotter(**kwargs, script=script, figure_name="adc2pe_1100V_tms_stats", shape='wide')
 

@@ -14,7 +14,7 @@ import seaborn as sns
 from scipy.stats import norm, binned_statistic as bs
 from scipy import interpolate
 
-from os.path import exists, join
+from os.path import exists, join, dirname, realpath
 from os import makedirs
 
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
@@ -57,16 +57,16 @@ class Scatter(OfficialPlotter):
         # self.fig = plt.figure(figsize=(12, 8))
         # self.ax = self.fig.add_subplot(1, 1, 1)
 
-    def add(self, x, y, x_err=None, y_err=None, label='', c=None):
+    def add(self, x, y, x_err=None, y_err=None, label='', c=None, **kwargs):
         if not c:
             c = self.ax._get_lines.get_next_color()
-        # no_err = y_err == 0
-        # err = ~no_err
-        # self.ax.errorbar(x[no_err], y[no_err], fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3)
-        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3, label=label)
+        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3, label=label, **kwargs)
 
         for cap in caps:
             cap.set_markeredgewidth(1)
+
+    def add_line(self, x, y, label='', **kwargs):
+        self.ax.plot(x, y, label=label, **kwargs)
 
     def create(self, x_label="", y_label="", title=""):
         self.ax.set_xlabel(x_label)
@@ -94,7 +94,7 @@ class Scatter(OfficialPlotter):
         self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
 
     def add_legend(self, loc=2):
-        self.ax.legend(loc=loc, prop={'size': 9})
+        self.ax.legend(loc=loc, prop={'size': 8})
 
 
 class Profile(OfficialPlotter):
@@ -171,6 +171,7 @@ class ADC2PEPlots(Tool):
         self.p_fwhm_profile = None
         self.p_rt_profile = None
         self.p_scatter_pix = None
+        self.p_fwhm_pix = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -223,6 +224,7 @@ class ADC2PEPlots(Tool):
         self.p_fwhm_profile = Profile(**kwargs, script=script, figure_name="fwhm_profile")
         self.p_rt_profile = Profile(**kwargs, script=script, figure_name="rt_profile")
         self.p_scatter_pix = Scatter(**kwargs, script=script, figure_name="scatter_pix")
+        self.p_fwhm_pix = Scatter(**kwargs, script=script, figure_name="fwhm_pix")
 
     def start(self):
         # df_list = []
@@ -404,9 +406,9 @@ class ADC2PEPlots(Tool):
         df_ljc = df_lj.loc[df_lj['cal']]
         df_lju = df_lj.loc[~df_lj['cal']]
 
-        output = join(self.p_fwhm_profile.output_dir, "data.csv")
-        self.log.info("Saving csv file: {}".format(output))
-        df_ljc.to_csv(output, index=False, index_label=False, float_format='%.6g')
+        # output = join(self.p_fwhm_profile.output_dir, "data.csv")
+        # self.log.info("Saving csv file: {}".format(output))
+        # df_ljc.to_csv(output, index=False, index_label=False, float_format='%.6g')
 
         # Create figures
         df_t = df_ljc.loc[df_ljc['dl1']>0.7]
@@ -423,8 +425,20 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.create("Illumination (p.e.)", "Charge (p.e.)", "Pixel Distribution")
         self.p_scatter_pix.set_x_log()
         self.p_scatter_pix.set_y_log()
+        mapm_path = join(dirname(realpath(__file__)), "DynRange_MeasRW.txt")
+        mapm_data = np.loadtxt(mapm_path, delimiter=',')
+        mapm_x = np.log10(mapm_data[:, 1])
+        mapm_y = np.log10(mapm_data[:, 2])
+        z = np.polyfit(mapm_x, mapm_y, 5)
+        p = np.poly1d(z)
+        fit_x = np.linspace(np.log10(1), np.log10(5000), 100)
+        x = 10**fit_x
+        y = 10**p(fit_x)
+        label = "MAPM Data"
+        self.p_scatter_pix.add_line(x, y, label, color='black')
+        df_plot = df_ljc.loc[df_ljc['illumination'] > 1]
         for ip, p in enumerate(self.poi):
-            df_pix = df_ljc.loc[df_ljc['pixel'] == p]
+            df_pix = df_plot.loc[df_plot['pixel'] == p]
             df_gb = df_pix.groupby(['type', 'level'])
             x = df_gb['illumination'].mean().values
             y = df_gb['dl1'].mean().values
@@ -437,7 +451,7 @@ class ADC2PEPlots(Tool):
             label = "Pixel {}".format(p)
             self.p_scatter_pix.add(x, y, x_err, y_err, label)
         p = 1825
-        df_pix = df_ljc.loc[df_ljc['pixel'] == p]
+        df_pix = df_plot.loc[df_plot['pixel'] == p]
         df_pix = df_pix[df_pix["width"]!=0]
         df_gb = df_pix.groupby(['type', 'level'])
         x = df_gb['illumination'].mean().values
@@ -452,12 +466,37 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.add(x, y, x_err, y_err, label)
         self.p_scatter_pix.add_xy_line()
         self.p_scatter_pix.add_legend()
+        self.p_scatter_pix.ax.set_xlim(left=0.5)
+
+        self.p_fwhm_pix.create("Peak Height (p.e.)", "FWHM (ns)", "")
+        self.p_fwhm_pix.set_x_log()
+        df_plot = df_ljc.loc[(df_ljc['fwhm'] > 1) & (df_ljc['illumination'] > 1)]
+        # df_plot['peak_height_log'] = np.log10(df_plot['peak_height'])
+        marker_mfc = ['black', 'white']
+        for ip, p in enumerate(self.poi):
+            df_pix = df_plot.loc[df_plot['pixel'] == p]
+            x = df_pix['peak_height'].values
+            y = df_pix['fwhm'].values
+            self.p_fwhm_pix.add(x, y, None, None, None, None, marker=',', zorder=1)
+        for ip, p in enumerate(self.poi):
+            df_pix = df_plot.loc[df_plot['pixel'] == p]
+            df_gb = df_pix.groupby(['type', 'level'])
+            x = df_gb['peak_height'].mean().values
+            y = df_gb['fwhm'].mean().values
+            x_err = df_gb['peak_height'].apply(np.std).values
+            y_err = df_gb['fwhm'].apply(np.std).values
+            label = "Pixel {}".format(p)
+            self.p_fwhm_pix.add(x, y, x_err, y_err, label, 'black', zorder=2, mfc=marker_mfc[ip])
+        self.p_fwhm_pix.ax.set_xlim(left=10**-0.8)
+        self.p_fwhm_pix.ax.set_ylim([1, 18])
+        self.p_fwhm_pix.add_legend()
 
     def finish(self):
         # Save figures
         self.p_fwhm_profile.save()
         self.p_rt_profile.save()
         self.p_scatter_pix.save()
+        self.p_fwhm_pix.save()
 
 if __name__ == '__main__':
     exe = ADC2PEPlots()

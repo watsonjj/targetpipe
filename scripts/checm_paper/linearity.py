@@ -411,7 +411,6 @@ class ADC2PEPlots(Tool):
         dfl.append(dict(path=base_path_pe.format(4163), type="LS64", cal=True, level=1850))
         dfl.append(dict(path=base_path_pe.format(4164), type="LS64", cal=True, level=2050))
         dfl.append(dict(path=base_path_pe.format(4165), type="LS64", cal=True, level=2250))
-        dfl.append(dict(path=base_path_pe.format(4166), type="LS64", cal=True, level=2450))
         dfl.append(dict(path=base_path_pe.format(4167), type="LS64", cal=True, level=2650))
         dfl.append(dict(path=base_path_pe.format(4168), type="LS64", cal=True, level=2850))
         dfl.append(dict(path=base_path_pe.format(4169), type="LS64", cal=True, level=3050))

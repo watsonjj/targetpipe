@@ -44,12 +44,12 @@ class TFPlotter(OfficialPlotter):
 
     def create(self, tf, tf_single, tf_min, tf_max, adc_min, adc_step, title):
         x = adc_min + np.arange(tf_min.size) * adc_step
-        self.ax.fill_between(x, tf_min, tf_max, color='black', label='Range')
+        self.ax.fill_between(x, tf_min, tf_max, color='black', label='All Cells')
         # self.ax.plot(x, tf_avg, color='grey', label='Average', lw=2)
-        self.ax.plot(x, tf_single, color='grey', label='Single', lw=2)
+        self.ax.plot(x, tf_single, color='grey', label='Single Cell', lw=2)
         # self.ax.set_title(title)
         self.ax.set_xlabel("ADC - Pedestal")
-        self.ax.set_ylabel("DAC - Baseline (V)")
+        self.ax.set_ylabel("Amplitude (V)")
         self.ax.legend(loc=2)
 
 
@@ -234,23 +234,23 @@ class TFInvestigator(Tool):
         p_kwargs = kwargs
         p_kwargs['script'] = "checm_paper_tf"
         p_kwargs['figure_name'] = "tfrange"
-        self.p_tf = TFPlotter(**kwargs, shape="wide")
+        self.p_tf = TFPlotter(**kwargs, shape="square")
         for pix in self.poi:
             p_kwargs['figure_name'] = "tfrange_p{}".format(pix)
             if pix == -1:
                 continue
-            self.p_range_sp[pix] = TFPlotter(**kwargs, shape="wide")
+            self.p_range_sp[pix] = TFPlotter(**kwargs, shape="square")
         for vped in self.voi:
             for pix in self.poi:
                 p_kwargs['figure_name'] = "tfhist_v{}_p{}".format(vped, pix)
                 if pix == -1:
                     p_kwargs['figure_name'] = "tfhist_v{}_wc".format(vped)
-                self.p_hist_vp[(vped, pix)] = BeforeAfterHist(**kwargs, shape="wide")
+                self.p_hist_vp[(vped, pix)] = BeforeAfterHist(**kwargs, shape="square")
         for pix in self.poi:
             p_kwargs['figure_name'] = "tfscatter_p{}".format(pix)
             if pix == -1:
                 p_kwargs['figure_name'] = "tfscatter_wc"
-            self.p_scatter[pix] = Scatter(**kwargs, shape="wide")
+            self.p_scatter[pix] = Scatter(**kwargs, shape="square")
 
     def start(self):
         # df_list = []
