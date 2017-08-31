@@ -5,8 +5,10 @@ from scipy.stats import norm as normal
 from traitlets import CaselessStrEnum
 
 from ctapipe.core import Component, Factory
-from targetpipe.fitting.spe_mapm import mapm_spe_fit, pedestal_signal, \
-    pe_signal
+from targetpipe.fitting.spe_mapm import mapm_spe_fit, \
+    pedestal_signal as mapm_pedestal, pe_signal as mapm_pe
+from targetpipe.fitting.spe_sipm import sipm_spe_fit, \
+    pedestal_signal as sipm_pedestal, pe_signal as sipm_pe
 from scipy.stats.distributions import poisson
 
 
@@ -166,6 +168,9 @@ class CHECMSPEFitter(ChargeFitter):
         self.add_parameter("spe_sigma", 20, 0, 100)
         self.add_parameter("lambda_", 1, 0, 10)
 
+        self.pedestal_signal = mapm_pedestal
+        self.pe_signal = mapm_pe
+
         self.k = np.arange(1, 11)
         self.subfit_labels = ['pedestal']
         for pe in self.k:
@@ -185,14 +190,14 @@ class CHECMSPEFitter(ChargeFitter):
 
     @staticmethod
     def iminuit_fit(x, y, p0, fit_x=None, limits=None):
+        fit = mapm_spe_fit
         if fit_x is None:
             fit_x = x
         if limits is None:
             limits = {}
 
         def minimizehist(norm, eped, eped_sigma, spe, spe_sigma, lambda_):
-            p = mapm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma,
-                             lambda_)
+            p = fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_)
             like = -2 * poisson.logpmf(y, p)
             return np.sum(like)
 
@@ -200,17 +205,17 @@ class CHECMSPEFitter(ChargeFitter):
                             print_level=0, pedantic=False, throw_nan=True)
         m0.migrad()
 
-        result = mapm_spe_fit(fit_x, **m0.values)
+        result = fit(fit_x, **m0.values)
         return result, m0.values
 
     def _get_subfits(self):
         if self.coeff:
             def pedestal_kw(x, norm, eped, eped_sigma, lambda_, **kw):
-                return pedestal_signal(x, norm, eped, eped_sigma, lambda_)
+                return self.pedestal_signal(x, norm, eped, eped_sigma, lambda_)
 
             def pe_kw(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, **kw):
-                return pe_signal(self.k[:, None], x[None, :], norm, eped,
-                                 eped_sigma, spe, spe_sigma, lambda_)
+                return self.pe_signal(self.k[:, None], x[None, :], norm, eped,
+                                      eped_sigma, spe, spe_sigma, lambda_)
 
             pedestal = pedestal_kw(self.fit_x, **self.coeff)
             pe_fits = pe_kw(self.fit_x, **self.coeff)
@@ -334,12 +339,18 @@ class CHECSSPEFitter(ChargeFitter):
         self.nbins = 60
         self.range = [-30, 100]
 
-        self.add_parameter("norm", None, 0, 100000)
-        self.add_parameter("eped", 0, -10, 10)
-        self.add_parameter("eped_sigma", 5, 0, 100)
-        self.add_parameter("spe", 20, 0, 90)
-        self.add_parameter("spe_sigma", 20, 0, 100)
-        self.add_parameter("lambda_", 20, 0, 10)
+        self.add_parameter("norm", None, 0, 10000)
+        self.add_parameter("eped", -0.5, -5, 5)
+        self.add_parameter("eped_sigma", 0.4, 0, 5)
+        self.add_parameter("spe", 1.4, 0, 5)
+        self.add_parameter("spe_sigma", 0.2, 0, 5)
+        self.add_parameter("lambda_", 2.1, 0, 5)
+        self.add_parameter("opct", 0.35, 0.1, 0.9)
+        self.add_parameter("pap", 0.1, 0.1, 0.9)
+        self.add_parameter("dap", 0.3, 0.1, 0.9)
+
+        self.pedestal_signal = sipm_pedestal
+        self.pe_signal = sipm_pe
 
         self.k = np.arange(1, 11)
         self.subfit_labels = ['pedestal']
@@ -360,32 +371,32 @@ class CHECSSPEFitter(ChargeFitter):
 
     @staticmethod
     def iminuit_fit(x, y, p0, fit_x=None, limits=None):
+        fit = sipm_spe_fit
         if fit_x is None:
             fit_x = x
         if limits is None:
             limits = {}
 
-        def minimizehist(norm, eped, eped_sigma, spe, spe_sigma, lambda_):
-            p = mapm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma,
-                             lambda_)
+        def minimizehist(norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap):
+            p = fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap)
             like = -2 * poisson.logpmf(y, p)
-            return np.sum(like)
+            return np.nansum(like)
 
         m0 = iminuit.Minuit(minimizehist, **p0, **limits,
-                            print_level=0, pedantic=False, throw_nan=True)
+                            print_level=0, pedantic=False, throw_nan=False)
         m0.migrad()
 
-        result = mapm_spe_fit(fit_x, **m0.values)
+        result = fit(fit_x, **m0.values)
         return result, m0.values
 
     def _get_subfits(self):
         if self.coeff:
             def pedestal_kw(x, norm, eped, eped_sigma, lambda_, **kw):
-                return pedestal_signal(x, norm, eped, eped_sigma, lambda_)
+                return self.pedestal_signal(x, norm, eped, eped_sigma, lambda_)
 
-            def pe_kw(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, **kw):
-                return pe_signal(self.k[:, None], x[None, :], norm, eped,
-                                 eped_sigma, spe, spe_sigma, lambda_)
+            def pe_kw(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap, **kw):
+                return self.pe_signal(self.k[:, None], x[None, :], norm, eped,
+                                      eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap)
 
             pedestal = pedestal_kw(self.fit_x, **self.coeff)
             pe_fits = pe_kw(self.fit_x, **self.coeff)

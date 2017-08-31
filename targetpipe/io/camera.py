@@ -52,8 +52,8 @@ class Config(Borg):
             )
 
             if not camera_id:
-                # self.id = 'checs'
-                self.id = 'checm'
+                self.id = 'checs'
+                # self.id = 'checm'
 
         if camera_id:
             self.id = camera_id

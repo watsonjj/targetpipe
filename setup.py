@@ -15,6 +15,8 @@ LICENSE = metadata.get('license', 'unknown')
 
 rgbtohex_module = Extension('targetpipe.utils.rgbtohex',
                             sources=['targetpipe/utils/rgbtohex.cc'])
+cross_module = Extension('targetpipe.utils.correlate_c',
+                         sources=['targetpipe/utils/correlate_c.cc'])
 
 setup(
     name=PACKAGENAME,
@@ -41,5 +43,5 @@ setup(
                 'Development Status :: 3 - Alpha',
     ],
 
-    ext_modules=[rgbtohex_module],
+    ext_modules=[rgbtohex_module, cross_module],
 )

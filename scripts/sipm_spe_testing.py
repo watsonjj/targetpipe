@@ -8,14 +8,153 @@ import numpy as np
 from os.path import exists, join
 from os import makedirs
 from IPython import embed
+import pandas as pd
+from scipy import interpolate
+from scipy.ndimage import correlate1d
 
 from ctapipe.calib.camera.dl0 import CameraDL0Reducer
 from ctapipe.calib.camera.dl1 import CameraDL1Calibrator
 from ctapipe.calib.camera.r1 import CameraR1CalibratorFactory
-from ctapipe.core import Tool
+from ctapipe.core import Tool, Component
 from ctapipe.image.charge_extractors import ChargeExtractorFactory
 from ctapipe.image.waveform_cleaning import WaveformCleanerFactory
 from ctapipe.io.eventfilereader import EventFileReaderFactory
+from targetpipe.utils.correlate import cross_correlate
+from targetpipe.fitting.chec import CHECSSPEFitter
+
+
+class CleanerNull(Component):
+    name = "CleanerNull"
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+
+    def clean(self, waveforms, connected):
+        return np.copy(waveforms)
+
+
+class CleanerGaussConvolve(Component):
+    name = "CleanerGaussConvolve"
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+        self.kernel = general_gaussian(5, p=1.0, sig=1)
+
+    def clean(self, waveforms, connected):
+        smooth_flat = np.convolve(waveforms.ravel(), self.kernel, "same")
+        smoothed = np.reshape(smooth_flat, waveforms.shape)
+        samples_std = np.std(waveforms, axis=1)
+        smooth_baseline_std = np.std(smoothed, axis=1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            smoothed *= (samples_std / smooth_baseline_std)[:, None]
+            smoothed[~np.isfinite(smoothed)] = 0
+        return smoothed
+
+
+class CleanerCrossCorrelate(Component):
+    name = "CleanerCrossCorrelate"
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+        file = np.loadtxt("/Users/Jason/Downloads/pulse_data.txt", delimiter=', ')
+        refx = file[:, 0]
+        refy = file[:, 1] - file[:, 1][0]
+        f = interpolate.interp1d(refx, refy, kind=3)
+        x = np.linspace(0, 77e-9, 76)
+        y = f(x)
+        self.reference_pulse = y
+
+    def clean(self, waveforms, connected):
+        return self.clean2(waveforms, connected)
+
+    def clean1(self, waveforms, connected):
+        smooth_flat = np.correlate(waveforms.ravel(), self.reference_pulse, "same")
+        smoothed = np.reshape(smooth_flat, waveforms.shape)
+        # samples_sum = np.sum(waveforms)
+        # smooth_baseline_sum = np.sum(smoothed)
+        # with np.errstate(divide='ignore', invalid='ignore'):
+        #     smoothed = smoothed * (samples_sum / smooth_baseline_sum)
+        #     smoothed[~np.isfinite(smoothed)] = 0
+        return smoothed
+
+    def clean2(self, waveforms, connected):
+        smoothed = correlate1d(waveforms, self.reference_pulse)
+        # samples_sum = np.sum(waveforms, axis=1)
+        # s_sum = np.sum(smoothed, axis=1)
+        # smoothed *= (samples_sum / s_sum)[:, None]
+        return smoothed
+
+
+class CleanerCrossCorrelateC(Component):
+    name = "CleanerCrossCorrelateC"
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+        file = np.loadtxt("/Users/Jason/Downloads/pulse_data.txt", delimiter=', ')
+        refx = file[:, 0]
+        refy = file[:, 1] - file[:, 1][0]
+        f = interpolate.interp1d(refx, refy, kind=3)
+        x = np.linspace(0, 77e-9, 76)
+        y = f(x)
+        self.reference_pulse = y
+
+    def clean(self, waveforms, connected):
+        smoothed = cross_correlate(waveforms, self.reference_pulse)
+        samples_sum = np.sum(waveforms, axis=1)
+        s_sum = np.sum(smoothed, axis=1)
+        smoothed *= (samples_sum / s_sum)[:, None]
+        return smoothed
+
+
+class CleanerSmoothBaselineSubtract(Component):
+    name = "CleanerSmoothBaselineSubtract"
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+        self.kernel = general_gaussian(10, p=1.0, sig=32)
+
+    def clean(self, waveforms, connected):
+        # Subtract initial baseline
+        baseline_sub = waveforms - np.mean(waveforms[:, :32], axis=1)[:, None]
+
+        # Obtain waveform with pulse masked
+        avgwf = np.mean(waveforms[connected], 0)
+        t0 = np.argmax(avgwf)
+        mask = np.zeros(waveforms.shape, dtype=np.bool)
+        mask[:, t0-10:t0+10] = True
+        masked = np.ma.masked_array(baseline_sub, mask)
+        no_pulse = np.ma.filled(masked, 0)
+
+        # Get smooth baseline (no pulse)
+        smooth_flat = np.convolve(no_pulse.ravel(), self.kernel, "same")
+        smooth_baseline = np.reshape(smooth_flat, waveforms.shape)
+        no_pulse_std = np.std(no_pulse, axis=1)
+        smooth_baseline_std = np.std(smooth_baseline, axis=1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            smooth_baseline *= (no_pulse_std / smooth_baseline_std)[:, None]
+            smooth_baseline[~np.isfinite(smooth_baseline)] = 0
+
+        # Get smooth waveform
+        smooth_wf = baseline_sub  # self.wf_smoother.apply(baseline_sub)
+
+        # Subtract smooth baseline
+        cleaned = smooth_wf - smooth_baseline
+        return cleaned
+
+
+class CleanerSBSGC(Component):
+    name = "CleanerSBSGC"
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+        self.sbs = CleanerSmoothBaselineSubtract(None, None)
+        self.smooth = CleanerGaussConvolve(None, None)
+
+    def clean(self, waveforms, connected):
+        waveforms = self.smooth.clean(waveforms, connected)
+        waveforms = self.sbs.clean(waveforms, connected)
+
+        return waveforms
 
 
 class SiPMSPETesting(Tool):
@@ -51,9 +190,25 @@ class SiPMSPETesting(Tool):
         super().__init__(**kwargs)
         self.reader = None
         self.r1 = None
+        self.fitter = None
 
         self.n_pixels = None
         self.n_samples = None
+
+        self.connected = None
+        self.match_t0 = None
+        self.within = None
+        self.ws = None
+        self.we = None
+        self.cleaners = None
+        self.output_dir = None
+        self.df = None
+        self.dfwf = None
+
+        self.poi = [22, 35, 40, 41, 42, 43]
+        self.wf_poi = 35
+        # self.eoi = 11
+        self.eoi = 10
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -68,450 +223,427 @@ class SiPMSPETesting(Tool):
         r1_class = r1_factory.get_class()
         self.r1 = r1_class(**kwargs)
 
+        self.fitter = CHECSSPEFitter(**kwargs)
+
         first_event = self.reader.get_event(0)
         self.n_pixels = first_event.inst.num_pixels[0]
         self.n_samples = first_event.r0.tel[0].num_samples
 
-    def start(self):
+        cleaners = [
+            CleanerNull(**kwargs),
+            CleanerGaussConvolve(**kwargs),
+            # CleanerSmoothBaselineSubtract(**kwargs),
+            # CleanerSBSGC(**kwargs),
+            CleanerCrossCorrelate(**kwargs),
+            # CleanerCrossCorrelateC(**kwargs),
+        ]
+        self.cleaners = {i.name: i for i in cleaners}
+
+        self.output_dir = join(self.reader.output_directory, "sipm_spe_testing")
+
         # connected = [40, 41, 42, 43]
         connected = list(range(self.n_pixels))
         ignore_pixels = [25, 26, 18, 19, 13, 14, 5, 6, 49, 37]
-        connected = [i for i in connected if i not in ignore_pixels]
-        self.n_pixels = len(connected)
-        pix = 35
-        pix_index = connected.index(pix)
+        self.connected = [i for i in connected if i not in ignore_pixels]
         shift = 4
         width = 8
-        match_t0 = 60
-        within = 3
+        self.match_t0 = 60
+        self.within = 3
 
-        window_start = match_t0 - shift
-        if window_start < 0:
-            window_start = 0
-        window_end = window_start + width
-        if window_end > self.n_samples - 1:
-            window_end = self.n_samples - 1
+        self.ws = self.match_t0 - shift
+        if self.ws < 0:
+            self.ws = 0
+        self.we = self.ws + width
+        if self.we > self.n_samples - 1:
+            self.we = self.n_samples - 1
 
-        n_events = self.reader.num_events
-        mask = np.zeros(n_events, dtype=np.bool)
-        area = np.zeros(n_events)
-        height_t0 = np.zeros(n_events)
-        height_peak = np.zeros(n_events)
-        peakpos_iw = np.zeros(n_events)
-        peakpos = np.zeros(n_events)
-        t0 = np.zeros(n_events)
-        t0_chk = np.zeros(n_events)
-        waveform_pix = np.zeros((n_events, self.n_samples))
-        waveform_avg = np.zeros((n_events, self.n_samples))
-        fwhm = np.zeros(n_events)
-        rise_time = np.zeros(n_events)
+    def start(self):
+        # recalculate = True
+        recalculate = False
+        if recalculate:
+            n_events = self.reader.num_events
+            source = self.reader.read()
 
-        ind = np.indices((self.n_pixels, self.n_samples))[1]
-        r_ind = ind[:, ::-1]
+            df_list = []
+            dfwf_list = []
 
-        cut_row = 0
-        cut_t0startend = 0
-        cut_avg = 0
+            a_event = np.indices((n_events, self.n_pixels))[0]
+            a_pixel = np.indices((n_events, self.n_pixels))[1]
+            a_row = dict()
+            a_area = dict()
+            a_height = dict()
+            a_peakpos = dict()
+            a_height_at_t0 = dict()
+            a_height_in_window = dict()
+            a_peakpos_in_window = dict()
+            for c in self.cleaners.keys():
+                a_row[c] = np.zeros((n_events, self.n_pixels))
+                a_area[c] = np.zeros((n_events, self.n_pixels))
+                a_height[c] = np.zeros((n_events, self.n_pixels))
+                a_peakpos[c] = np.zeros((n_events, self.n_pixels))
+                a_height_at_t0[c] = np.zeros((n_events, self.n_pixels))
+                a_height_in_window[c] = np.zeros((n_events, self.n_pixels))
+                a_peakpos_in_window[c] = np.zeros((n_events, self.n_pixels))
 
-        source = self.reader.read()
-        desc = "Looping through file"
-        for event in tqdm(source, desc=desc, total=n_events):
-            ev = event.count
+            desc = "Looping through file"
+            for event in tqdm(source, desc=desc, total=n_events):
+                ev = event.count
+                row = event.r0.tel[0].row
+                self.r1.calibrate(event)
+                r1 = event.r1.tel[0].pe_samples[0]
 
-            # Skip first row due to problem in pedestal subtraction
-            row = event.r0.tel[0].row[0]
-            if row == 0:
-                cut_row += 1
-                mask[ev] = True
-                continue
+                connected = self.connected
+                match_t0 = self.match_t0
+                ws = self.ws
+                we = self.we
 
-            # Calibrate
-            self.r1.calibrate(event)
-            r1 = event.r1.tel[0].pe_samples[0][connected]
+                for c, cleaner in self.cleaners.items():
+                    r1c = cleaner.clean(r1, connected)
 
-            # # Subtract baseline
-            # baseline_ev = np.median(r1[:, :40], 1)
-            # r1 = r1 - baseline_ev[:, None]
+                    # Get average pulse of event
+                    avgwf = np.mean(r1c[connected], 0)
+                    avgwf_t0 = np.argmax(avgwf)
 
-            # Waveform cleaning
-            kernel = general_gaussian(5, p=1.0, sig=1)
-            smooth_flat = np.convolve(r1.ravel(), kernel, "same")
-            smoothed = np.reshape(smooth_flat, r1.shape)
-            samples_std = np.std(r1, axis=1)
-            smooth_baseline_std = np.std(smoothed, axis=1)
-            with np.errstate(divide='ignore', invalid='ignore'):
-                smoothed *= (samples_std / smooth_baseline_std)[:, None]
-                smoothed[~np.isfinite(smoothed)] = 0
-            r1 = smoothed
+                    # Shift waveform to match t0 between events
+                    shift = avgwf_t0 - 60
+                    r1c_shift = np.zeros((self.n_pixels, self.n_samples))
+                    if shift >= 0:
+                        r1c_shift[:, :r1c[:, shift:].shape[1]] = r1c[:, shift:]
+                    else:
+                        r1c_shift[:, r1c[:, shift:].shape[1]:] = r1c[:, :shift]
 
-            # Get average pulse of event
-            avg = r1.mean(0)
+                    # Get average pulse of event after shift
+                    avgwf_shifted = np.mean(r1c_shift[connected], 0)
 
-            # if avg[20:40].max() < 2:
-            #     mask[ev] = True
-            #     continue
-            #
-            # r = event.r0.tel[0].row[0]
-            # c = event.r0.tel[0].column[0]
-            # bp = event.r0.tel[0].blockphase[0]
-            # blk = r + c * 8
-            # fci = event.r0.tel[0].first_cell_ids[0]
-            # print(ev, fci, blk, r, c, bp)
+                    # Get pixel wf
+                    wf = r1c[self.wf_poi]
+                    wf_shifted = r1c_shift[self.wf_poi]
 
-            # # Skip events with a low average maximum
-            # if avg.max() < 4:
-            #     cut_avg += 1
-            #     mask[ev] = True
-            #     continue
+                    a_row[c][ev] = row
+                    a_area[c][ev] = np.sum(r1c_shift[:, ws:we], 1)
+                    a_height[c][ev] = np.max(r1c_shift, 1)
+                    a_peakpos[c][ev] = np.argmax(r1c_shift, 1)
+                    a_height_at_t0[c][ev] = r1c_shift[:, match_t0]
+                    a_height_in_window[c][ev] = np.max(r1c_shift[:, ws:we], 1)
+                    a_peakpos_in_window[c][ev] = np.argmax(r1c_shift[:, ws:we], 1) + ws
 
-            # Get t0 of average pulse for event
-            # TODO: fit average pulse
-            t0_ev = avg.argmax()
+                    # Fill waveform dataframe
+                    dfwf_list.append(dict(
+                        cleaner=c,
+                        event=ev,
+                        row=row[self.wf_poi],
+                        avgwf=avgwf,
+                        wf=wf,
+                        avgwf_shifted=avgwf_shifted,
+                        wf_shifted=wf_shifted
+                    ))
 
-            # Skip events with t0 close to start or end of waveform
-            if t0_ev < 10 or t0_ev > 118:
-                cut_t0startend += 1
-                mask[ev] = True
-                continue
+            # Fill dataframe
+            for c in self.cleaners.keys():
+                a_c = np.full((n_events, self.n_pixels), c)
+                d_cleaner = dict(
+                    cleaner=a_c.ravel(),
+                    event=a_event.ravel(),
+                    pixel=a_pixel.ravel(),
+                    row=a_row[c].ravel(),
+                    area=a_area[c].ravel(),
+                    height=a_height[c].ravel(),
+                    peakpos=a_peakpos[c].ravel(),
+                    height_at_t0=a_height_at_t0[c].ravel(),
+                    height_in_window=a_height_in_window[c].ravel(),
+                    peakpos_in_window=a_peakpos_in_window[c].ravel()
+                )
+                df_cleaner = pd.DataFrame(d_cleaner)
+                df_list.append(df_cleaner)
 
-            # # Skip events outside acceptable t0 range
-            # if t0_ev < 70 or t0_ev > 75:
-            #     mask[ev] = True
-            #     continue
+            df = pd.concat(df_list)
+            dfwf = pd.DataFrame(dfwf_list)
 
-            # Shift waveform to match t0 between events
-            t0_ev_shift = t0_ev - 60
-            r1_shift = np.zeros((self.n_pixels, self.n_samples))
-            if t0_ev_shift >= 0:
-                r1_shift[:, :r1[:, t0_ev_shift:].shape[1]] = r1[:, t0_ev_shift:]
-            else:
-                r1_shift[:, r1[:, t0_ev_shift:].shape[1]:] = r1[:, :t0_ev_shift]
+            self.df = df
+            self.dfwf = dfwf
 
-            # Check t0 matching
-            avg_chk = r1_shift.mean(0)
-            t0_chk_ev = avg_chk.argmax()
+            store = pd.HDFStore(join(self.output_dir, "data.h5"))
+            store['df'] = df
+            store['dfwf'] = dfwf
 
-            r1_pix = r1_shift[pix_index]
-            area_ev = r1_pix[window_start:window_end].sum()
-            height_t0_ev = r1_pix[match_t0]
-            height_peak_ev = r1_pix[window_start:window_end].max()
-            peakpos_iw_ev = r1_pix[window_start:window_end].argmax() + window_start
-            peakpos_ev = r1_pix.argmax()
+        store = pd.HDFStore(join(self.output_dir, "data.h5"))
+        self.df = store['df']
+        self.dfwf = store['dfwf']
 
-            # Skip events with peakpos outside acceptable range
-            # if abs(peakpos_ev - match_t0) > within:
-            #     mask[ev] = True
-            #     continue
+    def finish(self):
+        df = self.df
+        dfwf = self.dfwf
 
-            ind_pix = ind[pix_index]
-            r_ind_pix = r_ind[pix_index]
-            max_ = np.max(r1_pix)
-            reversed_ = r1_pix[::-1]
-            mask_before = np.ma.masked_less(ind_pix, peakpos_ev).mask
-            mask_after = np.ma.masked_greater(r_ind_pix, peakpos_ev).mask
-            masked_bef = np.ma.masked_array(r1_pix, mask_before)
-            masked_aft = np.ma.masked_array(reversed_, mask_after)
-            half_max = max_/2
-            d_l = np.diff(np.sign(half_max - masked_aft))
-            d_r = np.diff(np.sign(half_max - masked_bef))
-            t_l = r_ind_pix[np.argmax(d_l)+1]
-            t_r = ind_pix[np.argmax(d_r)+1]
-            fwhm_ev = t_r - t_l
-            _10percent = 0.1 * max_
-            _90percent = 0.9 * max_
-            d10 = np.diff(np.sign(_10percent - masked_aft))
-            d90 = np.diff(np.sign(_90percent - masked_aft))
-            t10 = r_ind_pix[np.argmax(d10)+1]
-            t90 = r_ind_pix[np.argmax(d90)+1]
-            rise_time_ev = t90 - t10
+        # Row 0 has problems in ped subtraction
+        df = df.loc[df['row'] != 0]
+        dfwf = dfwf.loc[dfwf['row'] != 0]
 
-            # plt.plot(r1_pix)
-            # plt.axvline(t_r, color='red')
-            # plt.axvline(t_l, color='red')
-            # plt.axvline(t10, color='green')
-            # plt.axvline(t90, color='green')
-            # plt.axhline(half_max, color='red')
-            # plt.axhline(_10percent, color='green')
-            # plt.axhline(_90percent, color='green')
-            # plt.show()
+        # Cuts
+        # b = ((df['cleaner'] == 'CleanerGaussConvolve') &
+        #      (df['peakpos'] > 10) &
+        #      (df['peakpos'] < 118))
+        # df_c = df.loc[b]
+        # df_c['cleaner'] = 'GaussConvolveWfEdgeExcluded'
+        # df = pd.concat([df, df_c])
 
-            area[ev] = area_ev
-            height_t0[ev] = height_t0_ev
-            height_peak[ev] = height_peak_ev
-            peakpos_iw[ev] = peakpos_iw_ev
-            peakpos[ev] = peakpos_ev
-            t0[ev] = t0_ev
-            t0_chk[ev] = t0_chk_ev
-            waveform_pix[ev] = r1_pix
-            waveform_avg[ev] = avg
-            fwhm[ev] = fwhm_ev
-            rise_time[ev] = rise_time_ev
+        cleaners = np.unique(df['cleaner'])
 
-        def remove_events(array):
-            array = np.ma.masked_array(array, mask=mask).compressed()
-            return array
+        for c in cleaners:
+            b = (df['cleaner'] == c)
+            df_c = df.loc[b]
+            df.loc[b, 'area'] /= df_c['area'].mean()
+            df.loc[b, 'height'] /= df_c['height'].mean()
+            df.loc[b, 'height_at_t0'] /= df_c['height_at_t0'].mean()
+            df.loc[b, 'height_in_window'] /= df_c['height_at_t0'].mean()
 
-        def remove_events_samples(array):
-            mask_samples = np.zeros((n_events, self.n_samples), dtype=np.bool)
-            mask_samples = np.ma.mask_or(mask_samples, mask[:, None])
-            array = np.ma.masked_array(array, mask=mask_samples).compressed()
-            array = array.reshape((array.size // self.n_samples, self.n_samples))
-            return array
+        df.loc[(df['pixel'] == 35) & (df['cleaner'] == 'CleanerCrossCorrelate'), 'height_at_t0']
 
-        area = remove_events(area)
-        height_t0 = remove_events(height_t0)
-        height_peak = remove_events(height_peak)
-        peakpos_iw = remove_events(peakpos_iw)
-        peakpos = remove_events(peakpos)
-        t0 = remove_events(t0)
-        t0_chk = remove_events(t0_chk)
-        fwhm = remove_events(fwhm)
-        fwhm = np.ma.masked_where(fwhm < 0, fwhm).compressed()
-        rise_time = remove_events(rise_time)
-        waveform_pix = remove_events_samples(waveform_pix)
-        waveform_avg = remove_events_samples(waveform_avg)
-
-        self.log.info("Number of events removed by row cut = {}".format(cut_row))
-        self.log.info("Number of events removed by t0 close to start or "
-                      "end of waveform = {}".format(cut_t0startend))
-        self.log.info("Number of events removed by a low avg "
-                      "max = {}".format(cut_avg))
-        self.log.info("Number of events after cuts = {}".format(area.size))
-
-        output_dir = join(self.reader.output_directory, "sipm_spe_testing")
-        output_dir = join(output_dir, "ch{}".format(pix))
+        output_dir = join(self.output_dir, "p{}".format(self.wf_poi))
         if not exists(output_dir):
             self.log.info("Creating directory: {}".format(output_dir))
             makedirs(output_dir)
 
-        f_area_spectrum = plt.figure(figsize=(14, 10))
-        ax = f_area_spectrum.add_subplot(1, 1, 1)
-        range_ = [-80, 340]
-        bins = 140
-        increment = (range_[1] - range_[0]) / bins
-        ax.hist(area, bins=bins, range=range_)
-        ax.set_title("Area Spectrum (Channel {})".format(pix))
-        ax.set_xlabel("Area")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-        ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-        ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-        ax.xaxis.grid(b=True, which='major', alpha=0.8)
-        output_path = join(output_dir, "area_spectrum")
-        f_area_spectrum.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
+        # f_wf_pix = plt.figure(figsize=(14, 10))
+        # ax = f_wf_pix.add_subplot(1, 1, 1)
+        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        # for c in cleaners:
+        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'wf'].values[0]
+        #     ax.plot(wf, label=c)
+        # ax.set_title("Waveform (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        # ax.set_xlabel("Time (ns)")
+        # ax.set_ylabel("Amplitude (ADC pedsub)")
+        # ax.xaxis.set_minor_locator(MultipleLocator(1))
+        # ax.legend(loc=1)
+        # output_path = join(output_dir, "wf")
+        # f_wf_pix.savefig(output_path, bbox_inches='tight')
+        # self.log.info("Figure saved to: {}".format(output_path))
+        #
+        # f_wfshift_pix = plt.figure(figsize=(14, 10))
+        # ax = f_wfshift_pix.add_subplot(1, 1, 1)
+        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        # for c in cleaners:
+        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'wf_shifted'].values[0]
+        #     ax.plot(wf, label=c)
+        # plt.axvline(x=60, color="green")
+        # plt.axvline(x=self.ws, color="red")
+        # plt.axvline(x=self.we, color="red")
+        # ax.set_title("Waveform Shifted (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        # ax.set_xlabel("Time (ns)")
+        # ax.set_ylabel("Amplitude (ADC pedsub)")
+        # ax.xaxis.set_minor_locator(MultipleLocator(1))
+        # ax.legend(loc=1)
+        # output_path = join(output_dir, "wf_shifted")
+        # f_wfshift_pix.savefig(output_path, bbox_inches='tight')
+        # self.log.info("Figure saved to: {}".format(output_path))
+        #
+        # f_avgwf_pix = plt.figure(figsize=(14, 10))
+        # ax = f_avgwf_pix.add_subplot(1, 1, 1)
+        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        # for c in cleaners:
+        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'avgwf'].values[0]
+        #     ax.plot(wf, label=c)
+        # ax.set_title("Average Waveform (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        # ax.set_xlabel("Time (ns)")
+        # ax.set_ylabel("Amplitude (ADC pedsub)")
+        # ax.xaxis.set_minor_locator(MultipleLocator(1))
+        # ax.legend(loc=1)
+        # output_path = join(output_dir, "avgwf")
+        # f_avgwf_pix.savefig(output_path, bbox_inches='tight')
+        # self.log.info("Figure saved to: {}".format(output_path))
+        #
+        # f_avgwfshift_pix = plt.figure(figsize=(14, 10))
+        # ax = f_avgwfshift_pix.add_subplot(1, 1, 1)
+        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        # for c in cleaners:
+        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'avgwf_shifted'].values[0]
+        #     ax.plot(wf, label=c)
+        # plt.axvline(x=60, color="green")
+        # plt.axvline(x=self.ws, color="red")
+        # plt.axvline(x=self.we, color="red")
+        # ax.set_title("Average Waveform Shifted (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        # ax.set_xlabel("Time (ns)")
+        # ax.set_ylabel("Amplitude (ADC pedsub)")
+        # ax.xaxis.set_minor_locator(MultipleLocator(1))
+        # ax.legend(loc=1)
+        # output_path = join(output_dir, "avgwf_shifted")
+        # f_avgwfshift_pix.savefig(output_path, bbox_inches='tight')
+        # self.log.info("Figure saved to: {}".format(output_path))
 
-        f_height_t0_spectrum = plt.figure(figsize=(14, 10))
-        ax = f_height_t0_spectrum.add_subplot(1, 1, 1)
-        range_ = [-10, 45]
-        bins = 110
-        increment = (range_[1] - range_[0]) / bins
-        ax.hist(height_t0, bins=bins, range=range_)
-        ax.set_title("Height t0 Spectrum (Channel {})".format(pix))
-        ax.set_xlabel("Height (@t0)")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-        ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-        ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-        ax.xaxis.grid(b=True, which='major', alpha=0.8)
-        ax.xaxis.set_minor_locator(MultipleLocator(increment))
-        output_path = join(output_dir, "height_t0_spectrum")
-        f_height_t0_spectrum.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
+        for pix in self.poi:
+            df_pix = df.loc[df['pixel'] == pix]
+            output_dir = join(self.output_dir, "p{}".format(pix))
+            if not exists(output_dir):
+                self.log.info("Creating directory: {}".format(output_dir))
+                makedirs(output_dir)
 
-        f_height_peak_spectrum = plt.figure(figsize=(14, 10))
-        ax = f_height_peak_spectrum.add_subplot(1, 1, 1)
-        range_ = [-5, 50]
-        bins = 110
-        increment = (range_[1] - range_[0]) / bins
-        ax.hist(height_peak, bins=bins, range=range_)
-        ax.set_title("Height Peak Spectrum (Channel {})".format(pix))
-        ax.set_xlabel("Height (@Peak)")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-        ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-        ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-        ax.xaxis.grid(b=True, which='major', alpha=0.8)
-        ax.xaxis.set_minor_locator(MultipleLocator(increment))
-        output_path = join(output_dir, "height_peak_spectrum")
-        f_height_peak_spectrum.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
+            # f_area_spectrum = plt.figure(figsize=(14, 10))
+            # ax = f_area_spectrum.add_subplot(1, 1, 1)
+            # range_ = [-5, 15]
+            # bins = 140
+            # increment = (range_[1] - range_[0]) / bins
+            # for c in cleaners:
+            #     df_c = df_pix.loc[df_pix['cleaner']==c]
+            #     v = df_c['area'].values
+            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            # ax.set_title("Area Spectrum (Pixel {})".format(pix))
+            # ax.set_xlabel("Area")
+            # ax.set_ylabel("N")
+            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            # ax.legend(loc=1)
+            # output_path = join(output_dir, "area_spectrum")
+            # f_area_spectrum.savefig(output_path, bbox_inches='tight')
+            # self.log.info("Figure saved to: {}".format(output_path))
+            #
+            # f_height_spectrum = plt.figure(figsize=(14, 10))
+            # ax = f_height_spectrum.add_subplot(1, 1, 1)
+            # range_ = [-1, 5]
+            # bins = 110
+            # increment = (range_[1] - range_[0]) / bins
+            # for c in cleaners:
+            #     df_c = df_pix.loc[df_pix['cleaner']==c]
+            #     v = df_c['height'].values
+            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            # ax.set_title("Height Spectrum (Pixel {})".format(pix))
+            # ax.set_xlabel("Height")
+            # ax.set_ylabel("N")
+            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            # ax.legend(loc=1)
+            # output_path = join(output_dir, "height_spectrum")
+            # f_height_spectrum.savefig(output_path, bbox_inches='tight')
+            # self.log.info("Figure saved to: {}".format(output_path))
+            #
+            # f_peakpos_spectrum = plt.figure(figsize=(14, 10))
+            # ax = f_peakpos_spectrum.add_subplot(1, 1, 1)
+            # range_ = [0, self.n_samples]
+            # bins = self.n_samples
+            # increment = (range_[1] - range_[0]) / bins
+            # for c in cleaners:
+            #     df_c = df_pix.loc[df_pix['cleaner']==c]
+            #     v = df_c['peakpos'].values
+            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            # ax.set_title("Peakpos Spectrum (Pixel {})".format(pix))
+            # ax.set_xlabel("Peakpos")
+            # ax.set_ylabel("N")
+            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            # ax.legend(loc=1)
+            # output_path = join(output_dir, "peakpos_spectrum")
+            # f_peakpos_spectrum.savefig(output_path, bbox_inches='tight')
+            # self.log.info("Figure saved to: {}".format(output_path))
+            #
+            # f_heightatt0_spectrum = plt.figure(figsize=(14, 10))
+            # ax = f_heightatt0_spectrum.add_subplot(1, 1, 1)
+            # range_ = [-5, 15]
+            # bins = 110
+            # increment = (range_[1] - range_[0]) / bins
+            # for c in cleaners:
+            #     df_c = df_pix.loc[df_pix['cleaner']==c]
+            #     v = df_c['height_at_t0'].values
+            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            # ax.set_title("Height At T0 Spectrum (Pixel {})".format(pix))
+            # ax.set_xlabel("Height At T0")
+            # ax.set_ylabel("N")
+            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            # ax.legend(loc=1)
+            # output_path = join(output_dir, "heightatt0_spectrum")
+            # f_heightatt0_spectrum.savefig(output_path, bbox_inches='tight')
+            # self.log.info("Figure saved to: {}".format(output_path))
 
-        f_peakpos_iw_hist = plt.figure(figsize=(14, 10))
-        ax = f_peakpos_iw_hist.add_subplot(1, 1, 1)
-        min_ = peakpos_iw.min()
-        max_ = peakpos_iw.max()
-        nbins = int(max_ - min_)
-        n, e, _ = ax.hist(peakpos_iw, bins=nbins, range=[min_, max_])
-        ax.text(0.99, 0.99, 'Max = {}'.format(e[n.argmax()]),
-                verticalalignment='top', horizontalalignment='right',
-                transform=ax.transAxes, color='green', fontsize=15)
-        ax.set_title("peakpos Distribution inside window(Channel {})".format(pix))
-        ax.set_xlabel("peakpos")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "peakpos_iw_hist")
-        f_peakpos_iw_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
+            f_heightatt0_fit = plt.figure(figsize=(14, 10))
+            ax = plt.subplot2grid((1,3), (0,0), colspan=2)#f_heightatt0_fit.add_subplot(1, 2, 1)
+            axt = plt.subplot2grid((1,3), (0,2))#f_heightatt0_fit.add_subplot(1, 2, 2)
+            range_ = [-5, 4]
+            bins = 110
+            increment = (range_[1] - range_[0]) / bins
+            c = 'CleanerCrossCorrelate'
+            df_c = df_pix.loc[df_pix['cleaner'] == c]
+            v = df_c['height_at_t0'].values
+            self.fitter.range = range_
+            self.fitter.nbins = bins
+            self.fitter.apply(v)
+            h = self.fitter.hist
+            e = self.fitter.edges
+            b = self.fitter.between
+            fitx = self.fitter.fit_x
+            fit = self.fitter.fit
+            coeff = self.fitter.coeff
+            coeff_l = self.fitter.coeff_list
+            ax.hist(b, bins=e, weights=h, histtype='step')
+            ax.plot(fitx, fit, label="Fit")
+            for sf in self.fitter.subfit_labels:
+                arr = self.fitter.subfits[sf]
+                ax.plot(fitx, arr, label=sf)
+            ax.set_title("Height At T0 Fit (Pixel {}, Cleaner {})".format(pix, c))
+            ax.set_xlabel("Height At T0")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            axt.axis('off')
+            table_data = [['%.3f' % coeff[i]] for i in coeff_l]
+            table_row = coeff_l
+            table = axt.table(cellText=table_data, rowLabels=table_row, loc='center')
+            table.scale(1, 2)
+            table.auto_set_font_size(False)
+            table.set_fontsize(9)
+            output_path = join(output_dir, "heightatt0_fit")
+            f_heightatt0_fit.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
 
-        f_peakpos_hist = plt.figure(figsize=(14, 10))
-        ax = f_peakpos_hist.add_subplot(1, 1, 1)
-        min_ = peakpos.min()
-        max_ = peakpos.max()
-        nbins = int(max_ - min_)
-        n, e, _ = ax.hist(peakpos, bins=nbins, range=[min_, max_])
-        ax.text(0.99, 0.99, 'Max = {}'.format(e[n.argmax()]),
-                verticalalignment='top', horizontalalignment='right',
-                transform=ax.transAxes, color='green', fontsize=15)
-        ax.set_title("peakpos Distribution from whole waveform(Channel {})".format(pix))
-        ax.set_xlabel("peakpos")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "peakpos_hist")
-        f_peakpos_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_t0_hist = plt.figure(figsize=(14, 10))
-        ax = f_t0_hist.add_subplot(1, 1, 1)
-        min_ = t0.min()
-        max_ = t0.max()
-        nbins = int(max_ - min_)
-        n, e, _ = ax.hist(t0, bins=nbins, range=[min_, max_])
-        ax.text(0.99, 0.99, 'Max = {}'.format(e[n.argmax()]),
-                verticalalignment='top', horizontalalignment='right',
-                transform=ax.transAxes, color='green', fontsize=15)
-        ax.set_title("t0 Distribution")
-        ax.set_xlabel("t0")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "t0_hist")
-        f_t0_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_t0_chk_hist = plt.figure(figsize=(14, 10))
-        ax = f_t0_chk_hist.add_subplot(1, 1, 1)
-        min_ = t0_chk.min()
-        max_ = t0_chk.max()
-        nbins = int(max_ - min_ + 1)
-        n, e, _ = ax.hist(t0_chk, bins=nbins, range=[min_, max_])
-        ax.text(0.99, 0.99, 'Max = {}'.format(e[n.argmax()]),
-                verticalalignment='top', horizontalalignment='right',
-                transform=ax.transAxes, color='green', fontsize=15)
-        ax.set_title("t0 (matched) Distribution")
-        ax.set_xlabel("t0")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "t0_chk_hist")
-        f_t0_chk_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_fwhm_hist = plt.figure(figsize=(14, 10))
-        ax = f_fwhm_hist.add_subplot(1, 1, 1)
-        min_ = fwhm.min()
-        max_ = fwhm.max()
-        nbins = int(max_ - min_)
-        n, e, _ = ax.hist(fwhm, bins=nbins, range=[min_, max_])
-        ax.text(0.99, 0.99, 'Max = {}'.format(e[n.argmax()]),
-                verticalalignment='top', horizontalalignment='right',
-                transform=ax.transAxes, color='green', fontsize=15)
-        ax.set_title("fwhm Distribution (Channel {})".format(pix))
-        ax.set_xlabel("fwhm")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "fwhm_hist")
-        f_fwhm_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_rise_time_hist = plt.figure(figsize=(14, 10))
-        ax = f_rise_time_hist.add_subplot(1, 1, 1)
-        min_ = rise_time.min()
-        max_ = rise_time.max()
-        nbins = int(max_ - min_)
-        n, e, _ = ax.hist(rise_time, bins=nbins, range=[min_, max_])
-        ax.text(0.99, 0.99, 'Max = {}'.format(e[n.argmax()]),
-                verticalalignment='top', horizontalalignment='right',
-                transform=ax.transAxes, color='green', fontsize=15)
-        ax.set_title("rise_time Distribution (Channel {})".format(pix))
-        ax.set_xlabel("rise_time")
-        ax.set_ylabel("N")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "rise_time_hist")
-        f_rise_time_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_waveforms_pix = plt.figure(figsize=(14, 10))
-        ax = f_waveforms_pix.add_subplot(1, 1, 1)
-        ax.plot(np.rollaxis(waveform_pix, 1))
-        plt.axvline(x=60, color="green")
-        plt.axvline(x=window_start, color="red")
-        plt.axvline(x=window_end, color="red")
-        ax.set_title("Waveforms (Channel {})".format(pix))
-        ax.set_xlabel("Time (ns)")
-        ax.set_ylabel("Amplitude (ADC pedsub)")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "waveforms_pix")
-        f_waveforms_pix.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_waveforms_pix_hist = plt.figure(figsize=(14, 10))
-        ax = f_waveforms_pix_hist.add_subplot(1, 1, 1)
-        x = np.indices(waveform_pix.shape)[1].ravel()
-        y = waveform_pix.ravel()
-        hb = ax.hexbin(x, y, bins='log')
-        cb = f_waveforms_pix_hist.colorbar(hb, ax=ax)
-        cb.set_label('Counts (log)')
-        plt.axvline(x=60, color="green")
-        plt.axvline(x=window_start, color="red")
-        plt.axvline(x=window_end, color="red")
-        ax.set_title("Waveforms (Channel {})".format(pix))
-        ax.set_xlabel("Time (ns)")
-        ax.set_ylabel("Amplitude (ADC pedsub)")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "waveforms_pix_hist")
-        f_waveforms_pix_hist.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_waveforms_pix_hist_spe = plt.figure(figsize=(14, 10))
-        ax = f_waveforms_pix_hist_spe.add_subplot(1, 1, 1)
-        x = np.indices(waveform_pix.shape)[1].ravel()
-        y = waveform_pix.ravel()
-        yrange_ = [-5, 10]
-        ybins = 110
-        xrange_ = [-0.5, 127.5]
-        xbins = 128
-        h2, ex, ey = np.histogram2d(x, y, bins=[xbins, ybins], range=[xrange_, yrange_])
-        scale = LogNorm(vmin=160, vmax=277)
-        p = plt.pcolormesh(ex, ey, h2.T, norm=scale)
-        cb = f_waveforms_pix_hist_spe.colorbar(p, ax=ax, extend='max')
-        cb.set_label('Counts (log)')
-        plt.axvline(x=60, color="green")
-        plt.axvline(x=window_start, color="red")
-        plt.axvline(x=window_end, color="red")
-        ax.set_title("Waveforms (Channel {})".format(pix))
-        ax.set_xlabel("Time (ns)")
-        ax.set_ylabel("Amplitude (ADC pedsub)")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "waveforms_pix_hist_spe")
-        f_waveforms_pix_hist_spe.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        f_waveforms_avg = plt.figure(figsize=(14, 10))
-        ax = f_waveforms_avg.add_subplot(1, 1, 1)
-        ax.plot(np.rollaxis(waveform_avg, 1))
-        ax.set_title("Average Waveforms")
-        ax.set_xlabel("Time (ns)")
-        ax.set_ylabel("Amplitude (ADC pedsub)")
-        ax.xaxis.set_minor_locator(MultipleLocator(1))
-        output_path = join(output_dir, "waveforms_avg")
-        f_waveforms_avg.savefig(output_path, bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
-
-        output_path = join(output_dir, "area.npy")
-        np.save(output_path, area)
-        self.log.info("Numpy array saved to: {}".format(output_path))
-
-    def finish(self):
-        pass
+            # f_heightiw_spectrum = plt.figure(figsize=(14, 10))
+            # ax = f_heightiw_spectrum.add_subplot(1, 1, 1)
+            # range_ = [-5, 15]
+            # bins = 110
+            # increment = (range_[1] - range_[0]) / bins
+            # for c in cleaners:
+            #     df_c = df_pix.loc[df_pix['cleaner']==c]
+            #     v = df_c['height_in_window'].values
+            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            # ax.set_title("Height In Window Spectrum (Pixel {})".format(pix))
+            # ax.set_xlabel("Height In Window")
+            # ax.set_ylabel("N")
+            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            # ax.legend(loc=1)
+            # output_path = join(output_dir, "heightiw_spectrum")
+            # f_heightiw_spectrum.savefig(output_path, bbox_inches='tight')
+            # self.log.info("Figure saved to: {}".format(output_path))
+            #
+            # f_peakposiw_spectrum = plt.figure(figsize=(14, 10))
+            # ax = f_peakposiw_spectrum.add_subplot(1, 1, 1)
+            # range_ = [0, self.n_samples]
+            # bins = self.n_samples
+            # increment = (range_[1] - range_[0]) / bins
+            # for c in cleaners:
+            #     df_c = df_pix.loc[df_pix['cleaner']==c]
+            #     v = df_c['peakpos_in_window'].values
+            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            # ax.set_title("Peakpos In Window Spectrum (Pixel {})".format(pix))
+            # ax.set_xlabel("Peakpos In Window")
+            # ax.set_ylabel("N")
+            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            # ax.legend(loc=1)
+            # output_path = join(output_dir, "peakposiw_spectrum")
+            # f_peakposiw_spectrum.savefig(output_path, bbox_inches='tight')
+            # self.log.info("Figure saved to: {}".format(output_path))
 
 
 if __name__ == '__main__':
