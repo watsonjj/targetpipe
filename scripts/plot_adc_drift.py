@@ -148,8 +148,17 @@ class EventFileLooper(Tool):
                 event_min[index] = np.min(r1)
                 event_max[index] = np.max(r1)
 
+        # save data pints as numpy file
+        file_dir = join(self.file_reader.output_directory, "plot_adc_drift")
+        if not exists(file_dir):
+            self.log.info("Creating directory: {}".format(file_dir))
+            makedirs(file_dir)
+
+        path = join(file_dir, 'adc_drift')
+        np.save(path,(event_mean, event_stddev, event_min, event_max))
         # Create bokeh figures
         self.p_adcspread.create(event_mean, event_stddev, event_min, event_max)
+
 
         # Get bokeh layouts
         l_adcspread = self.p_adcspread.layout
