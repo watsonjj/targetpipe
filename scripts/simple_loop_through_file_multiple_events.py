@@ -76,9 +76,6 @@ def main():
     for ev_bunch in source:
         waveforms = reader.samples
 
-        from IPython import embed
-        embed()
-
 
 if __name__ == '__main__':
     main()
