@@ -146,8 +146,10 @@ class BokehFileViewer(Tool):
 
     @event_index.setter
     def event_index(self, val):
-        self._event_index = val
-        self.event = self.reader.get_event(val, False)
+        try:
+            self.event = self.reader.get_event(val, False)
+        except RuntimeError:
+            self.log.warning("Event Index {} does not exist".format(val))
 
     @property
     def event_id(self):
@@ -155,8 +157,10 @@ class BokehFileViewer(Tool):
 
     @event_id.setter
     def event_id(self, val):
-        self._event_id = val
-        self.event = self.reader.get_event(val, True)
+        try:
+            self.event = self.reader.get_event(val, True)
+        except RuntimeError:
+            self.log.warning("Event ID {} does not exist".format(val))
 
     @property
     def telid(self):
