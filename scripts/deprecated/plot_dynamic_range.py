@@ -17,10 +17,10 @@ from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from targetpipe.fitting.chec import CHECBrightFitter, SPEFitterFactory
 from targetpipe.io.file_looper import TargetioFileLooper
 from targetpipe.io.pixels import Dead
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 
 
-class RunsLinePlotter(OfficialPlotter):
+class RunsLinePlotter(ChecmPaperPlotter):
     name = 'RunsLinePlotter'
 
     def __init__(self, config, tool, **kwargs):

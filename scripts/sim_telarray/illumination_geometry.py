@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+from matplotlib import patches
 import numpy as np
 from IPython import embed
 
@@ -17,19 +18,28 @@ class Geometry:
         self.lightsource_distance = 1
 
         theta_f = np.pi / 2 - np.arccos(self.fiducial_radius / self.lightsource_distance)
-        self.fiducial_sa = 2 * np.pi * (1 - np.cos(theta_f))
-        self.fiducial_percent = 0.5 * (1 - np.cos(theta_f))
+        theta_ls = theta_f#self.lightsource_angle * np.pi / 180
         theta_p = np.arctan(self.pix_size / (2 * self.lightsource_distance))
+        self.lightsource_angle = theta_f * 180 / np.pi
+        self.lightsource_sa = 2 * np.pi * (1 - np.cos(theta_ls))
+        self.fiducial_sa = 2 * np.pi * (1 - np.cos(theta_f))
+        self.fiducial_percent = self.fiducial_sa / self.lightsource_sa
+        if self.fiducial_percent > 1: self.fiducial_percent = 1
         self.pix_sa = 2 * np.pi * (1 - np.cos(theta_p))
-        self.pix_percent = 0.5 * (1 - np.cos(theta_p))
+        self.pix_percent = self.pix_sa / self.lightsource_sa
+        if self.pix_percent > 1: self.pix_percent = 1
 
+        photons = self.set_illumination(1000)
+        print(photons)
+        print(self.lightsource_angle)
+
+    def set_illumination(self, lambda_):
+        self.lamda = lambda_
         self.pde = 0.3936
-        self.lamda = 0.7
         self.photons_pixel = self.lamda / self.pde
         self.photons_ls = self.photons_pixel / self.pix_percent
         self.photons_fiducial = self.photons_ls * self.fiducial_percent
-
-        print(self.photons_ls)
+        return self.photons_ls
 
     def plot_camera_circle(self):
         x = self.camera_curve_center_x
@@ -77,6 +87,9 @@ class Geometry:
         x = self.fiducial_center - self.lightsource_distance
         y = self.camera_curve_center_y
         self.ax.plot(x, y, 'x')
+        angle = self.lightsource_angle
+        wedge = patches.Wedge((x, y), 2*self.lightsource_distance, -angle, angle, alpha=0.5)
+        self.ax.add_patch(wedge)
 
     def plot_values(self):
         text = "Lightsource = {} photons \n" \

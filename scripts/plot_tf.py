@@ -8,7 +8,7 @@ from ctapipe.core import Tool, Component
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.calib.camera.makers import PedestalMaker
 from targetpipe.calib.camera.tf import TFApplier
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from tqdm import tqdm
 import numpy as np
 from matplotlib import pyplot as plt
@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from os.path import join, dirname
 
 
-class TFPlotter(OfficialPlotter):
+class TFPlotter(ChecmPaperPlotter):
     name = 'TFPlotter'
 
     def __init__(self, config, tool, **kwargs):

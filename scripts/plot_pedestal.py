@@ -8,7 +8,7 @@ from ctapipe.core import Tool, Component
 from ctapipe.io.eventfilereader import EventFileReaderFactory
 from targetpipe.calib.camera.makers import PedestalMaker
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from target_calib import Calibrator
 from tqdm import tqdm
 import numpy as np
@@ -19,7 +19,7 @@ from IPython import embed
 from matplotlib.colors import LogNorm
 
 
-class BlockPlotter(OfficialPlotter):
+class BlockPlotter(ChecmPaperPlotter):
     name = 'BlockPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -55,7 +55,7 @@ class BlockPlotter(OfficialPlotter):
         # self.ax.set_ylim(110, 120)
 
 
-class ResidualPlotter(OfficialPlotter):
+class ResidualPlotter(ChecmPaperPlotter):
     name = 'ResidualPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -105,7 +105,7 @@ class ResidualPlotter(OfficialPlotter):
         cbar.set_label("N")
 
 
-class ResidualStatsPlotter(OfficialPlotter):
+class ResidualStatsPlotter(ChecmPaperPlotter):
     name = 'ResidualStatsPlotter'
 
     def __init__(self, config, tool, **kwargs):

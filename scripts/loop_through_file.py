@@ -34,7 +34,6 @@ class EventFileLooper(Tool):
                         clip_amplitude='CameraDL1Calibrator.clip_amplitude',
                         radius='CameraDL1Calibrator.radius',
                         cleaner='WaveformCleanerFactory.cleaner',
-                        cleaner_t0='WaveformCleanerFactory.t0',
                         ))
     classes = List([EventFileReaderFactory,
                     ChargeExtractorFactory,
