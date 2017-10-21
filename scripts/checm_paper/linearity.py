@@ -27,7 +27,7 @@ from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.fitting.chec import CHECBrightFitter, CHECMSPEFitter
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.io.pixels import Dead, get_geometry
 from targetpipe.calib.camera.filter_wheel import FWCalibrator
 from targetpipe.utils.dactov import checm_dac_to_volts
@@ -35,7 +35,7 @@ from targetpipe.utils.dactov import checm_dac_to_volts
 from IPython import embed
 
 
-class ViolinPlotter(OfficialPlotter):
+class ViolinPlotter(ChecmPaperPlotter):
     name = 'ADC2PEPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -71,7 +71,7 @@ class ViolinPlotter(OfficialPlotter):
         self.ax.yaxis.set_minor_locator(minor_locator)
 
 
-class Dist1D(OfficialPlotter):
+class Dist1D(ChecmPaperPlotter):
     name = 'Dist1D'
 
     def __init__(self, config, tool, **kwargs):
@@ -131,7 +131,7 @@ class Dist1D(OfficialPlotter):
         self.ax.xaxis.set_minor_locator(minorLocator)
 
 
-class ImagePlotter(OfficialPlotter):
+class ImagePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -166,7 +166,7 @@ class ImagePlotter(OfficialPlotter):
         self.ax.axis('off')
 
 
-class Scatter(OfficialPlotter):
+class Scatter(ChecmPaperPlotter):
     name = 'Scatter'
 
     def __init__(self, config, tool, **kwargs):
@@ -228,7 +228,7 @@ class Scatter(OfficialPlotter):
         self.ax.legend(loc=loc, prop={'size': 9})
 
 
-class WaveformPlotter(OfficialPlotter):
+class WaveformPlotter(ChecmPaperPlotter):
     name = 'WaveformPlotter'
 
     def add(self, waveform, label):
@@ -244,7 +244,7 @@ class WaveformPlotter(OfficialPlotter):
         super().save(output_path)
 
 
-class Profile(OfficialPlotter):
+class Profile(ChecmPaperPlotter):
     name = 'Profile'
 
     def __init__(self, config, tool, **kwargs):
@@ -758,6 +758,8 @@ class ADC2PEPlots(Tool):
 
         store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
         df = store['df_ill']
+
+        embed()
 
         self.p_fwhm_profile.load_numpy('/Users/Jason/Downloads/profile_fwhm.npz')
         self.p_rt_profile.load_numpy('/Users/Jason/Downloads/profile_rt.npz')

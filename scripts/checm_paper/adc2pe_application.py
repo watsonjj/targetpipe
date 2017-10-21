@@ -17,10 +17,10 @@ from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.fitting.chec import CHECBrightFitter
 from targetpipe.io.pixels import Dead
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 
 
-class ADC2PEPlotter(OfficialPlotter):
+class ADC2PEPlotter(ChecmPaperPlotter):
     name = 'ADC2PEPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -61,7 +61,7 @@ class ADC2PEPlotter(OfficialPlotter):
             self.log.info("ADC2PE {} stddev = {}".format(key, std))
 
 
-class TMSpreadPlotter(OfficialPlotter):
+class TMSpreadPlotter(ChecmPaperPlotter):
     name = 'TMSpreadPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -113,7 +113,7 @@ class TMSpreadPlotter(OfficialPlotter):
         self.ax.yaxis.set_minor_locator(minor_locator)
 
 
-class GMDistributionPlotter(OfficialPlotter):
+class GMDistributionPlotter(ChecmPaperPlotter):
     name = 'GMDistributionPlotter'
 
     def __init__(self, config, tool, **kwargs):

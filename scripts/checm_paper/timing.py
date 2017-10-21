@@ -22,12 +22,12 @@ from ctapipe.visualization import CameraDisplay
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.io.pixels import Dead, get_geometry
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 
 from IPython import embed
 
 
-class Scatter(OfficialPlotter):
+class Scatter(ChecmPaperPlotter):
     name = 'Scatter'
 
     def __init__(self, config, tool, **kwargs):
@@ -70,7 +70,7 @@ class Scatter(OfficialPlotter):
         # axes[2].yaxis.set_minor_locator(AutoMinorLocator(5))
 
 
-class Hist2D(OfficialPlotter):
+class Hist2D(ChecmPaperPlotter):
     name = 'Hist2D'
 
     def __init__(self, config, tool, **kwargs):
@@ -119,7 +119,7 @@ class Hist2D(OfficialPlotter):
 
 
 
-class WaveformHist1DInt(OfficialPlotter):
+class WaveformHist1DInt(ChecmPaperPlotter):
     name = 'WaveformHist1DInt'
 
     def __init__(self, config, tool, **kwargs):
@@ -165,7 +165,7 @@ class WaveformHist1DInt(OfficialPlotter):
         super().save(output_path)
 
 
-class WaveformHist1D(OfficialPlotter):
+class WaveformHist1D(ChecmPaperPlotter):
     name = 'WaveformHist1D'
 
     def __init__(self, config, tool, **kwargs):
@@ -215,7 +215,7 @@ class WaveformHist1D(OfficialPlotter):
         super().save(output_path)
 
 
-class ImagePlotter(OfficialPlotter):
+class ImagePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):

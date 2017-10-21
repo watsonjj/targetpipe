@@ -11,7 +11,7 @@ from targetpipe.calib.camera.makers import PedestalMaker
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.calib.camera.tf import TFApplier
 from targetpipe.io.eventfilereader import TargetioFileReader
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from tqdm import tqdm, trange
 import numpy as np
 from matplotlib import pyplot as plt
@@ -23,7 +23,7 @@ from scipy.stats import norm
 from targetpipe.utils.dactov import checm_dac_to_volts
 
 
-class TFPlotter(OfficialPlotter):
+class TFPlotter(ChecmPaperPlotter):
     name = 'TFPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -53,7 +53,7 @@ class TFPlotter(OfficialPlotter):
         self.ax.legend(loc=2)
 
 
-class BeforeAfterHist(OfficialPlotter):
+class BeforeAfterHist(ChecmPaperPlotter):
     name = 'Hist1D'
 
     def __init__(self, config, tool, **kwargs):
@@ -122,7 +122,7 @@ class BeforeAfterHist(OfficialPlotter):
         super().save(output_path)
 
 
-class Scatter(OfficialPlotter):
+class Scatter(ChecmPaperPlotter):
     name = 'Scatter'
 
     def __init__(self, config, tool, **kwargs):

@@ -16,7 +16,7 @@ from ctapipe.instrument import CameraGeometry
 from ctapipe.visualization import CameraDisplay
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.utils.dactov import checm_dac_to_volts
 from astropy import units as u
 
@@ -82,7 +82,7 @@ class CustomCameraDisplay(CameraDisplay):
             # self.ellipse_t.set_color(self.ellipse.get_edgecolor())
 
 
-class ImagePlotter(OfficialPlotter):
+class ImagePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -130,7 +130,7 @@ class ImagePlotter(OfficialPlotter):
         camera.colorbar.ax.tick_params(labelsize=30)
 
 
-class WaveformPlotter(OfficialPlotter):
+class WaveformPlotter(ChecmPaperPlotter):
     name = 'WaveformPlotter'
 
     def __init__(self, config, tool, **kwargs):

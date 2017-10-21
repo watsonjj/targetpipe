@@ -27,7 +27,7 @@ from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.fitting.chec import CHECBrightFitter, CHECMSPEFitter
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.io.pixels import Dead, get_geometry
 from targetpipe.calib.camera.filter_wheel import FWCalibrator
 from targetpipe.utils.dactov import checm_dac_to_volts
@@ -35,7 +35,7 @@ from targetpipe.utils.dactov import checm_dac_to_volts
 from IPython import embed
 
 
-class Scatter(OfficialPlotter):
+class Scatter(ChecmPaperPlotter):
     name = 'Scatter'
 
     def __init__(self, config, tool, **kwargs):
@@ -97,7 +97,7 @@ class Scatter(OfficialPlotter):
         self.ax.legend(loc=loc, prop={'size': 8})
 
 
-class Profile(OfficialPlotter):
+class Profile(ChecmPaperPlotter):
     name = 'Profile'
 
     def __init__(self, config, tool, **kwargs):

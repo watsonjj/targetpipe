@@ -23,7 +23,7 @@ from ctapipe.visualization import CameraDisplay
 from ctapipe.io.eventfilereader import HessioFileReader
 
 from targetpipe.io.eventfilereader import TargetioFileReader
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from astropy import units as u
 
 
@@ -88,7 +88,7 @@ class CustomCameraDisplay(CameraDisplay):
             # self.ellipse_t.set_color(self.ellipse.get_edgecolor())
 
 
-class ImagePlotter(OfficialPlotter):
+class ImagePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -150,7 +150,7 @@ class ImagePlotter(OfficialPlotter):
         pass
 
 
-class PeakTimePlotter(OfficialPlotter):
+class PeakTimePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -244,7 +244,7 @@ class BrightImagePlotter(ImagePlotter):
         super().create(df_sub, geom)
 
 
-class CountPlotter(OfficialPlotter):
+class CountPlotter(ChecmPaperPlotter):
     name = 'CountPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -279,7 +279,7 @@ class CountPlotter(OfficialPlotter):
         self.ax.axis('off')
 
 
-class WholeDist(OfficialPlotter):
+class WholeDist(ChecmPaperPlotter):
     name = 'WholeDist'
 
     def __init__(self, config, tool, **kwargs):
@@ -357,7 +357,7 @@ class WholeDist(OfficialPlotter):
         self.ax6.yaxis.set_minor_locator(AutoMinorLocator(5))
 
 
-class WidthVsLength(OfficialPlotter):
+class WidthVsLength(ChecmPaperPlotter):
     name = 'WidthVsLength'
 
     def __init__(self, config, tool, **kwargs):
@@ -428,7 +428,7 @@ class WidthVsLength(OfficialPlotter):
         self.ax.legend(loc="upper right", prop={'size': 10})
 
 
-class SizeVsLength(OfficialPlotter):
+class SizeVsLength(ChecmPaperPlotter):
     name = 'WidthVsLength'
 
     def __init__(self, config, tool, **kwargs):
@@ -499,7 +499,7 @@ class SizeVsLength(OfficialPlotter):
         self.ax.legend(loc="upper right", prop={'size': 10})
 
 
-class WidthDivLength(OfficialPlotter):
+class WidthDivLength(ChecmPaperPlotter):
     name = 'WidthDivLength'
 
     def __init__(self, config, tool, **kwargs):
@@ -523,7 +523,7 @@ class WidthDivLength(OfficialPlotter):
         self.ax.set_title("Width/Length")
 
 
-class LengthDivSize(OfficialPlotter):
+class LengthDivSize(ChecmPaperPlotter):
     name = 'LengthDivSize'
 
     def __init__(self, config, tool, **kwargs):
@@ -547,7 +547,7 @@ class LengthDivSize(OfficialPlotter):
         self.ax.set_title("Length/Size")
 
 
-class PairPlotter(OfficialPlotter):
+class PairPlotter(ChecmPaperPlotter):
     name = 'PairPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -577,7 +577,7 @@ class PairPlotter(OfficialPlotter):
         self.ax = axes[0]
 
 
-class LengthPlotter(OfficialPlotter):
+class LengthPlotter(ChecmPaperPlotter):
     name = 'LengthPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -642,7 +642,7 @@ class LengthPlotter(OfficialPlotter):
         self.ax.legend(loc="upper right", prop={'size': 10})
 
 
-class WidthPlotter(OfficialPlotter):
+class WidthPlotter(ChecmPaperPlotter):
     name = 'WidthPlotter'
 
     def __init__(self, config, tool, **kwargs):

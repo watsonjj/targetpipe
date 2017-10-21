@@ -19,11 +19,11 @@ from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.fitting.chec import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.utils.dactov import checm_dac_to_volts
 
 
-class PixelSPEFitPlotter(OfficialPlotter):
+class PixelSPEFitPlotter(ChecmPaperPlotter):
     name = 'PixelSPEFitPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -69,7 +69,7 @@ class PixelSPEFitPlotter(OfficialPlotter):
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
-class TMSPEFitPlotter(OfficialPlotter):
+class TMSPEFitPlotter(ChecmPaperPlotter):
     name = 'TMSPEFitPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -115,7 +115,7 @@ class TMSPEFitPlotter(OfficialPlotter):
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
-class ADC2PEPlotter(OfficialPlotter):
+class ADC2PEPlotter(ChecmPaperPlotter):
     name = 'ADC2PEPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -149,7 +149,7 @@ class ADC2PEPlotter(OfficialPlotter):
             self.log.info("ADC2PE {}V stddev = {}".format(key, std))
 
 
-class ADC2PE1100VTMPlotter(OfficialPlotter):
+class ADC2PE1100VTMPlotter(ChecmPaperPlotter):
     name = 'ADC2PE1100VTMPlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -199,7 +199,7 @@ class ADC2PE1100VTMPlotter(OfficialPlotter):
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
-class ADC2PE1100VTMStatsPlotter(OfficialPlotter):
+class ADC2PE1100VTMStatsPlotter(ChecmPaperPlotter):
     name = 'ADC2PE1100VTMStatsPlotter'
 
     def __init__(self, config, tool, **kwargs):

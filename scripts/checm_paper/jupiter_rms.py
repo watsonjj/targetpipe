@@ -20,7 +20,7 @@ from ctapipe.instrument.camera import _get_min_pixel_seperation
 from ctapipe.visualization import CameraDisplay
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.io.pixels import get_geometry, checm_pixel_pos
 from IPython import embed
 from targetpipe.plots.quick_camera import plot_quick_camera
@@ -66,7 +66,7 @@ class Coordinates:
         return gd
 
 
-class ImagePlotter(OfficialPlotter):
+class ImagePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -173,7 +173,7 @@ class Gaussian2DFitter(Component):
         return res.x[0]
 
 
-class Image3DPlotter(OfficialPlotter):
+class Image3DPlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
@@ -213,7 +213,7 @@ class Image3DPlotter(OfficialPlotter):
         self.ax.set_zlabel("\nResidual RMS (p.e.)", linespacing=2.5)
 
 
-class Image1DProjection(OfficialPlotter):
+class Image1DProjection(ChecmPaperPlotter):
     name = 'Image1DProjection'
 
     def __init__(self, config, tool, **kwargs):
@@ -298,7 +298,7 @@ class Image1DProjection(OfficialPlotter):
         self.ax.axes.set_xlim(-0.8, 0.8)
 
 
-class ZoomedImagePlotter(OfficialPlotter):
+class ZoomedImagePlotter(ChecmPaperPlotter):
     name = 'ImagePlotter'
 
     def __init__(self, config, tool, **kwargs):
