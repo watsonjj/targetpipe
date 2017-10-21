@@ -9,7 +9,7 @@ from os import makedirs
 
 
 class OfficialPlotter(Component):
-    name = 'OfficialPlotter'
+    name = 'Official'
 
     type = CaStEn(['paper', 'talk'], 'paper',
                   help="Intended publishment of plot").tag(config=True)
@@ -46,25 +46,26 @@ class OfficialPlotter(Component):
                                        "text.fontsize": 10
                                        })
 
-        if self.shape == 'wide':
-            self.fig = plt.figure(figsize=(8, 4))
-        else:
-            self.fig = plt.figure(figsize=(4, 4))
-        self.ax = self.fig.add_subplot(1, 1, 1)
-
-        self.ax.xaxis.set_minor_locator(AutoMinorLocator())
-        self.ax.yaxis.set_minor_locator(AutoMinorLocator())
-        plt.tick_params(which='both', width=1)
-        plt.tick_params(which='minor', length=4)
-        plt.tick_params(which='major', length=7)
-
-        # self.ax.tick_params(labelsize=19)
+        self.fig, self.ax = self.create_figure()
 
         self.extension = 'pdf'
-        base_dir = "/Volumes/gct-jason/plots/checm_paper"
-        self.output_dir = join(base_dir, self.script)
-        figure_name = self.figure_name + "." + self.extension
-        self.output_path = join(self.output_dir, figure_name)
+        self.base_dir = "/Volumes/gct-jason/plots/checm_paper"
+
+    @property
+    def output_dir(self):
+        return join(self.base_dir, self.script)
+
+    @property
+    def output_path(self):
+        return join(self.output_dir, self.figure_name + "." + self.extension)
+
+    def create_figure(self):
+        if self.shape == 'wide':
+            fig = plt.figure(figsize=(8, 4))
+        else:
+            fig = plt.figure(figsize=(4, 4))
+        ax = fig.add_subplot(1, 1, 1)
+        return fig, ax
 
     def save(self, output_path=None):
         if output_path:
@@ -79,3 +80,29 @@ class OfficialPlotter(Component):
 
         self.fig.savefig(output_path, bbox_inches='tight')
         self.log.info("Figure saved to: {}".format(output_path))
+
+
+class ChecmPaperPlotter(OfficialPlotter):
+    name = 'ChecmPaperPlotter'
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+
+        self.ax.xaxis.set_minor_locator(AutoMinorLocator())
+        self.ax.yaxis.set_minor_locator(AutoMinorLocator())
+        plt.tick_params(which='both', width=1)
+        plt.tick_params(which='minor', length=4)
+        plt.tick_params(which='major', length=7)
+
+        # self.ax.tick_params(labelsize=19)
+
+        self.base_dir = "/Volumes/gct-jason/plots/checm_paper"
+
+
+class ThesisPlotter(ChecmPaperPlotter):
+    name = 'ThesisPlotter'
+
+    def __init__(self, config, tool, **kwargs):
+        super().__init__(config=config, tool=tool, **kwargs)
+
+        self.base_dir = "/Users/Jason/Dropbox/DropboxDocuments/University/Oxford/Reports/Thesis/plots"
