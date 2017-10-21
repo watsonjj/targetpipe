@@ -22,12 +22,12 @@ from targetpipe.calib.camera.r1 import TargetioR1Calibrator
 from targetpipe.fitting.chec import CHECMSPEFitter
 from targetpipe.io.pixels import Dead
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
-from targetpipe.plots.official import OfficialPlotter
+from targetpipe.plots.official import ChecmPaperPlotter
 
 from IPython import embed
 
 
-class Scatter(OfficialPlotter):
+class Scatter(ChecmPaperPlotter):
     name = 'Scatter'
 
     def __init__(self, config, tool, **kwargs):
