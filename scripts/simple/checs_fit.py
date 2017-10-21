@@ -12,7 +12,8 @@ from scipy.ndimage import correlate1d
 from scipy.stats.distributions import poisson
 import iminuit
 from tqdm import tqdm
-from fit_algorithms import sipm_spe_fit, pedestal_signal, pe_signal
+# from fit_algorithms import sipm_spe_fit, pedestal_signal, pe_signal
+from targetpipe.fitting.spe_sipm import sipm_spe_fit, pedestal_signal, pe_signal
 from IPython import embed
 
 
@@ -73,7 +74,7 @@ class Reader:
 
 class Cleaner:
     def __init__(self):
-        file = np.loadtxt("pulse_data.txt", delimiter=', ')
+        file = np.loadtxt("/Users/Jason/Downloads/fitting/pulse_data.txt", delimiter=', ')
         refx = file[:, 0]
         refy = file[:, 1] - file[:, 1][0]
         f = interpolate.interp1d(refx, refy, kind=3)
