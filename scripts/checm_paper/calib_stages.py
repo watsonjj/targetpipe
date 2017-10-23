@@ -34,12 +34,11 @@ class CustomCameraDisplay(CameraDisplay):
             allow_pick=False,
             autoupdate=True,
             autoscale=True,
-            antialiased=True,
             ):
         self.ellipse = None
         self.ellipse_t = None
         super().__init__(geometry, image, ax, title, norm, cmap, allow_pick,
-                         autoupdate, autoscale, antialiased)
+                         autoupdate, autoscale)
 
     def overlay_moments_update(self, momparams, **kwargs):
         """helper to overlay ellipse from a `reco.MomentParameters` structure
@@ -315,9 +314,9 @@ class CalibStages(Tool):
         t = "R1 Transfer Function Applied, pix={}".format(pix)
         self.p_calibmv_wf.create(pix_r1_mv, t, 'V')
         t = "R1 Calibrated p.e., pix={}".format(pix)
-        self.p_calibpe_wf.create(pix_r1, t, 'p.e.')
+        self.p_calibpe_wf.create(pix_r1, t, 'p.e./ns')
         t = "Cleaned Wf, pix={}".format(pix)
-        self.p_cleaned_wf.create(pix_cleaned, t, 'p.e.')
+        self.p_cleaned_wf.create(pix_cleaned, t, 'p.e./ns')
 
     def finish(self):
         self.p_raw.save()
