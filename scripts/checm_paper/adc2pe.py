@@ -45,8 +45,8 @@ class PixelSPEFitPlotter(ChecmPaperPlotter):
     def create(self, hist, edges, between, fit, fitx):
         # Normalise histogram
         norm = np.sum(np.diff(edges) * hist)
-        hist_n = hist/norm
-        fit_n = fit/norm
+        hist_n = hist#/norm
+        fit_n = fit#/norm
 
         # Roll axis for easier plotting
         nbins = hist_n.size
@@ -56,10 +56,10 @@ class PixelSPEFitPlotter(ChecmPaperPlotter):
 
         self.ax.semilogy(edges_tops, hist_tops, color='black', alpha=0.5)
         self.ax.semilogy(fitx, fit_n, color='black')
-        self.ax.set_ylim(ymin=3e-2)
+        # self.ax.set_ylim(ymin=3e-2)
         # self.ax.set_title("SPE Spectrum, Pixel 1559")
-        self.ax.set_xlabel("Pulse Area (V*ns)")
-        self.ax.set_ylabel("Probability Density")
+        self.ax.set_xlabel("Pulse Area (V ns)")
+        self.ax.set_ylabel("Counts")
 
         major_locator = MultipleLocator(0.05)
         # major_formatter = FormatStrFormatter('%d')
@@ -141,7 +141,7 @@ class ADC2PEPlotter(ChecmPaperPlotter):
                        legend=False)
         # self.ax.set_title("SPE Values for different HV Settings")
         self.ax.set_xlabel('HV')
-        self.ax.set_ylabel('SPE Value (V*ns)')
+        self.ax.set_ylabel('SPE Value (V ns / p.e.)')
         self.ax.legend(loc="upper left")
 
         for key in ['800', '800gm', '900', '900gm', '1000', '1000gm', '1100']:
