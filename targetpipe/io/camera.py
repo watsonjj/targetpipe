@@ -113,7 +113,6 @@ class Config(Borg):
         self.dead_pixels = []
         self.optical_foclen = 2.283
         mapping = MappingCHEC()
-        mapping.Rotate(3)
         self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
         self.ref_pulse_path = join(self.dir, 'checm_reference_pulse.npz')  # TODO
         self.n_rows = 8
