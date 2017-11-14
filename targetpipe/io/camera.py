@@ -2,6 +2,7 @@ import numpy as np
 from astropy import log
 from os.path import dirname, realpath, join
 from target_io import T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
+from target_calib import MappingModule, MappingCHEC
 
 
 class Borg:
@@ -27,7 +28,6 @@ class Config(Borg):
             self.pixel_id_path = None
             self.pixel_pos_path = None
             self.ref_pulse_path = None
-            self.pixel_id = None
             self.pixel_pos = None
             self.refshape = None
             self.refstep = None
@@ -76,8 +76,6 @@ class Config(Borg):
             log.error("No camera with id: {}".format(camera_id))
             raise
 
-        self.pixel_id = np.load(self.pixel_id_path)[:self.n_pix]
-        self.pixel_pos = np.load(self.pixel_pos_path)[:, :self.n_pix]
         ref_pulse_file = np.load(self.ref_pulse_path)
         self.refshape = ref_pulse_file['refshape']
         self.refstep = ref_pulse_file['refstep']
@@ -94,8 +92,8 @@ class Config(Borg):
         self.n_pix = 2048
         self.dead_pixels = [96, 276, 1906, 1910, 1916]
         self.optical_foclen = 2.283
-        self.pixel_id_path = join(self.dir, 'checm_pixel_id.npy')
         self.pixel_pos_path = join(self.dir, 'checm_pixel_pos.npy')
+        self.pixel_pos = np.load(self.pixel_pos_path)[:, :self.n_pix]
         self.ref_pulse_path = join(self.dir, 'checm_reference_pulse.npz')
         self.n_rows = 8
         self.n_columns = 64
@@ -114,8 +112,9 @@ class Config(Borg):
         self.n_pix = 2048
         self.dead_pixels = []
         self.optical_foclen = 2.283
-        self.pixel_id_path = join(self.dir, 'checm_pixel_id.npy')  # TODO
-        self.pixel_pos_path = join(self.dir, 'checm_pixel_pos.npy')  # TODO
+        mapping = MappingCHEC()
+        mapping.Rotate(3)
+        self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
         self.ref_pulse_path = join(self.dir, 'checm_reference_pulse.npz')  # TODO
         self.n_rows = 8
         self.n_columns = 16
@@ -126,5 +125,7 @@ class Config(Borg):
 
     def _case_checs_single(self):
         self._case_checs()
+        mapping = MappingModule()
+        self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
         self.n_pix = 64
         self.dead_pixels = []

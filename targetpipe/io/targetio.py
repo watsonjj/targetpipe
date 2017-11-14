@@ -228,8 +228,13 @@ class TargetioExtractor:
             If True ,'requested_event' now seeks for a particular events id
             instead of index
         """
+        index = requested_event
         if use_event_id:
             # Obtaining event id not implemented
-            self.event_index = self.tio_reader.GetEventIndex(requested_event)
-        else:
-            self.event_index = requested_event
+            index = self.tio_reader.GetEventIndex(requested_event)
+        n_events = self.n_events
+        if self.max_events and self.max_events < self.n_events:
+            n_events = self.max_events
+        if (index >= n_events) | (index < 0):
+            raise RuntimeError("Outside event range")
+        self.event_index = index
