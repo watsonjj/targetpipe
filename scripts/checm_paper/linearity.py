@@ -25,7 +25,7 @@ from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.visualization import CameraDisplay
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.fitting.chec import CHECBrightFitter, CHECMSPEFitter
+# from targetpipe.fitting.chec import CHECBrightFitter, CHECMSPEFitter
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
 from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.io.pixels import Dead, get_geometry
@@ -188,16 +188,16 @@ class Scatter(ChecmPaperPlotter):
         # self.fig = plt.figure(figsize=(12, 8))
         # self.ax = self.fig.add_subplot(1, 1, 1)
 
-    def add(self, x, y, x_err=None, y_err=None, label='', c=None):
+    def add(self, x, y, x_err=None, y_err=None, label='', c=None, fmt='o'):
         if not c:
             c = self.ax._get_lines.get_next_color()
         # no_err = y_err == 0
         # err = ~no_err
         # self.ax.errorbar(x[no_err], y[no_err], fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3)
-        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3, label=label)
+        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt=fmt, mew=1, color=c, alpha=1, markersize=3, capsize=3, elinewidth=0.7, label=label)
 
         for cap in caps:
-            cap.set_markeredgewidth(1)
+            cap.set_markeredgewidth(0.7)
 
     def create(self, x_label="", y_label="", title=""):
         self.ax.set_xlabel(x_label)
@@ -713,13 +713,13 @@ class ADC2PEPlots(Tool):
         #                             avgwf_charge=avgwf_charge))
         #
         # df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity.h5')
         # store['df'] = df
         #
-        # self.p_fwhm_profile.save_numpy('/Users/Jason/Downloads/profile_fwhm.npz')
-        # self.p_rt_profile.save_numpy('/Users/Jason/Downloads/profile_rt.npz')
+        # self.p_fwhm_profile.save_numpy('/Volumes/gct-jason/plots/checm_paper/df/profile_fwhm.npz')
+        # self.p_rt_profile.save_numpy('/Volumes/gct-jason/plots/checm_paper/df/profile_rt.npz')
         #
-        # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity.h5')
         # df = store['df']
         #
         # # Scale ADC values to match p.e.
@@ -753,16 +753,16 @@ class ADC2PEPlots(Tool):
         #         b = (df['type'] == t) & (df['pixel'] == p)
         #         df.loc[b, 'illumination'] = ill
         #         df.loc[b, 'illumination_err'] = err
-        # store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity.h5')
         # store['df_ill'] = df
 
-        store = pd.HDFStore('/Users/Jason/Downloads/linearity.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity.h5')
         df = store['df_ill']
 
         embed()
 
-        self.p_fwhm_profile.load_numpy('/Users/Jason/Downloads/profile_fwhm.npz')
-        self.p_rt_profile.load_numpy('/Users/Jason/Downloads/profile_rt.npz')
+        self.p_fwhm_profile.load_numpy('/Volumes/gct-jason/plots/checm_paper/df/profile_fwhm.npz')
+        self.p_rt_profile.load_numpy('/Volumes/gct-jason/plots/checm_paper/df/profile_rt.npz')
 
         # df_lj = df.loc[((df['type'] == 'LS62') &
         #                 (df['illumination'] < 20)) |
@@ -866,6 +866,7 @@ class ADC2PEPlots(Tool):
         self.p_time_res_pix.create("Illumination (p.e.)", "Time Resolution (ns)", "Pixel Timing Resolution")
         self.p_time_res_pix.set_x_log()
         self.p_time_res_pix.set_y_log()
+        fmt = ['o', 'x']
         for ip, p in enumerate(self.poi):
             df_pix = df_ljc.loc[df_ljc['pixel'] == p]
             x = df_pix['illumination']
@@ -873,7 +874,7 @@ class ADC2PEPlots(Tool):
             x_err = df_pix['illumination_err']
             gt1 = x > 1
             label = "Pixel {}".format(p)
-            self.p_time_res_pix.add(x[gt1], y[gt1], x_err[gt1], None, label)
+            self.p_time_res_pix.add(x[gt1], y[gt1], x_err[gt1], None, label, fmt=fmt[ip])
         # self.p_scatter_pix.add_xy_line()
         self.p_time_res_pix.add_legend(1)
 

@@ -29,7 +29,7 @@ class Geometry:
         self.pix_percent = self.pix_sa / self.lightsource_sa
         if self.pix_percent > 1: self.pix_percent = 1
 
-        photons = self.set_illumination(1000)
+        photons = self.set_illumination(2)
         print(photons)
         print(self.lightsource_angle)
 

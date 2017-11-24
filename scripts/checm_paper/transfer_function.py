@@ -322,10 +322,10 @@ class TFInvestigator(Tool):
         #                         ))
         #
         # df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Users/Jason/Downloads/tf.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/tf.h5')
         # store['df'] = df
 
-        store = pd.HDFStore('/Users/Jason/Downloads/tf.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/tf.h5')
         df = store['df']
 
         # Get TF

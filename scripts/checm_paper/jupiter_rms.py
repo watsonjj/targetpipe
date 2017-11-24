@@ -412,10 +412,10 @@ class JupiterRMS(Tool):
         #     result = self.df['path'].apply(get_run_averages, pbar=pbar)
         #     self.df['rms_pp'], self.df['n_events'] = zip(*result)
         #
-        # store = pd.HDFStore('/Users/Jason/Downloads/jupiter_rms.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/jupiter_rms.h5')
         # store['df'] = self.df
 
-        store = pd.HDFStore('/Users/Jason/Downloads/jupiter_rms.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/jupiter_rms.h5')
         self.df = store['df']
 
         group = self.df.groupby(['mirrors', 'type', 'deg'])
@@ -544,7 +544,7 @@ class JupiterRMS(Tool):
 # xxi, yyi = np.meshgrid(xi, yi[::-1])
 #
 # #create data
-# data = np.load('/Users/Jason/Downloads/test.npy')
+# data = np.load('/Volumes/gct-jason/plots/checm_paper/df/test.npy')
 #
 # di = griddata((x, y), data, (xi[None,:], yi[:,None]), method='cubic')
 # di = np.ma.masked_invalid(di)

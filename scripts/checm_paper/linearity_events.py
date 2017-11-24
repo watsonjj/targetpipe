@@ -25,7 +25,7 @@ from ctapipe.image.waveform_cleaning import CHECMWaveformCleanerAverage
 from ctapipe.visualization import CameraDisplay
 from targetpipe.io.eventfilereader import TargetioFileReader
 from targetpipe.calib.camera.r1 import TargetioR1Calibrator
-from targetpipe.fitting.chec import CHECBrightFitter, CHECMSPEFitter
+# from targetpipe.fitting.chec import CHECBrightFitter, CHECMSPEFitter
 from targetpipe.calib.camera.adc2pe import TargetioADC2PECalibrator
 from targetpipe.plots.official import ChecmPaperPlotter
 from targetpipe.io.pixels import Dead, get_geometry
@@ -57,13 +57,13 @@ class Scatter(ChecmPaperPlotter):
         # self.fig = plt.figure(figsize=(12, 8))
         # self.ax = self.fig.add_subplot(1, 1, 1)
 
-    def add(self, x, y, x_err=None, y_err=None, label='', c=None, **kwargs):
+    def add(self, x, y, x_err=None, y_err=None, label='', c=None, fmt='o', **kwargs):
         if not c:
             c = self.ax._get_lines.get_next_color()
-        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='o', mew=0.5, color=c, alpha=0.8, markersize=3, capsize=3, label=label, **kwargs)
+        (_, caps, _) = self.ax.errorbar(x, y, xerr=x_err, yerr=y_err, fmt=fmt, mew=1, color=c, alpha=1, markersize=3, capsize=3, elinewidth=0.7, label=label, **kwargs)
 
         for cap in caps:
-            cap.set_markeredgewidth(1)
+            cap.set_markeredgewidth(0.7)
 
     def add_line(self, x, y, label='', **kwargs):
         self.ax.plot(x, y, label=label, **kwargs)
@@ -365,10 +365,10 @@ class ADC2PEPlots(Tool):
         #     df_list.append(df_run)
         #
         # df = pd.concat(df_list)
-        # store = pd.HDFStore('/Users/Jason/Downloads/linearity_events.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
         # store['df'] = df
         #
-        # store = pd.HDFStore('/Users/Jason/Downloads/linearity_events.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
         # df = store['df']
         #
         # df_mean = df.groupby(['type', 'level', 'pixel'], as_index=False).mean()
@@ -393,10 +393,10 @@ class ADC2PEPlots(Tool):
         #         err = self.fw_calibrator.get_illumination_err(level)
         #         data = np.column_stack([ill, err])
         #         df.loc[b, ['illumination', 'illumination_err']] = data
-        # store = pd.HDFStore('/Users/Jason/Downloads/linearity_events.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
         # store['df_ill'] = df
 
-        store = pd.HDFStore('/Users/Jason/Downloads/linearity_events.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
         df = store['df_ill']
 
         df_lj = df.loc[((df['type'] == 'LS62') &
@@ -437,6 +437,7 @@ class ADC2PEPlots(Tool):
         label = "MAPM Data"
         self.p_scatter_pix.add_line(x, y, label, color='black')
         df_plot = df_ljc.loc[df_ljc['illumination'] > 1]
+        fmt = ['o', 'x']
         for ip, p in enumerate(self.poi):
             df_pix = df_plot.loc[df_plot['pixel'] == p]
             df_gb = df_pix.groupby(['type', 'level'])
@@ -449,7 +450,7 @@ class ADC2PEPlots(Tool):
             y_err_bottom = y - q25
             y_err = [y_err_bottom, y_err_top]
             label = "Pixel {}".format(p)
-            self.p_scatter_pix.add(x, y, x_err, y_err, label)
+            self.p_scatter_pix.add(x, y, x_err, y_err, label, fmt=fmt[ip])
         p = 1825
         df_pix = df_plot.loc[df_plot['pixel'] == p]
         df_pix = df_pix[df_pix["width"]!=0]
@@ -463,11 +464,11 @@ class ADC2PEPlots(Tool):
         y_err_bottom = y - q25
         y_err = [y_err_bottom, y_err_top]
         label = "Pixel {}, Saturation-Recovered".format(p)
-        self.p_scatter_pix.add(x, y, x_err, y_err, label)
+        self.p_scatter_pix.add(x, y, x_err, y_err, label, fmt='v')
         self.p_scatter_pix.add_xy_line()
         self.p_scatter_pix.add_legend()
         self.p_scatter_pix.ax.set_xlim(left=0.5, right=3000)
-        self.p_scatter_pix.ax.set_ylim(bottom=0.5, top=3000)
+        # self.p_scatter_pix.ax.set_ylim(bottom=0.5, top=3000)
 
         self.p_fwhm_pix.create("Peak Height (p.e.)", "FWHM (ns)", "")
         self.p_fwhm_pix.set_x_log()

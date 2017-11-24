@@ -884,10 +884,10 @@ class HillasBuilder(Tool):
                     df_list.append(d)
 
         self.df = pd.DataFrame(df_list)
-        store = pd.HDFStore('/Users/Jason/Downloads/hillas.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/hillas.h5')
         store['df'] = self.df
 
-        store = pd.HDFStore('/Users/Jason/Downloads/hillas.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/hillas.h5')
         self.df = store['df']
         self.df.loc[:, 'h_width'] /= 40.344e-3
         self.df.loc[:, 'h_length'] /= 40.344e-3
@@ -938,7 +938,7 @@ class HillasBuilder(Tool):
         output_dir = self.p_allimage.output_dir
 
         np_path = join(output_dir, "hillas.npz")
-        np.savez("/Users/Jason/Downloads/hillas.npz",
+        np.savez("/Volumes/gct-jason/plots/checm_paper/df/hillas.npz",
                  time=df_data['time'],
                  size=df_data['h_size'],
                  cen_x=df_data['h_cen_x'],

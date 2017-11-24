@@ -2,6 +2,7 @@ from traitlets import Dict, List, Unicode
 from ctapipe.core import Tool
 from targetpipe.calib.camera.tf import TFApplier
 import numpy as np
+from IPython import embed
 
 
 class TfComparer(Tool):

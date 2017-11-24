@@ -286,7 +286,7 @@ class CalibStages(Tool):
         tc = tailcuts_clean(geom, dl1, 20, 10)
         cleaned_dl1 = np.ma.masked_array(dl1, mask=~tc)
 
-        hillas = hillas_parameters(*pos, cleaned_dl1)
+        hillas = hillas_parameters(geom, cleaned_dl1)
 
         t = "Raw, T={}ns".format(t0)
         self.p_raw.create(t, "ADC", t0_r0, geom, tc, tc)

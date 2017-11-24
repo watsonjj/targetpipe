@@ -298,10 +298,10 @@ class ADC2PEPlots(Tool):
         #                             pixel_width=pixel_width))
         #
         # df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Users/Jason/Downloads/recovery.h5')
+        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/recovery.h5')
         # store['df'] = df
         #
-        store = pd.HDFStore('/Users/Jason/Downloads/recovery.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/recovery.h5')
         df = store['df']
 
         fw_cal = 2450
@@ -321,10 +321,10 @@ class ADC2PEPlots(Tool):
                 b = (df['type'] == t) & (df['pixel'] == p)
                 df.loc[b, 'illumination'] = ill
                 df.loc[b, 'illumination_err'] = err
-        store = pd.HDFStore('/Users/Jason/Downloads/recovery.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/recovery.h5')
         store['df_ill'] = df
 
-        store = pd.HDFStore('/Users/Jason/Downloads/recovery.h5')
+        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/recovery.h5')
         df = store['df_ill']
 
         df_lj = df.loc[((df['type'] == 'LS62') &
