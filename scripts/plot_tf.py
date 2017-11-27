@@ -14,6 +14,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 # import seaborn as sns
 from os.path import join, dirname
+from IPython import embed
 
 
 class TFPlotter(ChecmPaperPlotter):
@@ -36,15 +37,14 @@ class TFPlotter(ChecmPaperPlotter):
         super().__init__(config=config, tool=tool, **kwargs)
 
     def create(self, tf, adc_min, adc_step, tm, tmpix, cell):
-        pix_tf = tf[tm, tmpix, cell]
-
-        x = adc_min + np.arange(pix_tf.size) * adc_step
-        y = pix_tf
-        self.ax.plot(x, y, 'o')
+        x = adc_min + np.arange(tf.shape[-1]) * adc_step
+        y = tf[tm, tmpix].T
+        # self.ax.plot(x, y, 'o')
         self.ax.plot(x, y)
-        self.ax.set_title("TM: {}, TMPIX: {}, SAMP_CELL: {}".format(tm, tmpix, cell))
+        # self.ax.set_title("TM: {}, TMPIX: {}, SAMP_CELL: {}".format(tm, tmpix, cell))
+        self.ax.set_title("TF Values for a single channel")
         self.ax.set_xlabel("ADC")
-        self.ax.set_ylabel("Amplitude (mV)")
+        self.ax.set_ylabel("Calibrated Amplitude (VPED - 1050)")
 
 class TFApplicationPlotter(ChecmPaperPlotter):
     name = 'TFApplicationPlotter'
@@ -106,8 +106,8 @@ class PedestalBuilder(Tool):
         tf, adc_min, adc_step = self.tf.get_tf()
         tf = np.array(tf)
 
-        tm = 10
-        tmpix = 10
+        tm = 0
+        tmpix = 0
         cell = 0
 
         self.p_tf.create(tf, adc_min, adc_step, tm, tmpix, cell)
