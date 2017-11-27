@@ -210,9 +210,6 @@ class DL1Extractor(Tool):
                 self.fwhm[ev] = fwhm
                 self.rise_time[ev] = rise_time
 
-                from IPython import embed
-                embed()
-
                 #print(self.tack[ev]-self.tack[ev-1])
 
     def finish(self):
