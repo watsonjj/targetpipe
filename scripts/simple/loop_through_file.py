@@ -16,13 +16,6 @@ SKIP_EVENT = 2
 SKIP_END_EVENT = 1
 
 
-def get_bp_r_c(cells):
-    blockphase = cells % N_BLOCKSAMPLES
-    row = (cells // N_BLOCKSAMPLES) % 8
-    column = (cells // N_BLOCKSAMPLES) // 8
-    return blockphase, row, column
-
-
 class Reader:
     def __init__(self, path):
         self.path = path
@@ -61,7 +54,7 @@ class Reader:
 
 
 def main():
-    description = 'Check for missing pedestal values'
+    description = 'Simple Waveform Reader'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-f', '--file', dest='input_path', action='store',
                         required=True, help='path to the TIO r1 run file')
@@ -71,11 +64,6 @@ def main():
     source = reader.event_generator()
 
     for ev in source:
-        # Skip first row due to problem in pedestal subtraction
-        bp, r, c = get_bp_r_c(reader.first_cell_ids[0])
-        if r == 0:
-            continue
-
         waveforms = reader.samples
 
 
