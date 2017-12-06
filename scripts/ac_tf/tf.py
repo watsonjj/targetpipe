@@ -213,7 +213,7 @@ class TFSamplingCell(TF):
 
 class TFStorageCell(TF):
     name = "TFStorageCell"
-    fn = "tf_storeagecell.h5"
+    fn = "tf_storagecell.h5"
     cn = "storagecell"
 
     def __init__(self):
@@ -231,7 +231,7 @@ class TFStorageCell(TF):
 
 class TFStorageCellReduced(TFStorageCell):
     name = "TFStorageCellReduced"
-    fn = "tf_storeagecellreduced.h5"
+    fn = "tf_storagecellreduced.h5"
 
     def __init__(self):
         super().__init__()
@@ -240,7 +240,7 @@ class TFStorageCellReduced(TFStorageCell):
 
 class TFStorageCellReducedCompress(TFStorageCellReduced):
     name = "TFStorageCellReducedCompress"
-    fn = "tf_storeagecellreducedcompress.h5"
+    fn = "tf_storagecellreducedcompress.h5"
 
     def __init__(self):
         super().__init__()
@@ -345,7 +345,7 @@ class TFTargetCalib(TFSamplingCell):
             block = int(column * 8 + row)
             adc = np.ascontiguousarray(df_cell['adc'].values, dtype=np.float32)
             cal_c = np.zeros(adc.size, dtype=np.float32)
-            calibrator.ApplyArray(adc, cal_c, 0, pix, block, blockphase, True)
+            calibrator.ApplyArray(adc, cal_c, 0, pix, block, blockphase)
             cal[w] = cal_c
         df_sort['cal'] = cal
 

@@ -105,4 +105,4 @@ class ThesisPlotter(ChecmPaperPlotter):
     def __init__(self, config, tool, **kwargs):
         super().__init__(config=config, tool=tool, **kwargs)
 
-        self.base_dir = "/Users/Jason/Dropbox/DropboxDocuments/University/Oxford/Reports/Thesis/plots"
+        self.base_dir = "/Users/Jason/Dropbox/DropboxDocuments/University/Oxford/Reports/Thesis/figures/plots"

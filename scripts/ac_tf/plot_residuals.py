@@ -123,8 +123,44 @@ def main():
         p_res.plot(residuals[name], name)
     p_res.save()
 
+    r6 = [
+        'TFSamplingCell'
+    ]
+    p_res = ResidualPlot(figure_name="residual_6")
+    desc = "Generating plots"
+    for name in tqdm(r6, desc=desc):
+        p_res.plot(residuals[name], name)
+    p_res.save()
+
+    r7 = [
+        'TFSamplingCell',
+        'TFStorageCell',
+        'TFStorageCellReducedCompress'
+    ]
+    p_res = ResidualPlot(figure_name="residual_7")
+    desc = "Generating plots"
+    for name in tqdm(r7, desc=desc):
+        p_res.plot(residuals[name], name)
+    p_res.save()
+
     p_res = ResidualPlot(figure_name="residual_1z")
     for name in r1:
+        p_res.plot(residuals[name], name)
+    p_res.ax.set_xlim(-100, 100)
+    p_res.ax.set_ylim(8E-3, 3)
+    p_res.save()
+
+    p_res = ResidualPlot(figure_name="residual_6z")
+    desc = "Generating plots"
+    for name in tqdm(r6, desc=desc):
+        p_res.plot(residuals[name], name)
+    p_res.ax.set_xlim(-100, 100)
+    p_res.ax.set_ylim(8E-3, 3)
+    p_res.save()
+
+    p_res = ResidualPlot(figure_name="residual_7z")
+    desc = "Generating plots"
+    for name in tqdm(r7, desc=desc):
         p_res.plot(residuals[name], name)
     p_res.ax.set_xlim(-100, 100)
     p_res.ax.set_ylim(8E-3, 3)

@@ -120,7 +120,7 @@ class ImagePlotter(ChecmPaperPlotter):
         max_ = cleaned_image.max()
         min_ = np.percentile(image, 0.1)
         camera.set_limits_minmax(min_, max_)
-        camera.highlight_pixels(hl, hlc, 1, hla)
+        # camera.highlight_pixels(hl, hlc, 1, hla)
         if hillas:
             camera.overlay_moments_update(hillas, color='red', linewidth=2)
 

@@ -8,7 +8,7 @@ core_path = join(directory, "Amplitude_input.csv")
 pix_dir = join(directory, "p{}".format(pix))
 plot_dir = join(pix_dir, "plots")
 input_path = join(pix_dir, "input.h5")
-tf_path = "/Users/Jason/Downloads/SN0074/TF_File_v4.tcal"
+tf_path = "/Users/Jason/Software/CHECDevelopment/CHECS/Operation/SN0074_tf.tcal"
 
 
 class Plotter(ThesisPlotter):
