@@ -120,7 +120,7 @@ class ImagePlotter(ChecmPaperPlotter):
         max_ = cleaned_image.max()
         min_ = np.percentile(image, 0.1)
         camera.set_limits_minmax(min_, max_)
-        # camera.highlight_pixels(hl, hlc, 1, hla)
+        camera.highlight_pixels(hl, hlc, 1, hla)
         if hillas:
             camera.overlay_moments_update(hillas, color='red', linewidth=2)
 
@@ -199,7 +199,7 @@ class CalibStages(Tool):
 
         self.r1 = TargetioR1Calibrator(pedestal_path='/Volumes/gct-jason/data/170330/pedestal/Run05475_ped.tcal',
                                        tf_path='/Volumes/gct-jason/data/170314/tf/Run00001-00050_tf.tcal',
-                                       adc2pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_800gm_c1.tcal',
+                                       pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_800gm_c1.tcal',
                                        **kwargs,
                                        )
         self.r1_adc = TargetioR1Calibrator(pedestal_path='/Volumes/gct-jason/data/170330/pedestal/Run05475_ped.tcal',
@@ -271,7 +271,10 @@ class CalibStages(Tool):
         dl1 = event.dl1.tel[telid].image[0]
         cleaned = event.dl1.tel[telid].cleaned[0]
 
-        pix = np.argmax(dl1)
+        tc = tailcuts_clean(geom, dl1, 20, 10)
+        cleaned_dl1 = np.ma.masked_array(dl1, mask=~tc)
+
+        pix = np.ma.argmax(dl1)
 
         t0_r0 = r0[0, :, t0]
         t0_r1 = r1[0, :, t0]
@@ -282,9 +285,6 @@ class CalibStages(Tool):
         pix_r1_mv = checm_dac_to_volts(r1_adc[0, pix, :])
         pix_r1_pedestal = r1_pedestal[0, pix, :]
         pix_cleaned = cleaned[pix]
-
-        tc = tailcuts_clean(geom, dl1, 20, 10)
-        cleaned_dl1 = np.ma.masked_array(dl1, mask=~tc)
 
         hillas = hillas_parameters(geom, cleaned_dl1)
 

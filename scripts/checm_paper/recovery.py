@@ -139,11 +139,11 @@ class ADC2PEPlots(Tool):
 
         r1_0320 = TargetioR1Calibrator(pedestal_path='/Volumes/gct-jason/data/170320/pedestal/Run04109_ped.tcal',
                                        tf_path='/Volumes/gct-jason/data/170320/tf/Run04110-04159_tf.tcal',
-                                       adc2pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_1100.tcal',
+                                       pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_1100.tcal',
                                        **kwargs)
         r1_0319 = TargetioR1Calibrator(pedestal_path='/Volumes/gct-jason/data/170319/linearity/pedestal/Run04051_ped.tcal',
                                        tf_path='/Volumes/gct-jason/data/170319/linearity/tf/Run04001-04050_tf.tcal',
-                                       adc2pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_1100.tcal',
+                                       pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_1100.tcal',
                                        **kwargs)
 
         dfl = []

@@ -315,12 +315,12 @@ class TimingExtractor(Tool):
 
         self.r1_led = TargetioR1Calibrator(pedestal_path='/Volumes/gct-jason/data/170322/pedestal/Run04240_ped.tcal',
                                            tf_path='/Volumes/gct-jason/data/170322/tf/Run04277-04327_tf.tcal',
-                                           adc2pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_800gm_c1.tcal',
+                                           pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_800gm_c1.tcal',
                                            **kwargs,
                                            )
         self.r1_laser = TargetioR1Calibrator(pedestal_path='/Volumes/gct-jason/data/170320/pedestal/Run04109_ped.tcal',
                                              tf_path='/Volumes/gct-jason/data/170320/tf/Run04110-04159_tf.tcal',
-                                             adc2pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_1100.tcal',
+                                             pe_path='/Users/Jason/Software/CHECAnalysis/targetpipe/adc2pe/adc2pe_1100.tcal',
                                              **kwargs,
                                              )
         self.dl0 = CameraDL0Reducer(**kwargs)
