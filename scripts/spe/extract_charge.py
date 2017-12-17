@@ -99,6 +99,8 @@ def main():
 
     reader = Reader(args.input_path)
     n_events = reader.n_events
+    n_pixels = reader.n_pix
+    n_samples = reader.n_samples
     source = reader.event_generator()
 
     cccleaner = CrossCorrelation()
@@ -109,17 +111,32 @@ def main():
     avg_wf = None
     t0_eoi = None
 
+    desc = "Looping over events to get baseline"
+    n_base = 1000
+    baseline_waveforms = np.zeros((n_base, n_pixels, n_samples))
+    for ev in tqdm(source, total=n_base, desc=desc):
+        if ev >= n_base:
+            break
+        bp, r, c = get_bp_r_c(reader.first_cell_ids)
+
+        baseline_waveforms[ev] = reader.samples
+
+    avgwf_fb = np.mean(baseline_waveforms, (0, 1))
+    baseline = np.mean(avgwf_fb[0:16])
+
+    source = reader.event_generator()
     desc = "Looping over events"
     for ev in tqdm(source, total=n_events, desc=desc):
         bp, r, c = get_bp_r_c(reader.first_cell_ids)
 
-        waveforms = reader.samples
+        waveforms = reader.samples - baseline
 
         # Cross Correlation Method
         cleaned = cccleaner.clean(waveforms)
         avg = np.mean(cleaned, 0)
         avg_t0 = np.argmax(avg)
-        charge = cleaned[:, avg_t0]
+        bc = cleaned
+        charge = bc[:, avg_t0]
 
         # # Integration Window Method
         # cleaned = waveforms
@@ -172,6 +189,20 @@ def main():
     ax.xaxis.grid(b=True, which='major', alpha=0.8)
     output_path = join(output_dir, "charge_hist_p{}.pdf".format(poi))
     f_hist.savefig(output_path, bbox_inches='tight')
+    print("Figure saved to: {}".format(output_path))
+
+    f_avg_fb = plt.figure(figsize=(14, 10))
+    ax = f_avg_fb.add_subplot(1, 1, 1)
+    ax.plot(avgwf_fb)
+    ax.axvline(0, c='blue')
+    ax.axvline(16, c='blue')
+    ax.axhline(baseline, c='green')
+    ax.set_title("Average Wf (First {} Events)".format(n_base))
+    ax.set_xlabel("Time (ns)")
+    ax.set_ylabel("Amplitude")
+    ax.xaxis.set_major_locator(MultipleLocator(16))
+    output_path = join(output_dir, "wf_avgwf_fb.pdf")
+    f_avg_fb.savefig(output_path, bbox_inches='tight')
     print("Figure saved to: {}".format(output_path))
 
     f_raw = plt.figure(figsize=(14, 10))

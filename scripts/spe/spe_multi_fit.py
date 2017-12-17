@@ -17,9 +17,9 @@ def get_fitter():
         norm1=None,  # Automatically calculated by fitter from histogram
         norm2=None,  # Automatically calculated by fitter from histogram
         norm3=None,  # Automatically calculated by fitter from histogram
-        eped=-10,
+        eped=0,
         eped_sigma=4,
-        spe=37,
+        spe=40,
         spe_sigma=6,
         lambda_1=4,
         lambda_2=4,
@@ -32,9 +32,9 @@ def get_fitter():
         limit_norm1=(0, 100000),
         limit_norm2=(0, 100000),
         limit_norm3=(0, 100000),
-        limit_eped=(-20, 10),
+        limit_eped=(-10, 10),
         limit_eped_sigma=(2, 10),
-        limit_spe=(20, 40),
+        limit_spe=(30, 50),
         limit_spe_sigma=(2, 10),
         limit_lambda_1=(2, 5),
         limit_lambda_2=(2, 5),
