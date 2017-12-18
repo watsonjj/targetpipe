@@ -69,10 +69,15 @@ def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, 
     """
     # Obtain poisson distribution
     # TODO: could do something smarter here depending on lambda_
-    p = poisson.pmf(np.arange(11), lambda_)[:, None]
-    n = np.arange(p.size)[:, None]
-    j = np.arange(1, p.size)[None, :]
-    pct = np.sum(p * np.power(1-opct, j) * np.power(opct, n - j) * binom(n-1, j-1), 1)
+    gnorm = 1#0.65#3.0/math.sqrt(2*3.1415926)
+    npeaks = 11
+
+    # print(norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap)
+
+    n = np.arange(npeaks)[:, None]
+    j = np.arange(npeaks)[None, :]
+    pj = poisson.pmf(j, lambda_)
+    pct = np.sum(pj * np.power(1-opct, j) * np.power(opct, n - j) * binom(n-1, j-1), 1)
 
     sap = spe_sigma
     d1ap = dap
@@ -86,16 +91,18 @@ def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, 
     # pap_noap = pct - pap_ap1 - pap_ap2
 
     papk = np.power(1 - pap, n[:, 0])
-    pap_noap = pct * papk
-    pap_ap1 = pct * (1-papk) * papk
-    pap_ap2 = pct * (1-papk) * (1-papk)
+    p0AP = pct * papk
+    pAP1 = pct * (1-papk) * papk
+    pAP2 = pct * (1-papk) * (1-papk)
 
     pe_sigma = np.sqrt(k * spe_sigma ** 2 + eped_sigma ** 2)
     ap_sigma = np.sqrt(k * sap ** 2 + eped_sigma ** 2)
 
-    signal = norm * pap_noap[k] * gaussian.pdf(x, eped + k * spe, pe_sigma)
-    signal += norm * pap_ap1[k] * gaussian.pdf(x, eped + k * spe * (1.0-d1ap), ap_sigma)
-    signal += norm * pap_ap2[k] * gaussian.pdf(x, eped + k * spe * (1.0-d2ap), ap_sigma)
+    signal = p0AP[k] * gaussian.pdf(x, eped + k * spe, pe_sigma)
+    signal += pAP1[k] * gaussian.pdf(x, eped + k * spe * (1.0-d1ap), ap_sigma)
+    signal += pAP2[k] * gaussian.pdf(x, eped + k * spe * (1.0-d2ap), ap_sigma)
+
+    signal *= gnorm * norm
 
     return signal
 

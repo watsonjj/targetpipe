@@ -13,6 +13,7 @@ class ChargeFitter:
         self.hist = None
         self.edges = None
         self.between = None
+        self.n = None
         self.coeff = None
 
         self.nbins = 100
@@ -71,8 +72,7 @@ class ChargeFitter:
         self.limits["limit_" + name] = (lower, upper)
 
     def apply(self, spectrum):
-        hist, edges = self.get_histogram(spectrum)
-        between = (edges[1:] + edges[:-1]) / 2
+        hist, edges, between = self.get_histogram(spectrum)
 
         self.hist = hist
         self.edges = edges
@@ -90,7 +90,15 @@ class ChargeFitter:
     def get_histogram(self, spectrum):
         range_ = self.range[:]
         hist, edges = np.histogram(spectrum, bins=self.nbins, range=range_)
-        return hist, edges
+        between = (edges[1:] + edges[:-1]) / 2
+
+        zero = between[np.argmax(hist)]
+        spectrum -= zero
+
+        hist, edges = np.histogram(spectrum, bins=self.nbins, range=range_)
+        between = (edges[1:] + edges[:-1]) / 2
+
+        return hist, edges, between
 
     @abstractmethod
     def _perform_fit(self, hist, edges, between):
@@ -201,11 +209,9 @@ class CHECSSPEMultiFitter(ChargeFitter):
             self.subfit_labels.append('{}pe'.format(pe))
 
     def apply_multi(self, spectrum1, spectrum2, spectrum3):
-        hist1, edges = self.get_histogram(spectrum1)
-        hist2, _ = self.get_histogram(spectrum2)
-        hist3, _ = self.get_histogram(spectrum3)
-
-        between = (edges[1:] + edges[:-1]) / 2
+        hist1, edges, between = self.get_histogram(spectrum1)
+        hist2, _, _ = self.get_histogram(spectrum2)
+        hist3, _, _ = self.get_histogram(spectrum3)
 
         hist = [hist1, hist2, hist3]
         self.hist = hist
