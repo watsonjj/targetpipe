@@ -1,6 +1,6 @@
 import pandas as pd
 from core import input_path
-from tf import *
+from tf import TF, child_subclasses
 from tqdm import tqdm
 
 
@@ -8,21 +8,11 @@ def main():
     store = pd.HDFStore(input_path)
     df = store['df']
 
-    tf_list = [
-        TFSamplingCell,
-        TFStorageCell,
-        TFStorageCellReduced,
-        TFStorageCellReducedCompress,
-        TFPChip,
-        TFBest,
-        TFBestCompress,
-        TFNothing,
-        TFTargetCalib
-    ]
+    tf_list = child_subclasses(TF)
 
     desc = "Looping through TF list"
-    for TF in tqdm(tf_list):
-        tf = TF()
+    for cls in tqdm(tf_list):
+        tf = cls()
         tf.create(df)
 
 

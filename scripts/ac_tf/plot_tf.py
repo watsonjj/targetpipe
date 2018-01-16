@@ -1,11 +1,12 @@
 import pandas as pd
 from core import input_path, Plotter, plot_dir
-from tf import *
+from tf import TF, child_subclasses
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 from IPython import embed
 import pickle
+from os.path import join
 
 
 class TFPlot(Plotter):
@@ -24,21 +25,15 @@ class TFPlot(Plotter):
 def main():
     pickle_path = join(plot_dir, "plot_tf.p")
 
-    tf_list = [
-        TFSamplingCell,
-        TFStorageCell,
-        TFStorageCellReduced,
-        TFStorageCellReducedCompress,
-        TFPChip
-    ]
+    tf_list = child_subclasses(TF)
 
     tfs = {}
 
     desc = "Looping through TF list"
-    for TF in tqdm(tf_list):
-        tf_c = TF()
+    for cls in tqdm(tf_list):
+        tf_c = cls()
         adc_x, tf = tf_c._load_tf()
-        tfs[tf_c.name] = (adc_x, tf)
+        tfs[tf_c.__class__.__name__] = (adc_x, tf)
 
     pickle.dump(tfs, open(pickle_path, "wb"))
 
@@ -46,7 +41,8 @@ def main():
 
     r1 = [
         'TFSamplingCell',
-        # 'TFStorageCell',
+        'TFStorageCell',
+        'TFStorageCellExp',
         # 'TFStorageCellReduced',
         # 'TFStorageCellReducedInt',
         # 'TFPChip'

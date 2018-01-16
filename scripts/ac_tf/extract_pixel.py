@@ -1,12 +1,12 @@
 import pandas as pd
 from tqdm import tqdm
-from core import pix, core_path as input_path, pix_path as output_path
+from core import pix, core_path as input_path, input_path as output_path
 
 
 def main():
     desc = "Reading file"
     chunksize = 100000
-    nlines = 1093620302
+    nlines = 1097041566
     nchunks = nlines//chunksize
     tb = pd.read_csv(input_path, iterator=True, chunksize=chunksize)
     df_list = []

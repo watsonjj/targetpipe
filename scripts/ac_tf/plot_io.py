@@ -40,7 +40,7 @@ def main():
 
     tf_list = [
         TFSamplingCell,
-        TFStorageCell,
+        # TFStorageCell,
         # TFStorageCellReduced,
         # TFStorageCellReducedCompress,
         # TFPChip,
@@ -55,7 +55,7 @@ def main():
     for TF in tqdm(tf_list, desc=desc):
         tf = TF()
         df_cal = tf.calibrate(df)
-        io[tf.name] = df_cal.loc[:, ['vped', 'cal']]
+        io[tf.__class__.__name__] = df_cal.loc[:, ['vped', 'cal']]
 
     pickle.dump(io, open(pickle_path, "wb"))
 
@@ -63,7 +63,7 @@ def main():
 
     r1 = [
         'TFSamplingCell',
-        'TFStorageCell',
+        # 'TFStorageCell',
         # 'TFStorageCellReduced',
         # 'TFStorageCellReducedCompress',
         # 'TFPChip',
