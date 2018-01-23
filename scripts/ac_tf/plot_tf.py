@@ -1,6 +1,6 @@
 import pandas as pd
 from core import input_path, Plotter, plot_dir
-from tf import TF, child_subclasses
+from tf import TFSamplingCell, TFStorageCell, TFStorageCellPedestal, TFStorageCellPedestalZero
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -11,8 +11,8 @@ from os.path import join
 
 class TFPlot(Plotter):
     def plot(self, x, y, label):
-        # self.ax.plot(x, y, 'x-', mew=0.5, label=label)
-        self.ax.plot(x, y, mew=0.5, label=label)
+        self.ax.plot(x, y, 'x-', mew=0.5, label=label)
+        # self.ax.plot(x, y, mew=0.5, label=label)
 
         self.ax.set_xlabel("ADC")
         self.ax.set_ylabel("Amplitude (mV)")
@@ -25,7 +25,7 @@ class TFPlot(Plotter):
 def main():
     pickle_path = join(plot_dir, "plot_tf.p")
 
-    tf_list = child_subclasses(TF)
+    tf_list = [TFSamplingCell, TFStorageCell, TFStorageCellPedestal, TFStorageCellPedestalZero]
 
     tfs = {}
 
@@ -42,10 +42,8 @@ def main():
     r1 = [
         'TFSamplingCell',
         'TFStorageCell',
-        'TFStorageCellExp',
-        # 'TFStorageCellReduced',
-        # 'TFStorageCellReducedInt',
-        # 'TFPChip'
+        'TFStorageCellPedestal',
+        'TFStorageCellPedestalZero'
     ]
     p_comparison = TFPlot(figure_name="tf_comparison")
     desc = "Generating plots"
@@ -54,6 +52,8 @@ def main():
         x, tf = tfs[name]
         p_comparison.plot(x, tf[0], name)
         p_tf.plot(x, tf.T, "")
+        p_tf.ax.set_xlim(-12, 12)
+        p_tf.ax.set_ylim(-18, 18)
         p_tf.save()
     p_comparison.add_legend()
     p_comparison.save()

@@ -1,6 +1,6 @@
 import numpy as np
 from tqdm import tqdm, trange
-from core import pix_dir, tf_path, pix
+from core import pix_dir, tf_path, pix, pedestal_path
 from scipy.interpolate import interp1d, PchipInterpolator
 from tables import open_file
 from os.path import join
@@ -24,7 +24,7 @@ class TF:
     def __init__(self):
         tqdm.write("Created instance of {}".format(self.__class__.__name__))
         self.path = join(pix_dir, self.fn)
-        self.n_adc_points = 500
+        self.step = 8
         self.create_interp = 'linear'
         self.apply_interp = 'linear'
         self.compress = False
@@ -50,7 +50,8 @@ class TF:
         tqdm.write(">> Getting ADC points")
         adc_min = np.nanmin(adc)
         adc_max = np.nanmax(adc)
-        adc_x = np.linspace(adc_min, adc_max, self.n_adc_points)
+        n = np.ceil((adc_max - adc_min)/ self.step)
+        adc_x = np.linspace(adc_min, adc_max, n)
         return adc_x
 
     def _create_interpolation(self, adc_x, adc_cell, vped_cell, fill):
@@ -78,11 +79,13 @@ class TF:
                 if turn.size == 0:
                     check = False
                     break
-                adc_cell = np.delete(adc_cell, turn + 1)
-                vped_cell = np.delete(vped_cell, turn + 1)
+                adc_cell = np.delete(adc_cell, turn)
+                vped_cell = np.delete(vped_cell, turn)
                 fill = (vped_cell[0], vped_cell[-1])
 
             tf[cell] = self._create_interpolation(adc_x, adc_cell, vped_cell, fill)
+            # if cell == 2846:
+            #     embed()
         return tf
 
     def _save_tf(self, adc_x, tf):
@@ -179,7 +182,7 @@ class TFSamplingCell(TF):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 500
+        self.step = 8
 
 
 class TFSamplingCellPerfect(TFSamplingCell):
@@ -188,7 +191,7 @@ class TFSamplingCellPerfect(TFSamplingCell):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 2000
+        self.step = 2
 
 
 class TFStorageCell(TF):
@@ -197,12 +200,15 @@ class TFStorageCell(TF):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 500
+        self.step = 8
         self.create_interp = 'linear'
         self.apply_interp = 'linear'
 
     def _prepare_df(self, df):
         tqdm.write(">> Preparing df")
+        # c = target_calib.GetCellIDArray(df['fci'].values.astype(np.uint16),
+        #                                 df['sample'].values.astype(np.uint16))
+        # df['cell'] = c
         df[self.cn] = df['cell']
         df_sort = df.sort_values([self.cn, 'vped'])
         return df_sort
@@ -213,7 +219,7 @@ class TFStorageCell_60(TFStorageCell):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 60
+        self.step = 8 * 500/60
 
 
 class TFStorageCell_150(TFStorageCell):
@@ -221,7 +227,7 @@ class TFStorageCell_150(TFStorageCell):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 150
+        self.step = 8 * 500/150
 
 
 class TFStorageCell_300(TFStorageCell):
@@ -229,7 +235,7 @@ class TFStorageCell_300(TFStorageCell):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 300
+        self.step = 8 * 500/300
 
 
 class TFStorageCell_500(TFStorageCell):
@@ -237,7 +243,7 @@ class TFStorageCell_500(TFStorageCell):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 500
+        self.step = 8
 
 
 class TFStorageCell_1000(TFStorageCell):
@@ -245,47 +251,30 @@ class TFStorageCell_1000(TFStorageCell):
 
     def __init__(self):
         super().__init__()
-        self.n_adc_points = 1000
+        self.step = 8 * 500/1000
 
 
-class TFStorageCellExp(TFStorageCell):
-    fn = "tf_storagecellexp.h5"
+class TFStorageCellPedestal(TFStorageCell):
+    fn = "tf_storagecellpedestal.h5"
 
-    def __init__(self):
-        super().__init__()
-        self.n_adc_points = 60
+    def create(self, df):
+        store = pd.HDFStore(pedestal_path)
+        df = pd.concat([df, store['df']], ignore_index=True)
+        super().create(df)
+
+
+class TFStorageCellPedestalZero(TFStorageCellPedestal):
+    fn = "tf_storagecellpedestalzero.h5"
 
     def _get_adc_points(self, adc):
         tqdm.write(">> Getting ADC points")
         adc_min = np.nanmin(adc)
+        adc_min = self.step * ((adc_min // self.step) - 1)
         adc_max = np.nanmax(adc)
-
-        if adc_min > 0:
-            adc_x = 10 ** np.linspace(np.log10(adc_min), np.log10(adc_max), self.n_adc_points)
-        else:
-            n_n = int(0.1 * self.n_adc_points)
-            n_p = self.n_adc_points - n_n
-            adc_xp = 10 ** np.linspace(0, np.log10(adc_max), n_p)
-            adc_xn = -10 ** np.linspace(0, np.log10(-adc_min), n_p)[::-1]
-            adc_x = np.concatenate([adc_xn, adc_xp])
-
+        adc_max = self.step * ((adc_max // self.step) + 1)
+        n = np.ceil((adc_max - adc_min) / self.step)
+        adc_x = np.linspace(adc_min, adc_max, n+1)
         return adc_x
-
-
-class TFStorageCellExp_60(TFStorageCellExp):
-    fn = "tf_storagecellexp60.h5"
-
-    def __init__(self):
-        super().__init__()
-        self.n_adc_points = 60
-
-
-class TFStorageCellExp_150(TFStorageCellExp):
-    fn = "tf_storagecellexp150.h5"
-
-    def __init__(self):
-        super().__init__()
-        self.n_adc_points = 150
 
 
 # class TFPChip(TFStorageCellReducedCompress):
