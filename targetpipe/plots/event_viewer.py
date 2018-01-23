@@ -101,8 +101,7 @@ class EventViewerCamera(CameraDisplay):
             url = e.meta['input']
             # Check if geom actually needs to be changed
             if not (t == self._geom_tel and url == self._geom_url):
-                self.geom = CameraGeometry.guess(*e.inst.pixel_pos[t],
-                                                 e.inst.optical_foclen[t])
+                self.geom = e.inst.subarray.tel[t].camera
                 self._geom_tel = t
                 self._geom_url = url
         else:
