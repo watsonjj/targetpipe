@@ -1,11 +1,13 @@
+import matplotlib as mpl
 from matplotlib.ticker import AutoMinorLocator
 
 from ctapipe.core import Component
 from traitlets import CaselessStrEnum as CaStEn, Unicode
 from matplotlib import pyplot as plt
 import seaborn as sns
-from os.path import join, exists, dirname
+from os.path import join, exists, dirname, splitext
 from os import makedirs
+import numpy as np
 
 
 class OfficialPlotter(Component):
@@ -105,4 +107,57 @@ class ThesisPlotter(ChecmPaperPlotter):
     def __init__(self, config, tool, **kwargs):
         super().__init__(config=config, tool=tool, **kwargs)
 
+        rc = {  # setup matplotlib to use latex for output
+            "pgf.texsystem": "pdflatex", # change this if using xetex or lautex
+            "text.usetex": True,         # use LaTeX to write all text
+            "font.family": "serif",
+            "font.serif": [],            # blank entries should cause plots to inherit fonts from the document
+            "font.sans-serif": [],
+            "font.monospace": [],
+            "axes.titlesize": 10,
+            "axes.labelsize": 10,        # LaTeX default is 10pt font.
+            "font.size": 10,
+            "legend.fontsize": 8,        # Make the legend/label fonts a little smaller
+            "xtick.labelsize": 8,
+            "ytick.labelsize": 8,
+            "figure.figsize": self.figsize(0.9), # default fig size of 0.9 textwidth
+            "pgf.preamble": [
+                r"\usepackage[utf8x]{inputenc}", # use utf8 fonts becasue your computer can handle it :)
+                r"\usepackage[T1]{fontenc}" # plots will be generated using this preamble
+            ]
+        }
+        mpl.rcParams.update(rc)
+        sns.set_context(self.type, rc=rc)
+
         self.base_dir = "/Users/Jason/Dropbox/DropboxDocuments/University/Oxford/Reports/Thesis/figures/plots"
+
+    @staticmethod
+    def figsize(scale=0.9):
+        fig_width_pt = 469.755  # Get this from LaTeX using \the\textwidth
+        inches_per_pt = 1.0 / 72.27  # Convert pt to inch
+        golden_mean = (np.sqrt(5.0) - 1.0) / 2.0  # Aesthetic ratio (you could change this)
+        fig_width = fig_width_pt * inches_per_pt * scale  # width in inches
+        fig_height = fig_width * golden_mean  # height in inches
+        fig_size = [fig_width, fig_height]
+        return fig_size
+
+    def create_figure(self):
+        fig = plt.figure(figsize=self.figsize())
+        ax = fig.add_subplot(1, 1, 1)
+        return fig, ax
+
+    def save(self, output_path=None):
+        if output_path:
+            output_dir = dirname(output_path)
+        else:
+            output_path = self.output_path
+            output_dir = self.output_dir
+
+        if not exists(output_dir):
+            self.log.info("Creating directory: {}".format(output_dir))
+            makedirs(output_dir)
+
+        self.fig.savefig(output_path, bbox_inches='tight')
+        fn = splitext(output_path)[0]
+        plt.savefig('{}.pgf'.format(fn), bbox_inches='tight')
+        self.log.info("Figure saved to: {}".format(output_path))
