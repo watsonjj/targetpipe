@@ -1,18 +1,17 @@
 import matplotlib as mpl
-from matplotlib.ticker import AutoMinorLocator
+mpl.use('pgf')
 
 from ctapipe.core import Component
 from traitlets import CaselessStrEnum as CaStEn, Unicode
 from matplotlib import pyplot as plt
-import seaborn as sns
+from matplotlib.ticker import AutoMinorLocator
 from os.path import join, exists, dirname, splitext
 from os import makedirs
 import numpy as np
+import seaborn as sns
 
 
-class OfficialPlotter(Component):
-    name = 'Official'
-
+class ChecmPaperPlotter(Component):
     type = CaStEn(['paper', 'talk'], 'paper',
                   help="Intended publishment of plot").tag(config=True)
     shape = CaStEn(['square', 'wide'], 'square',
@@ -45,10 +44,20 @@ class OfficialPlotter(Component):
                                        "axes.titlesize":10,
                                        "axes.labelsize":10,
                                        "legend.fontsize": 10,
-                                       "text.fontsize": 10
+                                       "text.fontsize": 10,
+                                       "lines.markeredgewidth": 1,
                                        })
 
         self.fig, self.ax = self.create_figure()
+
+
+        self.ax.xaxis.set_minor_locator(AutoMinorLocator())
+        self.ax.yaxis.set_minor_locator(AutoMinorLocator())
+        plt.tick_params(which='both', width=1)
+        plt.tick_params(which='minor', length=4)
+        plt.tick_params(which='major', length=7)
+
+        # self.ax.tick_params(labelsize=19)
 
         self.extension = 'pdf'
         self.base_dir = "/Volumes/gct-jason/plots/checm_paper"
@@ -84,36 +93,23 @@ class OfficialPlotter(Component):
         self.log.info("Figure saved to: {}".format(output_path))
 
 
-class ChecmPaperPlotter(OfficialPlotter):
-    name = 'ChecmPaperPlotter'
+class Plotter():
+    def __init__(self, context, base_dir, script, figure_name):
+        self.context = context
+        self.base_dir = base_dir
+        self.script = script
+        self.figure_name = figure_name
 
-    def __init__(self, config, tool, **kwargs):
-        super().__init__(config=config, tool=tool, **kwargs)
-
-        self.ax.xaxis.set_minor_locator(AutoMinorLocator())
-        self.ax.yaxis.set_minor_locator(AutoMinorLocator())
-        plt.tick_params(which='both', width=1)
-        plt.tick_params(which='minor', length=4)
-        plt.tick_params(which='major', length=7)
-
-        # self.ax.tick_params(labelsize=19)
-
-        self.base_dir = "/Volumes/gct-jason/plots/checm_paper"
-
-
-class ThesisPlotter(ChecmPaperPlotter):
-    name = 'ThesisPlotter'
-
-    def __init__(self, config, tool, **kwargs):
-        super().__init__(config=config, tool=tool, **kwargs)
-
+        # sns.set_style("white")
+        # sns.set_style("ticks")
         rc = {  # setup matplotlib to use latex for output
             "pgf.texsystem": "pdflatex", # change this if using xetex or lautex
             "text.usetex": True,         # use LaTeX to write all text
-            "font.family": "serif",
+            "font.family": "cursive",
             "font.serif": [],            # blank entries should cause plots to inherit fonts from the document
             "font.sans-serif": [],
             "font.monospace": [],
+            "font.cursive": [],
             "axes.titlesize": 10,
             "axes.labelsize": 10,        # LaTeX default is 10pt font.
             "font.size": 10,
@@ -121,15 +117,28 @@ class ThesisPlotter(ChecmPaperPlotter):
             "xtick.labelsize": 8,
             "ytick.labelsize": 8,
             "figure.figsize": self.figsize(0.9), # default fig size of 0.9 textwidth
+            "lines.markeredgewidth": 1,
             "pgf.preamble": [
                 r"\usepackage[utf8x]{inputenc}", # use utf8 fonts becasue your computer can handle it :)
                 r"\usepackage[T1]{fontenc}" # plots will be generated using this preamble
             ]
         }
         mpl.rcParams.update(rc)
-        sns.set_context(self.type, rc=rc)
+        sns.set_context(self.context, rc=rc)
 
-        self.base_dir = "/Users/Jason/Dropbox/DropboxDocuments/University/Oxford/Reports/Thesis/figures/plots"
+        self.fig, self.ax = self.create_figure()
+
+    @property
+    def output_dir(self):
+        return join(self.base_dir, self.script)
+
+    @property
+    def output_path_pdf(self):
+        return join(self.output_dir, self.figure_name + "." + "pdf")
+
+    @property
+    def output_path_pgf(self):
+        return join(self.output_dir, self.figure_name + "." + "pgf")
 
     @staticmethod
     def figsize(scale=0.9):
@@ -144,20 +153,47 @@ class ThesisPlotter(ChecmPaperPlotter):
     def create_figure(self):
         fig = plt.figure(figsize=self.figsize())
         ax = fig.add_subplot(1, 1, 1)
+
+        fmt = mpl.ticker.StrMethodFormatter("{x}")
+        ax.xaxis.set_major_formatter(fmt)
+        ax.yaxis.set_major_formatter(fmt)
         return fig, ax
+
+    def add_legend(self, loc="upper right"):
+        self.ax.legend(loc=loc)
+        self.ax.legend.set_linewidth(15)
+
+    @staticmethod
+    def create_directory(directory):
+        if not exists(directory):
+            print("Creating directory: {}".format(directory))
+            makedirs(directory)
 
     def save(self, output_path=None):
         if output_path:
             output_dir = dirname(output_path)
+            self.create_directory(output_dir)
+            path, ext = splitext(output_path)
+            if ext and (ext != ".pdf" or ext != "pgf"):
+                self.fig.savefig(output_path, bbox_inches='tight')
+                print("Figure saved to: {}".format(output_path))
+            else:
+                path_pdf = path + ".pdf"
+                path_pgf = path + ".pgf"
+                self.fig.savefig(path_pdf, bbox_inches='tight')
+                print("Figure saved to: {}".format(path_pdf))
+                self.fig.savefig(path_pgf, bbox_inches='tight')
+                print("Figure saved to: {}".format(path_pgf))
         else:
-            output_path = self.output_path
-            output_dir = self.output_dir
+            self.create_directory(self.output_dir)
+            self.fig.savefig(self.output_path_pdf, bbox_inches='tight')
+            print("Figure saved to: {}".format(self.output_path_pdf))
+            self.fig.savefig(self.output_path_pgf, bbox_inches='tight')
+            print("Figure saved to: {}".format(self.output_path_pgf))
 
-        if not exists(output_dir):
-            self.log.info("Creating directory: {}".format(output_dir))
-            makedirs(output_dir)
 
-        self.fig.savefig(output_path, bbox_inches='tight')
-        fn = splitext(output_path)[0]
-        plt.savefig('{}.pgf'.format(fn), bbox_inches='tight')
-        self.log.info("Figure saved to: {}".format(output_path))
+class ThesisPlotter(Plotter):
+    def __init__(self, script, figure_name):
+        type = 'paper'
+        base_dir = "/Users/Jason/Dropbox/DropboxDocuments/University/Oxford/Reports/Thesis/figures/plots"
+        super().__init__(type, base_dir, script, figure_name)

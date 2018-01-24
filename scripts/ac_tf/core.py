@@ -1,5 +1,5 @@
 from os.path import join
-from targetpipe.plots.official import ThesisPlotter
+from targetpipe.plots.official import Plotter as OriginalPlotter
 from matplotlib import pyplot as plt
 
 pix = 0
@@ -12,12 +12,9 @@ pedestal_path = join(pix_dir, "pedestal.h5")
 tf_path = "/Users/Jason/Software/CHECDevelopment/CHECS/Operation/SN0074_tf.tcal"
 
 
-class Plotter(ThesisPlotter):
-    def __init__(self, config=None, tool=None, **kwargs):
-        super().__init__(config, tool, **kwargs)
-        self.base_dir = plot_dir
-
-    def create_figure(self):
-        fig = plt.figure(figsize=(10, 6))
-        ax = fig.add_subplot(1, 1, 1)
-        return fig, ax
+class Plotter(OriginalPlotter):
+    def __init__(self, figure_name):
+        type = 'paper'
+        base_dir = plot_dir
+        script = ""
+        super().__init__(type, base_dir, "", figure_name)
