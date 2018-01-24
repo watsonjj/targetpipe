@@ -154,14 +154,13 @@ class Plotter():
         fig = plt.figure(figsize=self.figsize())
         ax = fig.add_subplot(1, 1, 1)
 
-        fmt = mpl.ticker.StrMethodFormatter("{x}")
-        ax.xaxis.set_major_formatter(fmt)
-        ax.yaxis.set_major_formatter(fmt)
+        # fmt = mpl.ticker.StrMethodFormatter("{x}")
+        # ax.xaxis.set_major_formatter(fmt)
+        # ax.yaxis.set_major_formatter(fmt)
         return fig, ax
 
     def add_legend(self, loc="upper right"):
         self.ax.legend(loc=loc)
-        self.ax.legend.set_linewidth(15)
 
     @staticmethod
     def create_directory(directory):
@@ -169,7 +168,11 @@ class Plotter():
             print("Creating directory: {}".format(directory))
             makedirs(directory)
 
+    def finish(self):
+        pass
+
     def save(self, output_path=None):
+        self.finish()
         if output_path:
             output_dir = dirname(output_path)
             self.create_directory(output_dir)
