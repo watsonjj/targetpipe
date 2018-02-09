@@ -397,7 +397,7 @@ class TFTargetCalib(TFStorageCell):
     def calibrate(self, df):
         tqdm.write("> Calibrating dataframe")
         df_sort = self._prepare_df(df)
-        calibrator = target_calib.Calibrator('', tc_tf_path, [], False)
+        calibrator = target_calib.Calibrator('', tc_tf_path)
         calibrator.SetLookupPosition(0, 0)
         desc = "Calibrating samples"
 
