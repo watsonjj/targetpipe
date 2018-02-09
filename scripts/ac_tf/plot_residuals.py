@@ -8,6 +8,7 @@ from tqdm import tqdm
 from IPython import embed
 import pickle
 from os.path import join
+from tqdm import tqdm
 
 
 def rmse(true, measured):
@@ -46,11 +47,11 @@ class AbsResidualPlot(Plotter):
         x = df['vped']
         y = df['rmseabs']
         self.ax.plot(x, y, 'x-', mew=0.5, label=label)
-        self.ax.set_yscale("log", nonposy='clip')
+        # self.ax.set_yscale("log", nonposy='clip')
 
         self.ax.set_xlabel("Input Amplitude (mV)")
         self.ax.set_ylabel("Absolute Voltage Resolution (mV)")
-        self.ax.legend(loc="upper right")
+        # self.ax.legend(loc="upper right")
 
     def zoom(self):
         self.ax.set_xlim(-100, 100)
@@ -84,9 +85,9 @@ def main():
     residuals = pickle.load(open(pickle_path, "rb"))
 
     r= [
-        'TFSamplingCell',
-        'TFStorageCell',
-        'TFStorageCellPedestal',
+        # 'TFSamplingCell',
+        # 'TFStorageCell',
+        # 'TFStorageCellPedestal',
         'TFStorageCellPedestalZero'
     ]
     p_res = AbsResidualPlot(figure_name="absresidual_p")
@@ -100,7 +101,7 @@ def main():
     for name in tqdm(r, desc=desc):
         p_res.plot(residuals[name], name)
     p_res.ax.set_xlim(-100, 100)
-    p_res.ax.set_ylim(0.8, 6)
+    p_res.ax.set_ylim(0.8, 2)
     p_res.save()
 
     pe = 4

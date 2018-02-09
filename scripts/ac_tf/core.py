@@ -11,6 +11,8 @@ input_path = join(pix_dir, "input.h5")
 pedestal_path = join(pix_dir, "pedestal.h5")
 tf_path = "/Users/Jason/Software/CHECDevelopment/CHECS/Operation/SN0074_tf.tcal"
 
+tc_tfinput_path = join(pix_dir, "tctfinput.tcal")
+tc_tf_path = join(pix_dir, "tc_tf.tcal")
 
 class Plotter(OriginalPlotter):
     def __init__(self, figure_name):

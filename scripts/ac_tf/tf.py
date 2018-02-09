@@ -1,12 +1,13 @@
 import numpy as np
 from tqdm import tqdm, trange
-from core import pix_dir, tf_path, pix, pedestal_path
+from core import pix_dir, tf_path, pix, pedestal_path, tc_tfinput_path, tc_tf_path
 from scipy.interpolate import interp1d, PchipInterpolator
 from tables import open_file
 from os.path import join
 from IPython import embed
 import pandas as pd
 import target_calib
+from os.path import exists
 
 
 def child_subclasses(cls):
@@ -348,35 +349,72 @@ class TFStorageCellPedestalZero(TFStorageCellPedestal):
 #         return df_sort
 #
 #
-# class TFTargetCalib(TFSamplingCell):
-#     name = "TFTargetCalib"
-#     fn = "tf_targetcalib.h5"
-#
-#     def create(self, df):
-#         pass
-#
-#     def calibrate(self, df):
-#         tqdm.write("> Calibrating dataframe")
-#         calibrator = target_calib.Calibrator('', tf_path)
-#
-#         df_sort = self._prepare_df(df)
-#
-#         cells = np.unique(df_sort[self.cn]).astype(np.int)
-#         cal = np.zeros(df_sort.index.size, dtype=np.float32)
-#         vpeds = np.unique(df_sort['vped']).astype(np.int)
-#         desc = ">>> Calibrating adc"
-#         for c in tqdm(cells, desc=desc):
-#             w = np.where(df_sort[self.cn] == c)[0]
-#             df_cell = df_sort.iloc[w]
-#             cell = df_cell.iloc[0]['cell']
-#             blockphase = int(cell % 32)
-#             row = (cell // 32) % 8
-#             column = (cell // 32) // 8
-#             block = int(column * 8 + row)
-#             adc = np.ascontiguousarray(df_cell['adc'].values, dtype=np.float32)
-#             cal_c = np.zeros(adc.size, dtype=np.float32)
-#             calibrator.ApplyArray(adc, cal_c, 0, pix, block, blockphase)
-#             cal[w] = cal_c
-#         df_sort['cal'] = cal
-#
-#         return df_sort
+class TFTargetCalib(TFStorageCell):
+    name = "TFTargetCalib"
+    fn = "tf_targetcalib.h5"
+
+    def _create_input(self, df):
+        vped_list = np.unique(df['vped'])
+        maker = target_calib.TfMaker(vped_list.tolist(), 1, 4096)
+
+        desc = "Filling TargetCalib TFInput"
+
+        df_group = df.groupby('vped')
+        for vped, group in tqdm(df_group, desc="Looping through vpeds", total=len(df_group)):
+            maker.SetAmplitudeIndex(vped)
+            for _, row in tqdm(group.iterrows(), desc=desc, total=len(group.index)):
+                adc = row['adc']
+                fci = int(row['fci'])
+                sample = int(row['sample'])
+                maker.AddSample(adc, sample, 0, 0, fci)
+        maker.SaveTfInput(tc_tfinput_path)
+
+    def _get_input(self, df):
+        tqdm.write(">> Preparing input")
+        if not exists(tc_tfinput_path):
+            self._create_input(df)
+        maker = target_calib.TfMaker(tc_tfinput_path)
+        adc = np.array(maker.GetTfInput())[0, 0]
+        vped = np.array(maker.GetAmplitudeVector())
+        return vped, adc
+
+    def create(self, df):
+        tqdm.write("> Creating new TF")
+        df_sort = self._prepare_df(df)
+        vped, adc = self._get_input(df_sort)
+        maker = target_calib.TfMaker(tc_tfinput_path)
+        maker.Save(tc_tf_path, self.step, 0, False)
+
+    def _load_tf(self):
+        tqdm.write(">> Loading TF from: {}".format(self.path))
+        calibrator = target_calib.Calibrator('', tc_tf_path)
+        tf = np.array(calibrator.GetTf())[0, 0]
+        adc_min = calibrator.GetAdcMin()
+        adc_step = calibrator.GetAdcStep()
+        adc_x = adc_min + np.arange(tf.shape[-1]) * adc_step
+        return adc_x, tf
+
+    def calibrate(self, df):
+        tqdm.write("> Calibrating dataframe")
+        df_sort = self._prepare_df(df)
+        calibrator = target_calib.Calibrator('', tc_tf_path, [], False)
+        calibrator.SetLookupPosition(0, 0)
+        desc = "Calibrating samples"
+
+        df_sort['cal'] = 0.
+        a = np.zeros(len(df_sort.index))
+        for index, row in tqdm(df_sort.iterrows(), total=len(df_sort.index), desc="Calibrating samples"):
+            r = int(row['row'])
+            c = int(row['column'])
+            bp = int(row['blockphase'])
+            adc = row['adc']
+            sample = int(row['sample'])
+            calibrator.SetPacketInfo(0, r, c, bp)
+            cal = calibrator.ApplySample(adc, sample)
+            df_sort.at[index, 'cal'] = cal
+        return df_sort
+
+    def get_hits(self, df):
+        maker = target_calib.TfMaker(tc_tfinput_path)
+        hits = np.array(maker.GetHits())
+        return hits

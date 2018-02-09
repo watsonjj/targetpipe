@@ -52,16 +52,16 @@ def main():
 
     tf_list = [TFSamplingCell, TFStorageCell, TFStorageCellPedestal, TFStorageCellPedestalZero]
 
-    samples = {}
-
-    desc = "Looping through TF list"
-    samples["Pedestal Subtracted ADC"] = df['adc'].values
-    for cls in tqdm(tf_list, desc=desc):
-        tf = cls()
-        df_cal = tf.calibrate(df)
-        samples[tf.__class__.__name__] = df_cal['cal'].values
-
-    pickle.dump(samples, open(pickle_path, "wb"))
+    # samples = {}
+    #
+    # desc = "Looping through TF list"
+    # samples["Pedestal Subtracted ADC"] = df['adc'].values
+    # for cls in tqdm(tf_list, desc=desc):
+    #     tf = cls()
+    #     df_cal = tf.calibrate(df)
+    #     samples[tf.__class__.__name__] = df_cal['cal'].values
+    #
+    # pickle.dump(samples, open(pickle_path, "wb"))
 
     samples = pickle.load(open(pickle_path, "rb"))
 

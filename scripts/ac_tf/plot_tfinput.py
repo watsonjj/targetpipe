@@ -54,9 +54,10 @@ def main():
     for name in tqdm(r1):
         p_tf = TFPlot(figure_name="tfinput_{}".format(name))
         x, adc = tfs[name]
+        m = (x > -12) & (x < 12)
         p_comparison.plot(x, adc[0], name)
         y1 = adc.T
-        p_tf.plot(x, y1, "")
+        p_tf.plot(x[m], y1[m], "")
         p_tf.ax.set_xlim(-12, 12)
         p_tf.ax.set_ylim(-18, 18)
         p_tf.save()
