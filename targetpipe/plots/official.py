@@ -1,5 +1,5 @@
 import matplotlib as mpl
-mpl.use('pgf')
+# mpl.use('pgf')
 
 from ctapipe.core import Component
 from traitlets import CaselessStrEnum as CaStEn, Unicode
@@ -102,29 +102,31 @@ class Plotter():
 
         # sns.set_style("white")
         # sns.set_style("ticks")
-        rc = {  # setup matplotlib to use latex for output
-            "pgf.texsystem": "pdflatex", # change this if using xetex or lautex
-            "text.usetex": True,         # use LaTeX to write all text
-            "font.family": "cursive",
-            "font.serif": [],            # blank entries should cause plots to inherit fonts from the document
-            "font.sans-serif": [],
-            "font.monospace": [],
-            "font.cursive": [],
-            "axes.titlesize": 10,
-            "axes.labelsize": 10,        # LaTeX default is 10pt font.
-            "font.size": 10,
-            "legend.fontsize": 8,        # Make the legend/label fonts a little smaller
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
-            "figure.figsize": self.figsize(0.9), # default fig size of 0.9 textwidth
-            "lines.markeredgewidth": 1,
-            "pgf.preamble": [
-                r"\usepackage[utf8x]{inputenc}", # use utf8 fonts becasue your computer can handle it :)
-                r"\usepackage[T1]{fontenc}" # plots will be generated using this preamble
-            ]
-        }
-        mpl.rcParams.update(rc)
-        sns.set_context(self.context, rc=rc)
+        # rc = {  # setup matplotlib to use latex for output
+        #     "pgf.texsystem": "pdflatex", # change this if using xetex or lautex
+        #     "text.usetex": True,         # use LaTeX to write all text
+        #     "font.family": "cursive",
+        #     "font.serif": [],            # blank entries should cause plots to inherit fonts from the document
+        #     "font.sans-serif": [],
+        #     "font.monospace": [],
+        #     "font.cursive": [],
+        #     "axes.titlesize": 10,
+        #     "axes.labelsize": 10,        # LaTeX default is 10pt font.
+        #     "font.size": 10,
+        #     "legend.fontsize": 8,        # Make the legend/label fonts a little smaller
+        #     "xtick.labelsize": 8,
+        #     "ytick.labelsize": 8,
+        #     "figure.figsize": self.figsize(0.9), # default fig size of 0.9 textwidth
+        #     "lines.markeredgewidth": 1,
+        #     "pgf.preamble": [
+        #         r"\usepackage[utf8x]{inputenc}", # use utf8 fonts becasue your computer can handle it :)
+        #         r"\usepackage[T1]{fontenc}" # plots will be generated using this preamble
+        #     ]
+        # }
+        # mpl.rcParams.update(rc)
+        # sns.set_context(self.context, rc=rc)
+
+        sns.set_context(self.context)
 
         self.fig, self.ax = self.create_figure()
 
@@ -191,8 +193,8 @@ class Plotter():
             self.create_directory(self.output_dir)
             self.fig.savefig(self.output_path_pdf, bbox_inches='tight')
             print("Figure saved to: {}".format(self.output_path_pdf))
-            self.fig.savefig(self.output_path_pgf, bbox_inches='tight')
-            print("Figure saved to: {}".format(self.output_path_pgf))
+            # self.fig.savefig(self.output_path_pgf, bbox_inches='tight')
+            # print("Figure saved to: {}".format(self.output_path_pgf))
 
 
 class ThesisPlotter(Plotter):
