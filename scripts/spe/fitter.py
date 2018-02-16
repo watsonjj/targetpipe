@@ -198,7 +198,8 @@ class CHECSSPEMultiFitter(ChargeFitter):
         self.add_parameter("lambda_3", 1, 0.5, 5)
         self.add_parameter("opct", 0.5, 0, 1)
         self.add_parameter("pap", 0.5, 0, 1)
-        self.add_parameter("dap", 0.5, 0, 1)
+        self.add_parameter("dap1", 0.5, 0, 1)
+        self.add_parameter("dap2", 0.5, 0, 1)
 
         self.pedestal_signal = sipm_pedestal
         self.pe_signal = sipm_pe
@@ -231,11 +232,11 @@ class CHECSSPEMultiFitter(ChargeFitter):
         print("No apply method for this fitter, use apply_multi")
 
     @staticmethod
-    def fit_function(x, norm1, norm2, norm3, eped, eped_sigma, spe, spe_sigma, lambda_1, lambda_2, lambda_3, opct, pap, dap):
+    def fit_function(x, norm1, norm2, norm3, eped, eped_sigma, spe, spe_sigma, lambda_1, lambda_2, lambda_3, opct, pap, dap1, dap2):
         fit = sipm_spe_fit
-        p1 = fit(x, norm1, eped, eped_sigma, spe, spe_sigma, lambda_1, opct, pap, dap)
-        p2 = fit(x, norm2, eped, eped_sigma, spe, spe_sigma, lambda_2, opct, pap, dap)
-        p3 = fit(x, norm3, eped, eped_sigma, spe, spe_sigma, lambda_3, opct, pap, dap)
+        p1 = fit(x, norm1, eped, eped_sigma, spe, spe_sigma, lambda_1, opct, pap, dap1, dap2)
+        p2 = fit(x, norm2, eped, eped_sigma, spe, spe_sigma, lambda_2, opct, pap, dap1, dap2)
+        p3 = fit(x, norm3, eped, eped_sigma, spe, spe_sigma, lambda_3, opct, pap, dap1, dap2)
         return p1, p2, p3
 
     def _perform_fit(self, hist, edges, between):
@@ -258,8 +259,8 @@ class CHECSSPEMultiFitter(ChargeFitter):
         if fix is None:
             fix = {}
 
-        def minimizehist(norm1, norm2, norm3, eped, eped_sigma, spe, spe_sigma, lambda_1, lambda_2, lambda_3, opct, pap, dap):
-            p1, p2, p3 = self.fit_function(x, norm1, norm2, norm3, eped, eped_sigma, spe, spe_sigma, lambda_1, lambda_2, lambda_3, opct, pap, dap)
+        def minimizehist(norm1, norm2, norm3, eped, eped_sigma, spe, spe_sigma, lambda_1, lambda_2, lambda_3, opct, pap, dap1, dap2):
+            p1, p2, p3 = self.fit_function(x, norm1, norm2, norm3, eped, eped_sigma, spe, spe_sigma, lambda_1, lambda_2, lambda_3, opct, pap, dap1, dap2)
             like1 = -2 * poisson.logpmf(y[0], p1)
             like2 = -2 * poisson.logpmf(y[1], p2)
             like3 = -2 * poisson.logpmf(y[2], p3)

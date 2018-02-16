@@ -22,11 +22,12 @@ def get_fitter():
         spe=40,
         spe_sigma=10,
         lambda_1=1,
-        lambda_2=1,
-        lambda_3=1,
+        lambda_2=3,
+        lambda_3=5,
         opct=0.5,
-        pap=0.5,
-        dap=0.5
+        pap=0.8,
+        dap1=0.5,
+        dap2=0.5
     )
     limit = dict(
         limit_norm1=(0, 100000),
@@ -41,7 +42,8 @@ def get_fitter():
         limit_lambda_3=(0.5, 3),
         limit_opct=(0, 0.8),
         limit_pap=(0, 0.8),
-        limit_dap=(0, 0.8)
+        limit_dap1=(0, 0.8),
+        limit_dap2=(0, 0.8)
     )
     fix = dict(
         fix_norm1=True,

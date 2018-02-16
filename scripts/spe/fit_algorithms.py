@@ -31,7 +31,7 @@ def pedestal_signal(x, norm, eped, eped_sigma, lambda_):
     return signal
 
 
-def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap):
+def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2):
     """
     Obtain the signal provided by photoelectrons in the pulse spectrum.
 
@@ -80,11 +80,11 @@ def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, 
     pct = np.sum(pj * np.power(1-opct, j) * np.power(opct, n - j) * binom(n-1, j-1), 1)
 
     sap = spe_sigma
-    d1ap = dap
-    d2ap = 2*dap
-    if d1ap > d2ap:
-        d1ap = 2*dap
-        d2ap = dap
+    d1ap = dap1
+    d2ap = dap2#2*dap
+    # if d1ap > d2ap:
+    #     d1ap = 2*dap
+    #     d2ap = dap
 
     # pap_ap1 = pct * pap
     # pap_ap2 = pct * pap ** 2
@@ -107,7 +107,7 @@ def pe_signal(k, x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, 
     return signal
 
 
-def sipm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap):
+def sipm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2):
     """
     Fit for the SPE spectrum of a MAPM
 
@@ -139,7 +139,7 @@ def sipm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, 
 
     # Obtain pe signal
     k = np.arange(1, 11)
-    params = [norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap]
+    params = [norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2]
     pe_s = pe_signal(k[:, None], x[None, :], *params).sum(0)
 
     signal = ped_s + pe_s
