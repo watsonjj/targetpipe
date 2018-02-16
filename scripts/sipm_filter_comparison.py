@@ -205,11 +205,10 @@ class SiPMSPETesting(Tool):
         self.df = None
         self.dfwf = None
 
-        self.poi = [22, 35, 40, 41, 42, 43]
-        self.wf_poi = 35
+        self.poi = [897]
+        self.wf_poi = 897
         # self.eoi = 11
         self.eoi = 10
-
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
         kwargs = dict(config=self.config, tool=self)
@@ -226,8 +225,7 @@ class SiPMSPETesting(Tool):
         self.fitter = CHECSSPEFitter(**kwargs)
 
         first_event = self.reader.get_event(0)
-        self.n_pixels = first_event.inst.num_pixels[0]
-        self.n_samples = first_event.r0.tel[0].num_samples
+        self.n_pixels, self.n_samples = first_event.r1.tel[0].pe_samples[0].shape
 
         cleaners = [
             CleanerNull(**kwargs),
@@ -258,8 +256,8 @@ class SiPMSPETesting(Tool):
             self.we = self.n_samples - 1
 
     def start(self):
-        # recalculate = True
-        recalculate = False
+        recalculate = True
+        # recalculate = False
         if recalculate:
             n_events = self.reader.num_events
             source = self.reader.read()
@@ -403,71 +401,71 @@ class SiPMSPETesting(Tool):
             self.log.info("Creating directory: {}".format(output_dir))
             makedirs(output_dir)
 
-        # f_wf_pix = plt.figure(figsize=(14, 10))
-        # ax = f_wf_pix.add_subplot(1, 1, 1)
-        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
-        # for c in cleaners:
-        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'wf'].values[0]
-        #     ax.plot(wf, label=c)
-        # ax.set_title("Waveform (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
-        # ax.set_xlabel("Time (ns)")
-        # ax.set_ylabel("Amplitude (ADC pedsub)")
-        # ax.xaxis.set_minor_locator(MultipleLocator(1))
-        # ax.legend(loc=1)
-        # output_path = join(output_dir, "wf")
-        # f_wf_pix.savefig(output_path, bbox_inches='tight')
-        # self.log.info("Figure saved to: {}".format(output_path))
-        #
-        # f_wfshift_pix = plt.figure(figsize=(14, 10))
-        # ax = f_wfshift_pix.add_subplot(1, 1, 1)
-        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
-        # for c in cleaners:
-        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'wf_shifted'].values[0]
-        #     ax.plot(wf, label=c)
-        # plt.axvline(x=60, color="green")
-        # plt.axvline(x=self.ws, color="red")
-        # plt.axvline(x=self.we, color="red")
-        # ax.set_title("Waveform Shifted (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
-        # ax.set_xlabel("Time (ns)")
-        # ax.set_ylabel("Amplitude (ADC pedsub)")
-        # ax.xaxis.set_minor_locator(MultipleLocator(1))
-        # ax.legend(loc=1)
-        # output_path = join(output_dir, "wf_shifted")
-        # f_wfshift_pix.savefig(output_path, bbox_inches='tight')
-        # self.log.info("Figure saved to: {}".format(output_path))
-        #
-        # f_avgwf_pix = plt.figure(figsize=(14, 10))
-        # ax = f_avgwf_pix.add_subplot(1, 1, 1)
-        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
-        # for c in cleaners:
-        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'avgwf'].values[0]
-        #     ax.plot(wf, label=c)
-        # ax.set_title("Average Waveform (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
-        # ax.set_xlabel("Time (ns)")
-        # ax.set_ylabel("Amplitude (ADC pedsub)")
-        # ax.xaxis.set_minor_locator(MultipleLocator(1))
-        # ax.legend(loc=1)
-        # output_path = join(output_dir, "avgwf")
-        # f_avgwf_pix.savefig(output_path, bbox_inches='tight')
-        # self.log.info("Figure saved to: {}".format(output_path))
-        #
-        # f_avgwfshift_pix = plt.figure(figsize=(14, 10))
-        # ax = f_avgwfshift_pix.add_subplot(1, 1, 1)
-        # dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
-        # for c in cleaners:
-        #     wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'avgwf_shifted'].values[0]
-        #     ax.plot(wf, label=c)
-        # plt.axvline(x=60, color="green")
-        # plt.axvline(x=self.ws, color="red")
-        # plt.axvline(x=self.we, color="red")
-        # ax.set_title("Average Waveform Shifted (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
-        # ax.set_xlabel("Time (ns)")
-        # ax.set_ylabel("Amplitude (ADC pedsub)")
-        # ax.xaxis.set_minor_locator(MultipleLocator(1))
-        # ax.legend(loc=1)
-        # output_path = join(output_dir, "avgwf_shifted")
-        # f_avgwfshift_pix.savefig(output_path, bbox_inches='tight')
-        # self.log.info("Figure saved to: {}".format(output_path))
+        f_wf_pix = plt.figure(figsize=(14, 10))
+        ax = f_wf_pix.add_subplot(1, 1, 1)
+        dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        for c in cleaners:
+            wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'wf'].values[0]
+            ax.plot(wf, label=c)
+        ax.set_title("Waveform (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        ax.set_xlabel("Time (ns)")
+        ax.set_ylabel("Amplitude (ADC pedsub)")
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.legend(loc=1)
+        output_path = join(output_dir, "wf")
+        f_wf_pix.savefig(output_path, bbox_inches='tight')
+        self.log.info("Figure saved to: {}".format(output_path))
+
+        f_wfshift_pix = plt.figure(figsize=(14, 10))
+        ax = f_wfshift_pix.add_subplot(1, 1, 1)
+        dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        for c in cleaners:
+            wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'wf_shifted'].values[0]
+            ax.plot(wf, label=c)
+        plt.axvline(x=60, color="green")
+        plt.axvline(x=self.ws, color="red")
+        plt.axvline(x=self.we, color="red")
+        ax.set_title("Waveform Shifted (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        ax.set_xlabel("Time (ns)")
+        ax.set_ylabel("Amplitude (ADC pedsub)")
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.legend(loc=1)
+        output_path = join(output_dir, "wf_shifted")
+        f_wfshift_pix.savefig(output_path, bbox_inches='tight')
+        self.log.info("Figure saved to: {}".format(output_path))
+
+        f_avgwf_pix = plt.figure(figsize=(14, 10))
+        ax = f_avgwf_pix.add_subplot(1, 1, 1)
+        dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        for c in cleaners:
+            wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'avgwf'].values[0]
+            ax.plot(wf, label=c)
+        ax.set_title("Average Waveform (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        ax.set_xlabel("Time (ns)")
+        ax.set_ylabel("Amplitude (ADC pedsub)")
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.legend(loc=1)
+        output_path = join(output_dir, "avgwf")
+        f_avgwf_pix.savefig(output_path, bbox_inches='tight')
+        self.log.info("Figure saved to: {}".format(output_path))
+
+        f_avgwfshift_pix = plt.figure(figsize=(14, 10))
+        ax = f_avgwfshift_pix.add_subplot(1, 1, 1)
+        dfwf_ev = dfwf.loc[dfwf['event'] == self.eoi]
+        for c in cleaners:
+            wf = dfwf_ev.loc[dfwf_ev['cleaner'] == c, 'avgwf_shifted'].values[0]
+            ax.plot(wf, label=c)
+        plt.axvline(x=60, color="green")
+        plt.axvline(x=self.ws, color="red")
+        plt.axvline(x=self.we, color="red")
+        ax.set_title("Average Waveform Shifted (Event {}, Pixel {})".format(self.eoi, self.wf_poi))
+        ax.set_xlabel("Time (ns)")
+        ax.set_ylabel("Amplitude (ADC pedsub)")
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.legend(loc=1)
+        output_path = join(output_dir, "avgwf_shifted")
+        f_avgwfshift_pix.savefig(output_path, bbox_inches='tight')
+        self.log.info("Figure saved to: {}".format(output_path))
 
         for pix in self.poi:
             df_pix = df.loc[df['pixel'] == pix]
@@ -476,89 +474,89 @@ class SiPMSPETesting(Tool):
                 self.log.info("Creating directory: {}".format(output_dir))
                 makedirs(output_dir)
 
-            # f_area_spectrum = plt.figure(figsize=(14, 10))
-            # ax = f_area_spectrum.add_subplot(1, 1, 1)
-            # range_ = [-5, 15]
-            # bins = 140
-            # increment = (range_[1] - range_[0]) / bins
-            # for c in cleaners:
-            #     df_c = df_pix.loc[df_pix['cleaner']==c]
-            #     v = df_c['area'].values
-            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
-            # ax.set_title("Area Spectrum (Pixel {})".format(pix))
-            # ax.set_xlabel("Area")
-            # ax.set_ylabel("N")
-            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
-            # ax.legend(loc=1)
-            # output_path = join(output_dir, "area_spectrum")
-            # f_area_spectrum.savefig(output_path, bbox_inches='tight')
-            # self.log.info("Figure saved to: {}".format(output_path))
-            #
-            # f_height_spectrum = plt.figure(figsize=(14, 10))
-            # ax = f_height_spectrum.add_subplot(1, 1, 1)
-            # range_ = [-1, 5]
-            # bins = 110
-            # increment = (range_[1] - range_[0]) / bins
-            # for c in cleaners:
-            #     df_c = df_pix.loc[df_pix['cleaner']==c]
-            #     v = df_c['height'].values
-            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
-            # ax.set_title("Height Spectrum (Pixel {})".format(pix))
-            # ax.set_xlabel("Height")
-            # ax.set_ylabel("N")
-            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
-            # ax.legend(loc=1)
-            # output_path = join(output_dir, "height_spectrum")
-            # f_height_spectrum.savefig(output_path, bbox_inches='tight')
-            # self.log.info("Figure saved to: {}".format(output_path))
-            #
-            # f_peakpos_spectrum = plt.figure(figsize=(14, 10))
-            # ax = f_peakpos_spectrum.add_subplot(1, 1, 1)
-            # range_ = [0, self.n_samples]
-            # bins = self.n_samples
-            # increment = (range_[1] - range_[0]) / bins
-            # for c in cleaners:
-            #     df_c = df_pix.loc[df_pix['cleaner']==c]
-            #     v = df_c['peakpos'].values
-            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
-            # ax.set_title("Peakpos Spectrum (Pixel {})".format(pix))
-            # ax.set_xlabel("Peakpos")
-            # ax.set_ylabel("N")
-            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
-            # ax.legend(loc=1)
-            # output_path = join(output_dir, "peakpos_spectrum")
-            # f_peakpos_spectrum.savefig(output_path, bbox_inches='tight')
-            # self.log.info("Figure saved to: {}".format(output_path))
-            #
-            # f_heightatt0_spectrum = plt.figure(figsize=(14, 10))
-            # ax = f_heightatt0_spectrum.add_subplot(1, 1, 1)
-            # range_ = [-5, 15]
-            # bins = 110
-            # increment = (range_[1] - range_[0]) / bins
-            # for c in cleaners:
-            #     df_c = df_pix.loc[df_pix['cleaner']==c]
-            #     v = df_c['height_at_t0'].values
-            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
-            # ax.set_title("Height At T0 Spectrum (Pixel {})".format(pix))
-            # ax.set_xlabel("Height At T0")
-            # ax.set_ylabel("N")
-            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
-            # ax.legend(loc=1)
-            # output_path = join(output_dir, "heightatt0_spectrum")
-            # f_heightatt0_spectrum.savefig(output_path, bbox_inches='tight')
-            # self.log.info("Figure saved to: {}".format(output_path))
+            f_area_spectrum = plt.figure(figsize=(14, 10))
+            ax = f_area_spectrum.add_subplot(1, 1, 1)
+            range_ = [-5, 15]
+            bins = 140
+            increment = (range_[1] - range_[0]) / bins
+            for c in cleaners:
+                df_c = df_pix.loc[df_pix['cleaner']==c]
+                v = df_c['area'].values
+                ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            ax.set_title("Area Spectrum (Pixel {})".format(pix))
+            ax.set_xlabel("Area")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            output_path = join(output_dir, "area_spectrum")
+            f_area_spectrum.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
+
+            f_height_spectrum = plt.figure(figsize=(14, 10))
+            ax = f_height_spectrum.add_subplot(1, 1, 1)
+            range_ = [-1, 5]
+            bins = 110
+            increment = (range_[1] - range_[0]) / bins
+            for c in cleaners:
+                df_c = df_pix.loc[df_pix['cleaner']==c]
+                v = df_c['height'].values
+                ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            ax.set_title("Height Spectrum (Pixel {})".format(pix))
+            ax.set_xlabel("Height")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            output_path = join(output_dir, "height_spectrum")
+            f_height_spectrum.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
+
+            f_peakpos_spectrum = plt.figure(figsize=(14, 10))
+            ax = f_peakpos_spectrum.add_subplot(1, 1, 1)
+            range_ = [0, self.n_samples]
+            bins = self.n_samples
+            increment = (range_[1] - range_[0]) / bins
+            for c in cleaners:
+                df_c = df_pix.loc[df_pix['cleaner']==c]
+                v = df_c['peakpos'].values
+                ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            ax.set_title("Peakpos Spectrum (Pixel {})".format(pix))
+            ax.set_xlabel("Peakpos")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            output_path = join(output_dir, "peakpos_spectrum")
+            f_peakpos_spectrum.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
+
+            f_heightatt0_spectrum = plt.figure(figsize=(14, 10))
+            ax = f_heightatt0_spectrum.add_subplot(1, 1, 1)
+            range_ = [-5, 15]
+            bins = 110
+            increment = (range_[1] - range_[0]) / bins
+            for c in cleaners:
+                df_c = df_pix.loc[df_pix['cleaner']==c]
+                v = df_c['height_at_t0'].values
+                ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            ax.set_title("Height At T0 Spectrum (Pixel {})".format(pix))
+            ax.set_xlabel("Height At T0")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            output_path = join(output_dir, "heightatt0_spectrum")
+            f_heightatt0_spectrum.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
 
             f_heightatt0_fit = plt.figure(figsize=(14, 10))
             ax = plt.subplot2grid((1,3), (0,0), colspan=2)#f_heightatt0_fit.add_subplot(1, 2, 1)
@@ -603,47 +601,47 @@ class SiPMSPETesting(Tool):
             f_heightatt0_fit.savefig(output_path, bbox_inches='tight')
             self.log.info("Figure saved to: {}".format(output_path))
 
-            # f_heightiw_spectrum = plt.figure(figsize=(14, 10))
-            # ax = f_heightiw_spectrum.add_subplot(1, 1, 1)
-            # range_ = [-5, 15]
-            # bins = 110
-            # increment = (range_[1] - range_[0]) / bins
-            # for c in cleaners:
-            #     df_c = df_pix.loc[df_pix['cleaner']==c]
-            #     v = df_c['height_in_window'].values
-            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
-            # ax.set_title("Height In Window Spectrum (Pixel {})".format(pix))
-            # ax.set_xlabel("Height In Window")
-            # ax.set_ylabel("N")
-            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
-            # ax.legend(loc=1)
-            # output_path = join(output_dir, "heightiw_spectrum")
-            # f_heightiw_spectrum.savefig(output_path, bbox_inches='tight')
-            # self.log.info("Figure saved to: {}".format(output_path))
-            #
-            # f_peakposiw_spectrum = plt.figure(figsize=(14, 10))
-            # ax = f_peakposiw_spectrum.add_subplot(1, 1, 1)
-            # range_ = [0, self.n_samples]
-            # bins = self.n_samples
-            # increment = (range_[1] - range_[0]) / bins
-            # for c in cleaners:
-            #     df_c = df_pix.loc[df_pix['cleaner']==c]
-            #     v = df_c['peakpos_in_window'].values
-            #     ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
-            # ax.set_title("Peakpos In Window Spectrum (Pixel {})".format(pix))
-            # ax.set_xlabel("Peakpos In Window")
-            # ax.set_ylabel("N")
-            # ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
-            # ax.xaxis.set_major_locator(MultipleLocator(increment*10))
-            # ax.xaxis.grid(b=True, which='minor', alpha=0.5)
-            # ax.xaxis.grid(b=True, which='major', alpha=0.8)
-            # ax.legend(loc=1)
-            # output_path = join(output_dir, "peakposiw_spectrum")
-            # f_peakposiw_spectrum.savefig(output_path, bbox_inches='tight')
-            # self.log.info("Figure saved to: {}".format(output_path))
+            f_heightiw_spectrum = plt.figure(figsize=(14, 10))
+            ax = f_heightiw_spectrum.add_subplot(1, 1, 1)
+            range_ = [-5, 15]
+            bins = 110
+            increment = (range_[1] - range_[0]) / bins
+            for c in cleaners:
+                df_c = df_pix.loc[df_pix['cleaner']==c]
+                v = df_c['height_in_window'].values
+                ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            ax.set_title("Height In Window Spectrum (Pixel {})".format(pix))
+            ax.set_xlabel("Height In Window")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            output_path = join(output_dir, "heightiw_spectrum")
+            f_heightiw_spectrum.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
+
+            f_peakposiw_spectrum = plt.figure(figsize=(14, 10))
+            ax = f_peakposiw_spectrum.add_subplot(1, 1, 1)
+            range_ = [0, self.n_samples]
+            bins = self.n_samples
+            increment = (range_[1] - range_[0]) / bins
+            for c in cleaners:
+                df_c = df_pix.loc[df_pix['cleaner']==c]
+                v = df_c['peakpos_in_window'].values
+                ax.hist(v, bins=bins, range=range_, label=c, histtype='step')
+            ax.set_title("Peakpos In Window Spectrum (Pixel {})".format(pix))
+            ax.set_xlabel("Peakpos In Window")
+            ax.set_ylabel("N")
+            ax.xaxis.set_minor_locator(MultipleLocator(increment*2))
+            ax.xaxis.set_major_locator(MultipleLocator(increment*10))
+            ax.xaxis.grid(b=True, which='minor', alpha=0.5)
+            ax.xaxis.grid(b=True, which='major', alpha=0.8)
+            ax.legend(loc=1)
+            output_path = join(output_dir, "peakposiw_spectrum")
+            f_peakposiw_spectrum.savefig(output_path, bbox_inches='tight')
+            self.log.info("Figure saved to: {}".format(output_path))
 
 
 if __name__ == '__main__':
