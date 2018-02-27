@@ -109,8 +109,8 @@ class DL1Extractor(Tool):
 
         n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
-        n_pixels = first_event.inst.num_pixels[0]
-        n_samples = first_event.r0.tel[0].num_samples
+        r1 = first_event.r1.tel[0].pe_samples[0]
+        n_pixels, n_samples = r1.shape
 
         self.tack = np.zeros(n_events)
         self.sec = np.zeros(n_events)
@@ -136,8 +136,8 @@ class DL1Extractor(Tool):
         n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
         telid = list(first_event.r0.tels_with_data)[0]
-        n_pixels = first_event.inst.num_pixels[0]
-        n_samples = first_event.r0.tel[0].num_samples
+        r1 = first_event.r1.tel[0].pe_samples[0]
+        n_pixels, n_samples = r1.shape
 
         ind = np.indices((n_pixels, n_samples))[1]
         r_ind = ind[:, ::-1]
