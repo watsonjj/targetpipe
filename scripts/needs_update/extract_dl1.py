@@ -54,8 +54,6 @@ class DL1Extractor(Tool):
 
         self.dead = None
 
-        self.output_dir = None
-
         self.tack = None
         self.sec = None
         self.ns = None
@@ -102,11 +100,6 @@ class DL1Extractor(Tool):
 
         self.dead = Dead()
 
-        self.output_dir = join(self.reader.output_directory, "extract_adc2pe")
-        if not exists(self.output_dir):
-            self.log.info("Creating directory: {}".format(self.output_dir))
-            makedirs(self.output_dir)
-
         n_events = self.reader.num_events
         first_event = self.reader.get_event(0)
         r1 = first_event.r1.tel[0].pe_samples[0]
@@ -128,7 +121,7 @@ class DL1Extractor(Tool):
         self.fwhm = np.zeros((n_events, n_pixels))
         self.rise_time = np.zeros((n_events, n_pixels))
         self.n_saturated = np.zeros((n_events, n_pixels))
-        #Justus:
+        # Justus:
         self.n_1pe = np.zeros((n_events, n_pixels))
         self.peak_height = np.zeros((n_events, n_pixels))
 
@@ -210,8 +203,6 @@ class DL1Extractor(Tool):
                 self.fwhm[ev] = fwhm
                 self.rise_time[ev] = rise_time
 
-                #print(self.tack[ev]-self.tack[ev-1])
-
     def finish(self):
         output_path = self.reader.input_path.replace("_r0.tio", "_dl1.npz")
         output_path = output_path.replace("_r1.tio", "_dl1.npz")
@@ -231,12 +222,13 @@ class DL1Extractor(Tool):
                  peak_time=self.peak_time,
                  n_saturated=self.n_saturated,
                  # Justus:
-                 n_1pe = self.n_1pe,
-                 peak_height = self.peak_height,
+                 n_1pe=self.n_1pe,
+                 peak_height=self.peak_height,
                  fwhm=self.fwhm,
                  rise_time=self.rise_time
                  )
         self.log.info("DL1 Numpy array saved to: {}".format(output_path))
+
 
 exe = DL1Extractor()
 exe.run()
