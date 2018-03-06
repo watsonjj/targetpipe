@@ -365,10 +365,10 @@ class ADC2PEPlots(Tool):
         #     df_list.append(df_run)
         #
         # df = pd.concat(df_list)
-        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
+        # store = pd.HDFStore('/Users/Jason/Downloads/linearity_events.h5')
         # store['df'] = df
         #
-        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
+        # store = pd.HDFStore('/Users/Jason/Downloads/linearity_events.h5')
         # df = store['df']
         #
         # df_mean = df.groupby(['type', 'level', 'pixel'], as_index=False).mean()
@@ -393,11 +393,11 @@ class ADC2PEPlots(Tool):
         #         err = self.fw_calibrator.get_illumination_err(level)
         #         data = np.column_stack([ill, err])
         #         df.loc[b, ['illumination', 'illumination_err']] = data
-        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
-        # store['df_ill'] = df
+        # store = pd.HDFStore('/Users/Jason/Downloads/linearity_events2.h5')
+        # store['df'] = df
 
-        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/linearity_events.h5')
-        df = store['df_ill']
+        store = pd.HDFStore('/Users/Jason/Downloads/linearity_events2.h5')
+        df = store['df']
 
         df_lj = df.loc[((df['type'] == 'LS62') &
                         (df['level'] <= 2850)) |
@@ -422,7 +422,7 @@ class ADC2PEPlots(Tool):
         self.p_rt_profile.create(x, y, [0.1, 1000], 20, True, "Pixel Area (p.e.)", "Rise Time (ns)")
         self.p_rt_profile.set_x_log()
 
-        self.p_scatter_pix.create("Illumination (p.e.)", "Charge (p.e.)", "Pixel Distribution")
+        self.p_scatter_pix.create("Illumination (p.e./pixel)", "Charge (p.e./pixel)", "Pixel Distribution")
         self.p_scatter_pix.set_x_log()
         self.p_scatter_pix.set_y_log()
         mapm_path = join(dirname(realpath(__file__)), "DynRange_MeasRW.txt")

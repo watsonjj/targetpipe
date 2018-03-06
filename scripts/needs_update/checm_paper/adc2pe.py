@@ -140,7 +140,7 @@ class ADC2PEPlotter(ChecmPaperPlotter):
                        split=True, scale='count', inner='quartile',
                        legend=False)
         # self.ax.set_title("SPE Values for different HV Settings")
-        self.ax.set_xlabel('HV')
+        self.ax.set_xlabel('HV (V)')
         self.ax.set_ylabel('SPE Value (V ns / p.e.)')
         self.ax.legend(loc="upper left")
 

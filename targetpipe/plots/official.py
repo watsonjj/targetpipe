@@ -9,7 +9,7 @@ from os.path import join, exists, dirname, splitext
 from os import makedirs
 import numpy as np
 import seaborn as sns
-
+from cycler import cycler
 
 class ChecmPaperPlotter(Component):
     type = CaStEn(['paper', 'talk'], 'paper',
@@ -47,6 +47,7 @@ class ChecmPaperPlotter(Component):
                                        "text.fontsize": 10,
                                        "lines.markeredgewidth": 1,
                                        })
+        mpl.rcParams['axes.prop_cycle'] = cycler(color='bgrcmyk')
 
         self.fig, self.ax = self.create_figure()
 
