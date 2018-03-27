@@ -92,7 +92,7 @@ class TMSPEFitPlotter(ChecmPaperPlotter):
 
         # Normalise histogram
         norm = np.sum(np.diff(edges, axis=1) * hist, axis=1)
-        hist_n = hist/norm[:, None]
+        hist_n = hist#/norm[:, None]
 
         # Roll axis for easier plotting
         hist_r = np.rollaxis(hist_n, 1)
@@ -105,7 +105,7 @@ class TMSPEFitPlotter(ChecmPaperPlotter):
         # self.ax.set_ylim(ymin=1e-4)
         # self.ax.set_title("SPE Spectrum, TM 24")
         self.ax.set_xlabel("Pulse Area ({})".format(x_unit))
-        self.ax.set_ylabel("Probability Density")
+        self.ax.set_ylabel("Counts")
 
         major_locator = MultipleLocator(x_major)
         # major_formatter = FormatStrFormatter('%d')
@@ -235,6 +235,15 @@ class ADC2PE1100VTMStatsPlotter(ChecmPaperPlotter):
         self.ax.xaxis.set_minor_locator(minor_locator)
 
 
+class Hist(ChecmPaperPlotter):
+    name = 'Hist'
+
+    def create(self, array, xlabel):
+        self.ax.hist(array, bins='auto', color='black')
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel('Counts')
+
+
 class ADC2PEPlots(Tool):
     name = "ADC2PEPlots"
     description = "Create plots related to adc2pe"
@@ -268,6 +277,11 @@ class ADC2PEPlots(Tool):
         self.p_adc2pe = None
         self.p_adc2pe_1100tm = None
         self.p_adc2pe_1100tm_stats = None
+        self.p_eped = None
+        self.p_eped_sigma = None
+        self.p_spe = None
+        self.p_spe_sigma = None
+        self.p_lambda = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -304,6 +318,11 @@ class ADC2PEPlots(Tool):
         self.p_adc2pe = ADC2PEPlotter(**kwargs, script=script, figure_name="adc2pe", shape='square')
         self.p_adc2pe_1100tm = ADC2PE1100VTMPlotter(**kwargs, script=script, figure_name="adc2pe_1100V_tms", shape='wide')
         self.p_adc2pe_1100tm_stats = ADC2PE1100VTMStatsPlotter(**kwargs, script=script, figure_name="adc2pe_1100V_tms_stats", shape='wide')
+        self.p_eped = Hist(**kwargs, script=script, figure_name="f_eped", shape='square')
+        self.p_eped_sigma = Hist(**kwargs, script=script, figure_name="f_eped_sigma", shape='square')
+        self.p_spe = Hist(**kwargs, script=script, figure_name="f_spe", shape='square')
+        self.p_spe_sigma = Hist(**kwargs, script=script, figure_name="f_spe_sigma", shape='square')
+        self.p_lambda = Hist(**kwargs, script=script, figure_name="f_lambda", shape='square')
 
     def start(self):
         n_events = self.reader.num_events
@@ -328,6 +347,12 @@ class ADC2PEPlots(Tool):
         edges_tm24_pe = np.zeros((64, self.fitter.nbins + 1))
         between_tm24_pe = np.zeros((64, self.fitter.nbins))
 
+        f_eped = np.zeros(n_pixels)
+        f_eped_sigma = np.zeros(n_pixels)
+        f_spe = np.zeros(n_pixels)
+        f_spe_sigma = np.zeros(n_pixels)
+        f_lambda = np.zeros(n_pixels)
+
         source = self.reader.read()
         desc = "Looping through file"
         for event in tqdm(source, total=n_events, desc=desc):
@@ -348,8 +373,6 @@ class ADC2PEPlots(Tool):
         for pix in trange(n_pixels, desc=desc):
             tm = pix // 64
             tmpix = pix % 64
-            if tm != 24:
-                continue
             if not self.fitter.apply(dl1[:, pix]):
                 self.log.warning("Pixel {} couldn't be fit".format(pix))
                 continue
@@ -359,9 +382,25 @@ class ADC2PEPlots(Tool):
                 between_pix1559 = self.fitter.between
                 fit_pix1559 = self.fitter.fit
                 fitx_pix1559 = self.fitter.fit_x
-            hist_tm24[tmpix] = self.fitter.hist
-            edges_tm24[tmpix] = self.fitter.edges
-            between_tm24[tmpix] = self.fitter.between
+            if tm == 24:
+                hist_tm24[tmpix] = self.fitter.hist
+                edges_tm24[tmpix] = self.fitter.edges
+                between_tm24[tmpix] = self.fitter.between
+            f_eped[pix] = self.fitter.coeff['eped']
+            f_eped_sigma[pix] = self.fitter.coeff['eped_sigma']
+            f_spe[pix] = self.fitter.coeff['spe']
+            f_spe_sigma[pix] = self.fitter.coeff['spe_sigma']
+            f_lambda[pix] = self.fitter.coeff['lambda_']
+
+        f_eped = checm_dac_to_volts(f_eped)
+        f_eped_sigma = checm_dac_to_volts(f_eped_sigma)
+        f_spe = checm_dac_to_volts(f_spe)
+        f_spe_sigma = checm_dac_to_volts(f_spe_sigma)
+        f_eped = self.dead.mask1d(f_eped).compressed()
+        f_eped_sigma = self.dead.mask1d(f_eped_sigma).compressed()
+        f_spe = self.dead.mask1d(f_spe).compressed()
+        f_spe_sigma = self.dead.mask1d(f_spe_sigma).compressed()
+        f_lambda = self.dead.mask1d(f_lambda).compressed()
 
         edges_pix1559 = checm_dac_to_volts(edges_pix1559)
         between_pix1559 = checm_dac_to_volts(between_pix1559)
@@ -413,12 +452,18 @@ class ADC2PEPlots(Tool):
         # Create figures
         self.p_pixelspe.create(hist_pix1559, edges_pix1559, between_pix1559,
                                fit_pix1559, fitx_pix1559)
-        self.p_tmspe.create(hist_tm24, edges_tm24, between_tm24, "V*ns")
+        self.p_tmspe.create(hist_tm24, edges_tm24, between_tm24, "V ns")
         self.p_tmspe_pe.create(hist_tm24_pe, edges_tm24_pe, between_tm24_pe,
                                "p.e.", 1)
         self.p_adc2pe.create(df)
         self.p_adc2pe_1100tm.create(df)
         self.p_adc2pe_1100tm_stats.create(df)
+        self.p_eped.create(f_eped, "Pedestal (V ns)")
+        self.p_eped_sigma.create(f_eped_sigma, "Pedestal Sigma (V ns)")
+        self.p_spe.create(f_spe, "SPE (V ns)")
+        self.p_spe_sigma.create(f_spe_sigma, "SPE Sigma (V ns)")
+        self.p_lambda.create(f_lambda, "Illumination (Photoelectrons)")
+
 
     def finish(self):
         # Save figures
@@ -428,6 +473,11 @@ class ADC2PEPlots(Tool):
         self.p_adc2pe.save()
         self.p_adc2pe_1100tm.save()
         self.p_adc2pe_1100tm_stats.save()
+        self.p_eped.save()
+        self.p_eped_sigma.save()
+        self.p_spe.save()
+        self.p_spe_sigma.save()
+        self.p_lambda.save()
 
 
 if __name__ == '__main__':

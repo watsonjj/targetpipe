@@ -171,6 +171,7 @@ class ADC2PEPlots(Tool):
         self.p_fwhm_profile = None
         self.p_rt_profile = None
         self.p_scatter_pix = None
+        self.p_tres_pix = None
         self.p_fwhm_pix = None
 
     def setup(self):
@@ -224,6 +225,7 @@ class ADC2PEPlots(Tool):
         self.p_fwhm_profile = Profile(**kwargs, script=script, figure_name="fwhm_profile")
         self.p_rt_profile = Profile(**kwargs, script=script, figure_name="rt_profile")
         self.p_scatter_pix = Scatter(**kwargs, script=script, figure_name="scatter_pix")
+        self.p_tres_pix = Scatter(**kwargs, script=script, figure_name="tres_pix")
         self.p_fwhm_pix = Scatter(**kwargs, script=script, figure_name="fwhm_pix")
 
     def start(self):
@@ -259,6 +261,7 @@ class ADC2PEPlots(Tool):
         #     dl1 = np.zeros((n_events, self.n_pixels))
         #     peak_height = np.zeros((n_events, self.n_pixels))
         #     peak_time = np.zeros((n_events, self.n_pixels))
+        #     peak_time_shifted = np.zeros((n_events, self.n_pixels))
         #     fwhm = np.zeros((n_events, self.n_pixels))
         #     rise_time = np.zeros((n_events, self.n_pixels))
         #     width = np.zeros((n_events, self.n_pixels))
@@ -335,9 +338,12 @@ class ADC2PEPlots(Tool):
         #         recovered_charge = 10 ** (ch ** 2)
         #     recovered_charge[width==0] = 0
         #
+        #     peak_time_shifted = peak_time - peak_time.mean(1)[:, None]
+        #
         #     dl1 = self.dead.mask2d(dl1).compressed()
         #     peak_height = self.dead.mask2d(peak_height).compressed()
         #     peak_time = self.dead.mask2d(peak_time).compressed()
+        #     peak_time_shifted = self.dead.mask2d(peak_time_shifted).compressed()
         #     fwhm = self.dead.mask2d(fwhm).compressed()
         #     rise_time = self.dead.mask2d(rise_time).compressed()
         #     width = self.dead.mask2d(width).compressed()
@@ -356,6 +362,7 @@ class ADC2PEPlots(Tool):
         #                  dl1=dl1,
         #                  peak_height=peak_height,
         #                  peak_time=peak_time,
+        #                  peak_time_shifted=peak_time_shifted,
         #                  fwhm=fwhm,
         #                  rise_time=rise_time,
         #                  width=width,
@@ -470,6 +477,21 @@ class ADC2PEPlots(Tool):
         self.p_scatter_pix.ax.set_xlim(left=0.5, right=3000)
         # self.p_scatter_pix.ax.set_ylim(bottom=0.5, top=3000)
 
+        self.p_tres_pix.create("Illumination (p.e./pixel)", "Time Resolution (ns)", "Pixel Timing Resolution")
+        self.p_tres_pix.set_x_log()
+        self.p_tres_pix.set_y_log()
+        df_plot = df_ljc.loc[(df_ljc['illumination'] > 1) & (df_ljc['dl1'] > 0.7)]
+        fmt = ['o', 'x']
+        for ip, p in enumerate(self.poi):
+            df_pix = df_plot.loc[df_plot['pixel'] == p]
+            df_gb = df_pix.groupby(['type', 'level'])
+            x = df_gb['illumination'].mean().values
+            y = df_gb['peak_time_shifted'].std().values
+            x_err = df_gb['illumination_err'].mean().values
+            label = "Pixel {}".format(p)
+            self.p_tres_pix.add(x, y, x_err, None, label, fmt=fmt[ip])
+        self.p_tres_pix.add_legend(1)
+
         self.p_fwhm_pix.create("Peak Height (p.e.)", "FWHM (ns)", "")
         self.p_fwhm_pix.set_x_log()
         df_plot = df_ljc.loc[(df_ljc['fwhm'] > 1) & (df_ljc['illumination'] > 1)]
@@ -498,6 +520,7 @@ class ADC2PEPlots(Tool):
         self.p_fwhm_profile.save()
         self.p_rt_profile.save()
         self.p_scatter_pix.save()
+        self.p_tres_pix.save()
         self.p_fwhm_pix.save()
 
 if __name__ == '__main__':

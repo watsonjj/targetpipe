@@ -491,10 +491,10 @@ class TimingExtractor(Tool):
         #         df_list.append(d)
         #
         # self.df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/timing.h5')
+        # store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
         # store['df'] = self.df
 
-        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/timing.h5')
+        store = pd.HDFStore('/Users/Jason/Downloads/timing.h5')
         self.df = store['df']
 
     def finish(self):
