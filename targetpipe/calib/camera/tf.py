@@ -86,7 +86,7 @@ class TFApplier(Component):
             Size = (n_pix, n_cells).
 
         """
-        tf = np.array(self.calibrator.GetTf())
-        adc_min = self.calibrator.GetAdcMin()
-        adc_step = self.calibrator.GetAdcStep()
-        return tf, adc_min, adc_step
+        reader = target_calib.TFArrayReader(self.tf_path)
+        tf = np.array(reader.GetTF())
+        steps = np.array(reader.GetAdcPoints())
+        return tf, steps

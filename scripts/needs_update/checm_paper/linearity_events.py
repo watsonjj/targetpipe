@@ -460,7 +460,7 @@ class ADC2PEPlots(Tool):
             self.p_scatter_pix.add(x, y, x_err, y_err, label, fmt=fmt[ip])
         p = 1825
         df_pix = df_plot.loc[df_plot['pixel'] == p]
-        df_pix = df_pix[df_pix["width"]!=0]
+        df_pix = df_pix[(df_pix["width"]!=0) & (df_pix["illumination"] > 150)]
         df_gb = df_pix.groupby(['type', 'level'])
         x = df_gb['illumination'].mean().values
         y = df_gb['recovered_charge'].mean().values

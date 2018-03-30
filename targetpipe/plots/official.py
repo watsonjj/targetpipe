@@ -37,16 +37,26 @@ class ChecmPaperPlotter(Component):
         """
         super().__init__(config=config, parent=tool, **kwargs)
 
-        sns.set_style("white")
-        sns.set_style("ticks")
-        sns.set_context(self.type, rc={"font.famly": "Helvetica",
-                                       "font.size":10,
-                                       "axes.titlesize":10,
-                                       "axes.labelsize":10,
-                                       "legend.fontsize": 10,
-                                       "text.fontsize": 10,
-                                       "lines.markeredgewidth": 1,
-                                       })
+        # sns.set_style("white")
+        # sns.set_style("ticks")
+        # sns.set_context(self.type, rc={"font.famly": "Helvetica",
+        #                                "font.size":10,
+        #                                "axes.titlesize":10,
+        #                                "axes.labelsize":10,
+        #                                "legend.fontsize": 10,
+        #                                "text.fontsize": 10,
+        #                                "lines.markeredgewidth": 1,
+        #                                })
+        sns.set(self.type, style='ticks', rc={
+            "font.family": [u"Helvetica"],
+            "xtick.labelsize": 8,
+            "ytick.labelsize": 8,
+            "font.size": 10,
+            "axes.titlesize": 10,
+            "axes.labelsize": 10,
+            "legend.fontsize": 10,
+            "lines.markeredgewidth": 1
+        })
         mpl.rcParams['axes.prop_cycle'] = cycler(color='bgrcmyk')
 
         self.fig, self.ax = self.create_figure()

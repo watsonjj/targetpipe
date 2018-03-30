@@ -42,8 +42,7 @@ class TFPlotter(ChecmPaperPlotter):
         """
         super().__init__(config=config, tool=tool, **kwargs)
 
-    def create(self, tf, tf_single, tf_min, tf_max, adc_min, adc_step, title):
-        x = adc_min + np.arange(tf_min.size) * adc_step
+    def create(self, tf, tf_single, tf_min, tf_max, x, title):
         self.ax.fill_between(x, tf_min, tf_max, color='black', label='All Cells')
         # self.ax.plot(x, tf_avg, color='grey', label='Average', lw=2)
         self.ax.plot(x, tf_single, color='grey', label='Single Cell', lw=2)
@@ -275,7 +274,7 @@ class TFInvestigator(Tool):
         #         self.r1_p.calibrate(event)
         #         wfs_p[ev] = event.r1.tel[0].pe_samples[0]
         #         self.r1_t.calibrate(event)
-        #         wfs_t[ev] = checm_dac_to_mv(event.r1.tel[0].pe_samples[0])
+        #         wfs_t[ev] = checm_dac_to_volts(event.r1.tel[0].pe_samples[0])
         #
         #     desc3 = "Aggregate information per pixel"
         #     for pix in trange(self.n_pixels, desc=desc3):
@@ -322,21 +321,21 @@ class TFInvestigator(Tool):
         #                         ))
         #
         # df = pd.DataFrame(df_list)
-        # store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/tf.h5')
+        # store = pd.HDFStore('/Users/Jason/Downloads/tf.h5')
         # store['df'] = df
 
-        store = pd.HDFStore('/Volumes/gct-jason/plots/checm_paper/df/tf.h5')
+        store = pd.HDFStore('/Users/Jason/Downloads/tf.h5')
         df = store['df']
 
         # Get TF
-        tf, adc_min, adc_step = self.tf.get_tf()
+        tf, steps = self.tf.get_tf()
         tf = checm_dac_to_volts(np.array(tf))
 
         # Create Plots
         tf_min = np.min(tf, axis=(0,1,2))
         tf_max = np.max(tf, axis=(0,1,2))
         title = "Transfer Function Range, Whole Camera"
-        self.p_tf.create(tf, tf[10,10,0], tf_min, tf_max, adc_min, adc_step, title)
+        self.p_tf.create(tf, tf[10,10,0], tf_min, tf_max, steps, title)
         for pix, f in self.p_range_sp.items():
             if pix == -1:
                 continue
@@ -346,7 +345,7 @@ class TFInvestigator(Tool):
             tf_min = np.min(tf_pix, axis=0)
             tf_max = np.max(tf_pix, axis=0)
             title = "Transfer Function Range, Pixel = {}".format(pix)
-            f.create(tf_pix, tf_pix[0], tf_min, tf_max, adc_min, adc_step, title)
+            f.create(tf_pix, tf_pix[0], tf_min, tf_max, steps, title)
 
         for (vped, pix), f in self.p_hist_vp.items():
             df_vp = df.loc[(df['vped'] == vped) & (df['pixel'] == pix)]
