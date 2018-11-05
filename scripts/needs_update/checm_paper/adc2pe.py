@@ -96,6 +96,12 @@ class TMSPEFitPlotter(ChecmPaperPlotter):
 
         # Roll axis for easier plotting
         hist_r = np.rollaxis(hist_n, 1)
+
+        np.savez(self.figure_name + ".npz", hist=hist, edges=edges, between=between)
+
+        # from IPython import embed
+        # embed()
+
         nbins, npix = hist_r.shape
         e = edges[0]
         hist_tops = np.insert(hist_r, np.arange(nbins), hist_r, axis=0)
@@ -282,6 +288,7 @@ class ADC2PEPlots(Tool):
         self.p_spe = None
         self.p_spe_sigma = None
         self.p_lambda = None
+        self.p_enf = None
 
     def setup(self):
         self.log_format = "%(levelname)s: %(message)s [%(name)s.%(funcName)s]"
@@ -323,6 +330,7 @@ class ADC2PEPlots(Tool):
         self.p_spe = Hist(**kwargs, script=script, figure_name="f_spe", shape='square')
         self.p_spe_sigma = Hist(**kwargs, script=script, figure_name="f_spe_sigma", shape='square')
         self.p_lambda = Hist(**kwargs, script=script, figure_name="f_lambda", shape='square')
+        self.p_enf = Hist(**kwargs, script=script, figure_name="f_enf", shape='square')
 
     def start(self):
         n_events = self.reader.num_events
@@ -463,7 +471,8 @@ class ADC2PEPlots(Tool):
         self.p_spe.create(f_spe, "SPE (V ns)")
         self.p_spe_sigma.create(f_spe_sigma, "SPE Sigma (V ns)")
         self.p_lambda.create(f_lambda, "Illumination (Photoelectrons)")
-
+        enf = np.sqrt(f_spe_sigma**2 - f_eped_sigma**2)/f_spe
+        self.p_enf.create(enf, "Relative SPE Width")
 
     def finish(self):
         # Save figures
@@ -478,6 +487,7 @@ class ADC2PEPlots(Tool):
         self.p_spe.save()
         self.p_spe_sigma.save()
         self.p_lambda.save()
+        self.p_enf.save()
 
 
 if __name__ == '__main__':

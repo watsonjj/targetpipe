@@ -137,7 +137,8 @@ class CHECSSPEFitter(ChargeFitter):
         self.add_parameter("lambda_", 1, 0, 5)
         self.add_parameter("opct", 0.5, 0, 1)
         self.add_parameter("pap", 0.5, 0, 1)
-        self.add_parameter("dap", 0.5, 0, 1)
+        self.add_parameter("dap1", 0.5, 0, 1)
+        self.add_parameter("dap2", 0.5, 0, 1)
 
         self.pedestal_signal = sipm_pedestal
         self.pe_signal = sipm_pe
@@ -148,8 +149,8 @@ class CHECSSPEFitter(ChargeFitter):
             self.subfit_labels.append('{}pe'.format(pe))
 
     @staticmethod
-    def fit_function(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap):
-        return sipm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap)
+    def fit_function(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2):
+        return sipm_spe_fit(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2)
 
     def _perform_fit(self, hist, edges, between):
         self.p0 = self.initial.copy()
@@ -166,8 +167,8 @@ class CHECSSPEFitter(ChargeFitter):
         if fix is None:
             fix = {}
 
-        def minimizehist(norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap):
-            p = self.fit_function(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap)
+        def minimizehist(norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2):
+            p = self.fit_function(x, norm, eped, eped_sigma, spe, spe_sigma, lambda_, opct, pap, dap1, dap2)
             like = -2 * poisson.logpmf(y, p)
             return np.nansum(like)
 

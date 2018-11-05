@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator
-from target_io import TargetIOEventReader as TIOReader
+from target_io import WaveformArrayReader as TIOReader
 from target_io import T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
 from scipy import interpolate
 from scipy.ndimage import correlate1d
@@ -35,9 +35,7 @@ class Reader:
     def __init__(self, path):
         self.path = path
 
-        self.reader = TIOReader(self.path, N_CELLS,
-                                SKIP_SAMPLE, SKIP_END_SAMPLE,
-                                SKIP_EVENT, SKIP_END_EVENT)
+        self.reader = TIOReader(self.path, SKIP_SAMPLE, SKIP_END_SAMPLE)
 
         self.is_r1 = self.reader.fR1
         if not self.is_r1:
@@ -49,7 +47,7 @@ class Reader:
         self.n_modules = self.reader.fNModules
         self.n_tmpix = self.n_pix // self.n_modules
         self.n_samples = self.reader.fNSamples
-        self.n_cells = self.reader.fNCells
+        # self.n_cells = self.reader.fNCells
 
         self.max_blocksinwf = self.n_samples // N_BLOCKSAMPLES + 1
         self.samples = np.zeros((self.n_pix, self.n_samples), dtype=np.float32)

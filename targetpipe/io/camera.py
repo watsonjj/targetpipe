@@ -2,7 +2,7 @@ import numpy as np
 from astropy import log
 from os.path import dirname, realpath, join
 from target_io import T_SAMPLES_PER_WAVEFORM_BLOCK as N_BLOCKSAMPLES
-from target_calib import MappingModule, MappingCHEC
+# from target_calib import MappingModule, MappingCHEC
 
 
 class Borg:
@@ -52,8 +52,8 @@ class Config(Borg):
             )
 
             if not camera_id:
-                self.id = 'checs'
-                # self.id = 'checm'
+                # self.id = 'checs'
+                self.id = 'checm'
 
         if camera_id:
             self.id = camera_id
@@ -112,8 +112,8 @@ class Config(Borg):
         self.n_pix = 2048
         self.dead_pixels = []
         self.optical_foclen = 2.283
-        mapping = MappingCHEC()
-        self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
+        # mapping = MappingCHEC()
+        # self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
         self.ref_pulse_path = join(self.dir, 'checm_reference_pulse.npz')  # TODO
         self.n_rows = 8
         self.n_columns = 16
@@ -124,7 +124,7 @@ class Config(Borg):
 
     def _case_checs_single(self):
         self._case_checs()
-        mapping = MappingModule()
-        self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
+        # mapping = MappingModule()
+        # self.pixel_pos = np.vstack([mapping.GetXPixVector(), mapping.GetYPixVector()])
         self.n_pix = 64
         self.dead_pixels = []

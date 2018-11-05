@@ -87,14 +87,14 @@ class Scatter(ChecmPaperPlotter):
 
     def set_x_log(self):
         self.ax.set_xscale('log')
-        self.ax.get_xaxis().set_major_formatter(FuncFormatter(lambda x, _: '{:g}'.format(x)))
+        # self.ax.get_xaxis().set_major_formatter(FuncFormatter(lambda x, _: '{:g}'.format(x)))
 
     def set_y_log(self):
         self.ax.set_yscale('log')
-        self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
+        # self.ax.get_yaxis().set_major_formatter(FuncFormatter(lambda y, _: '{:g}'.format(y)))
 
-    def add_legend(self, loc=2):
-        self.ax.legend(loc=loc, prop={'size': 8})
+    def add_legend(self, loc=2, **kwargs):
+        self.ax.legend(loc=loc, **kwargs)
 
 
 class Profile(ChecmPaperPlotter):
@@ -473,7 +473,7 @@ class ADC2PEPlots(Tool):
         label = "Pixel {}, Saturation-Recovered".format(p)
         self.p_scatter_pix.add(x, y, x_err, y_err, label, fmt='v')
         self.p_scatter_pix.add_xy_line()
-        self.p_scatter_pix.add_legend()
+        self.p_scatter_pix.add_legend(4, markerfirst=False)
         self.p_scatter_pix.ax.set_xlim(left=0.5, right=3000)
         # self.p_scatter_pix.ax.set_ylim(bottom=0.5, top=3000)
 

@@ -100,6 +100,7 @@ class ChecmPaperPlotter(Component):
             self.log.info("Creating directory: {}".format(output_dir))
             makedirs(output_dir)
 
+        self.fig.tight_layout()
         self.fig.savefig(output_path, bbox_inches='tight')
         self.log.info("Figure saved to: {}".format(output_path))
 
