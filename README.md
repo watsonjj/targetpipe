@@ -1,12 +1,12 @@
-targetpipe
+# targetpipe
 
 A python module to read in CHEC data through target_io.py into the event
 containers defined in ctapipe (The CTA Pipeline python module). This allows
 CHEC data to be analaysed using methods defined in ctapipe, and is the first
 step to fully integrating the offline analysis into ctapipe.
 
-INSTALLATION
-------------
+## Installation
+
 Installation of all software (ctapipe, its requirements, and TargetIO) must
 be done in the same conda environment created in the ctapipe installation
 instructions!
@@ -14,8 +14,8 @@ instructions!
 This script is installed alongside TargetIO when 'make install' is executed,
 assuming the cmake argument -DPYTHON=ON has been used.
 
-REQUIREMENTS
-------------
+## Requirements
+
 - ctapipe -
 https://cta-observatory.github.io/ctapipe/getting_started/index.html
 
